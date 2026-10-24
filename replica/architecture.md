@@ -37,7 +37,7 @@ Tables: 36 (+3 views). Full SQL in `schema.sql`. Access rules: row level securit
 | availability | availability_periods (+ availability_public view) | away, injured, vacation; teammates see "unavailable", only staff see the reason |
 | schedule | seasons, venues, event_series, events, event_managers | types: training, match, tournament, social; competition: league, cup, friendly; one open season per team; an event manager runs one event without team-wide rights |
 | answers | rsvps (+ rsvps_public view) | answer for yourself; staff can set one for a player; notes for staff only |
-| attendance | attendance | present, late (minutes), absent, excused; recorded by staff or the event manager |
+| attendance | attendance | present, late (minutes), absent, excused; recorded by staff or the event manager, or by the player's geo check-in (`method`, `checked_in_at`, `distance_m`, `accuracy_m`; never coordinates) |
 | results | scores, match_events | live score with compare-and-set version; goals, assists, cards, wickets |
 | player of the match | potm_votes (+ potm_results view) | one vote, only if you played, never for yourself; results shown after voting closes |
 | points | points_ledger | off unless the team turns it on; automatic rows once per event and reason; manual rows by staff with a note |
@@ -55,6 +55,7 @@ Tables: 36 (+3 views). Full SQL in `schema.sql`. Access rules: row level securit
 - a player answers for themselves but not a teammate; can't add events, record attendance, give themselves points or read the staff chat
 - a captain can add trainings but not matches without that permission, records attendance, adds manual points
 - an event manager records attendance for their own trip but not another game
+- geo check-in: 37 m from the pitch 5 min after start → present; 25 min after → late 25; 3.7 km away, a ±900 m fix, or 3 hours early → refused with a plain message; checking in twice keeps the first time; a captain's mark is never overwritten; a player can't edit their own row; a club owner not on the roster can't check in
 - a teammate sees a player is unavailable but not that they're injured or why; the captain sees the reason
 - a full car rejects another rider
 - a player sees only their own dues, can report an e-Transfer, can't mark it verified; a captain without the payments permission sees no dues; the club treasurer verifies
@@ -73,7 +74,7 @@ Reads go through the Supabase client under RLS. Multi-row writes and anything th
 | schedule | `createEvent` (one-off or weekly), `updateEvent`, `setEventStatus`, `assignEventManager` |
 | availability | `setAvailability`, `clearAvailability` (player or staff) |
 | answers | RLS upsert `rsvps`; GET `/r/[signed]` one-tap from email; `remindNoReplies` |
-| attendance | `saveAttendance` (whole squad at once; computes points in the same transaction) |
+| attendance | `saveAttendance` (whole squad at once; computes points in the same transaction), `checkIn(eventId, lat, lng, accuracy)` → `rpc('check_in')`, then awards points for that row |
 | results | `updateScore` (versioned), `addMatchEvent`, `finishMatch`, `openPotmVoting`, `closePotmVoting` (awards points) |
 | carpools | `offerRide`, `requestRide`, `assignRider`, `markPickedUp`, `cancelRide` |
 | dues | `createFee` (for all or chosen players), `waiveDue`, `reportPayment` (player), `recordPayment` / `verifyPayment` (payments permission), `sendDuesReminders` |
@@ -91,7 +92,19 @@ Jobs: `send-outbox` (every minute), `event-reminders` (every 15 min; skips playe
 - **Races:** two scorers (version check), two riders taking the last seat (trigger with row lock), attendance saved twice (upsert).
 - **Points fairness:** rules are explicit numbers, every change is a ledger row with a reason, and staff edits need a note. Show players how their total was earned.
 - **Money:** this version only records payments made elsewhere. No card data ever touches the app. Verification is limited to the payments permission or the club treasurer.
-- **Privacy:** health notes and injury reasons are staff-only. Location for carpools is a typed meeting point, not GPS. GPS pickup confirmation (from the AKFC list) is deferred: if added, capture location once at "I've arrived", never track continuously, and get consent first.
+- **Privacy:** health notes and injury reasons are staff-only. Location for carpools is a typed meeting point, not GPS.
+
+### Geo-tagged attendance
+
+- **Off by default**, turned on per team (`teams.geo_checkin_enabled`). Each venue needs a map pin and a radius (default 150 m, 50–1000).
+- **One fix, when the player taps "I'm here".** The browser asks for location permission at that moment (`navigator.geolocation.getCurrentPosition`, high accuracy, 10 s timeout). No background tracking, no location history, no map of players.
+- **Distance is worked out in the database** (`check_in`, security definer, haversine). Only the distance and accuracy are stored; the coordinates are dropped.
+- **Window:** 60 minutes before the start until the end. Present if checked in less than `late_after_minutes` after the start, otherwise late with the minutes.
+- **Refused** when too far away, the fix is rougher than ±200 m, the event is cancelled, or the team has it off. Every refusal says what to do: "You're 3,699 m from Club grounds", "Step outside and try again, or ask your captain".
+- **Captain's mark wins.** Check-in never overwrites a staff row; staff can still change a geo row. A player can't edit their own row.
+- **Spoofing:** a determined player can fake a browser location. Check-ins are evidence, not proof: the captain's attendance screen shows "Checked in 9:56 · 37 m" next to each name so odd ones stand out, and captains have the final say. Native app builds can add mock-location detection later.
+- **Consent copy** on first use: "We check your location once, only when you tap I'm here, to confirm you're at the venue. We keep the distance, not where you were."
+- **Reminder push** ("Kick-off in 15 min. Tap to check in") is sent only to players who answered Going and haven't checked in.
 - **Notifications:** queue fan-out; iPhone push needs the home-screen install; cancellations always send.
 - **Email deliverability:** SPF, DKIM and DMARC on the sending domain before the first invite.
 - **Deletion (PIPEDA):** deleting an account removes private info and answers; chat keeps text as "Former member"; ledger and payment rows keep amounts with the name removed, so club totals still add up.
@@ -102,5 +115,5 @@ Jobs: `send-outbox` (every minute), `event-reminders` (every 15 min; skips playe
 2. **Must-haves:** roster and roles, schedule with edit and cancel, availability, RSVP and Who's coming, attendance, team chat, push, home.
 3. **Club accounts:** club setup and look, join page, club admin, treasurer.
 4. **Should-haves:** dues, seasons, carpools, results and player of the match, points and leaderboard, subject messages, calendar feeds, exports.
-5. **Could-haves:** analytics dashboard, follow a team, membership cards and sponsor rewards, GPS pickup confirmation.
+5. **Could-haves:** analytics dashboard, follow a team, membership cards and sponsor rewards, GPS pickup confirmation for carpools (reuse the check-in approach: one fix at pickup).
 6. **Fixes from replica-entrepreneur.**

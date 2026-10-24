@@ -63,6 +63,9 @@ Players own their accounts and answer for themselves,roster,must,yes,partial,sam
 "Mark yourself away, injured or on vacation",availability,must,no,no,teammates see unavailable; reason is staff-only; reminders skip you
 "Take attendance: present, late (minutes), absent, excused",attendance,must,partial,no,what happened vs what was said
 Attendance history and rate per player,attendance,should,partial,no,player profile and team stats
+Geo check-in: player taps I'm here at the venue,attendance,should,no,no,"off by default per team; one location fix; within venue radius; present or late from the time; stores distance not coordinates"
+Venue map pin and check-in radius,schedule,should,partial,no,default 150 m
+Check-in reminder push before kick-off,notifications,could,no,no,only to Going players not yet checked in
 "Event manager for one event (away trip, tournament)",roster,should,no,no,"attendance, scoring, carpools for that event only"
 Staff-only chat,chat,should,no,no,captains and coaches
 Reply to a message in chat,chat,should,no,no,
@@ -80,4 +83,4 @@ Dues reminders,dues,could,no,no,"weekly, opt-in per fee"
 Club and team stats dashboard,analytics,could,partial,no,"attendance trends, dues collected, carpool use"
 Digital membership card,membership,could,no,no,later
 Sponsor offers and rewards,membership,could,no,no,later; revenue for clubs
-GPS pickup confirmation,carpools,could,no,skip,deferred: privacy review first; capture once at arrival if built
+GPS pickup confirmation,carpools,could,no,no,reuse geo check-in: one fix at pickup

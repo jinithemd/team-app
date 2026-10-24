@@ -117,3 +117,42 @@ insert into points_ledger(team_id,user_id,points,reason,note,created_by) values 
 \echo [ok] captain adds manual points
 \echo captain can read the staff chat (1):
 select count(*) from conversations where kind='staff';
+
+\echo == Geo check-in
+reset role;
+update teams set geo_checkin_enabled=true where id='20000000-0000-0000-0000-000000000001';
+insert into venues(id,team_id,name,lat,lng,check_in_radius_m) values ('80000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Club grounds',44.2312,-76.4860,150);
+insert into events(id,team_id,type,start_at,end_at,tz,venue_id) values
+ ('30000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000001','training',now()-interval '5 minutes',now()+interval '85 minutes','America/Toronto','80000000-0000-0000-0000-000000000001'),
+ ('30000000-0000-0000-0000-000000000004','20000000-0000-0000-0000-000000000001','training',now()-interval '25 minutes',now()+interval '65 minutes','America/Toronto','80000000-0000-0000-0000-000000000001'),
+ ('30000000-0000-0000-0000-000000000005','20000000-0000-0000-0000-000000000001','training',now()+interval '3 hours',now()+interval '4 hours','America/Toronto','80000000-0000-0000-0000-000000000001');
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000b1';
+\echo Rahul checks in 40 m from the pitch, 5 min after start (present):
+select * from check_in('30000000-0000-0000-0000-000000000003',44.2315,-76.4858,12);
+\echo checks in again from the car park later: first check-in stands (present):
+select status from check_in('30000000-0000-0000-0000-000000000003',44.2318,-76.4862,10);
+\echo stored row has distance and accuracy, no coordinates (geo, 12):
+select method, accuracy_m from attendance where event_id='30000000-0000-0000-0000-000000000003';
+\echo [expect fail] check in from home, 3 km away:
+select * from check_in('30000000-0000-0000-0000-000000000004',44.2553,-76.5180,10);
+\echo [expect fail] rough fix (± 900 m):
+select * from check_in('30000000-0000-0000-0000-000000000004',44.2312,-76.4860,900);
+\echo [expect fail] too early, 3 hours before:
+select * from check_in('30000000-0000-0000-0000-000000000005',44.2312,-76.4860,10);
+\echo arrives 25 min after start (late, 25):
+select * from check_in('30000000-0000-0000-0000-000000000004',44.2312,-76.4860,8);
+\echo [expect fail] player edits their geo row to present:
+update attendance set status='present', minutes_late=null where event_id='30000000-0000-0000-0000-000000000004' returning 1;
+\echo (0 rows above means blocked)
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+\echo captain marks Sana excused, then Sana checks in: captain mark stands (excused):
+insert into attendance(event_id,user_id,status,recorded_by) values ('30000000-0000-0000-0000-000000000003','00000000-0000-0000-0000-0000000000b2','excused','00000000-0000-0000-0000-0000000000c0');
+set request.jwt.sub='00000000-0000-0000-0000-0000000000b2';
+select status from check_in('30000000-0000-0000-0000-000000000003',44.2312,-76.4860,8);
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a0';
+\echo [expect fail] club owner not on the roster checks in:
+select * from check_in('30000000-0000-0000-0000-000000000003',44.2312,-76.4860,8);
+\echo captain sees both check-ins with method (2):
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+select count(*) from attendance where method='geo';

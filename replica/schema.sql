@@ -95,6 +95,8 @@ create table teams (
   -- Points: off unless the team turns it on. Rules are numbers, applied when attendance is recorded.
   points_enabled boolean not null default false,
   points_public boolean not null default true,  -- leaderboard visible to the whole team
+  -- Geo check-in: off unless the team turns it on. Players tap "I'm here" at the venue.
+  geo_checkin_enabled boolean not null default false,
   points_rules jsonb not null default '{"training":1,"match":2,"away_bonus":10,"late_penalty":-1,"late_after_minutes":15,"excused":0,"potm":3}',
   created_by uuid not null references profiles(id) on delete restrict,
   archived_at timestamptz,
@@ -180,10 +182,13 @@ create table venues (
   team_id uuid not null references teams(id) on delete cascade,
   name text not null,
   address text,
-  lat double precision,
-  lng double precision,
+  lat double precision check (lat between -90 and 90),
+  lng double precision check (lng between -180 and 180),
+  -- How close counts as "at the venue". Big parks need more than a gym.
+  check_in_radius_m int not null default 150 check (check_in_radius_m between 50 and 1000),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint lat_lng_together check ((lat is null) = (lng is null))
 );
 create index on venues (team_id);
 
@@ -266,13 +271,80 @@ create table attendance (
   user_id uuid not null references profiles(id) on delete cascade,
   status text not null check (status in ('present','late','absent','excused')),
   minutes_late int check (minutes_late between 0 and 600),
+  -- 'geo' = the player checked in at the venue; 'staff' = a captain or event manager marked it.
+  -- We keep how far away and how accurate the fix was, never the coordinates themselves.
+  method text not null default 'staff' check (method in ('staff','geo')),
+  checked_in_at timestamptz,
+  distance_m int check (distance_m >= 0),
+  accuracy_m int check (accuracy_m >= 0),
   recorded_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   primary key (event_id, user_id),
-  constraint late_has_minutes check (status <> 'late' or minutes_late is not null)
+  constraint late_has_minutes check (status <> 'late' or minutes_late is not null),
+  constraint geo_has_fix check (method <> 'geo' or (checked_in_at is not null and distance_m is not null and accuracy_m is not null))
 );
 create index on attendance (user_id);
+
+-- Geo check-in. The phone sends one location fix; we work out the distance here and store only
+-- the distance and accuracy. Opens 60 minutes before the start and closes at the end.
+-- A mark a captain already made wins: check-in never overwrites a staff row.
+create or replace function check_in(p_event uuid, p_lat double precision, p_lng double precision, p_accuracy_m double precision)
+returns table (status text, minutes_late int, distance_m int)
+language plpgsql security definer set search_path = public as $$
+#variable_conflict use_column
+declare
+  e events%rowtype; v venues%rowtype; t teams%rowtype;
+  d double precision; late_after int; mins int; st text; existing attendance%rowtype;
+begin
+  if auth.uid() is null then raise exception 'Sign in first' using errcode = 'insufficient_privilege'; end if;
+  select * into e from events where id = p_event;
+  if not found then raise exception 'Event not found' using errcode = 'no_data_found'; end if;
+  select * into t from teams where id = e.team_id;
+  if not exists (select 1 from roster_members r where r.team_id = e.team_id and r.user_id = auth.uid()
+                 and r.status = 'active' and r.is_player) then
+    raise exception 'Only players on this team can check in' using errcode = 'insufficient_privilege';
+  end if;
+  if not t.geo_checkin_enabled then raise exception 'Check-in is off for this team' using errcode = 'check_violation'; end if;
+  if e.status <> 'active' then raise exception 'This event is %', e.status using errcode = 'check_violation'; end if;
+  if now() < e.start_at - interval '60 minutes' then raise exception 'Check-in opens an hour before the start' using errcode = 'check_violation'; end if;
+  if now() > e.end_at then raise exception 'Check-in has closed' using errcode = 'check_violation'; end if;
+  select * into v from venues where id = e.venue_id;
+  if v.lat is null then raise exception 'This venue has no map pin yet' using errcode = 'check_violation'; end if;
+  if p_lat is null or p_lng is null or p_lat not between -90 and 90 or p_lng not between -180 and 180 then
+    raise exception 'Bad location' using errcode = 'invalid_parameter_value';
+  end if;
+  if p_accuracy_m is null or p_accuracy_m > 200 then
+    raise exception 'Your location is too rough (± % m). Step outside and try again, or ask your captain.', round(coalesce(p_accuracy_m, 0))
+      using errcode = 'check_violation';
+  end if;
+  -- Haversine, metres.
+  d := 2 * 6371000 * asin(sqrt(
+         power(sin(radians(p_lat - v.lat) / 2), 2)
+       + cos(radians(v.lat)) * cos(radians(p_lat)) * power(sin(radians(p_lng - v.lng) / 2), 2)));
+  if d > v.check_in_radius_m then
+    raise exception 'You''re % m from %. Check in when you get there.', round(d), v.name using errcode = 'check_violation';
+  end if;
+
+  select * into existing from attendance a where a.event_id = p_event and a.user_id = auth.uid();
+  if found and existing.method = 'staff' then
+    return query select existing.status, existing.minutes_late, round(d)::int;
+    return;
+  end if;
+  if found and existing.method = 'geo' then   -- already checked in: first check-in time stands
+    return query select existing.status, existing.minutes_late, existing.distance_m;
+    return;
+  end if;
+
+  late_after := coalesce((t.points_rules->>'late_after_minutes')::int, 15);
+  mins := greatest(0, floor(extract(epoch from (now() - e.start_at)) / 60))::int;
+  st := case when mins >= late_after then 'late' else 'present' end;
+  insert into attendance (event_id, user_id, status, minutes_late, method, checked_in_at, distance_m, accuracy_m, recorded_by)
+  values (p_event, auth.uid(), st, case when st = 'late' then mins end, 'geo', now(), round(d)::int, round(p_accuracy_m)::int, auth.uid());
+  return query select st, case when st = 'late' then mins end, round(d)::int;
+end $$;
+revoke all on function check_in(uuid, double precision, double precision, double precision) from public;
+grant execute on function check_in(uuid, double precision, double precision, double precision) to authenticated;
 
 -- Live score and result.
 create table scores (
