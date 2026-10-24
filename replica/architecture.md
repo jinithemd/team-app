@@ -1,201 +1,106 @@
-# Architecture: team management app (a rebuild of SportsEngine Team Management's core features)
+# Architecture: team and club app for adult players
 
-Working name only; replica-brand picks the real one. Reads `recon.md` and `features.csv`.
-Web first (mobile-first PWA). A native Expo app can come later and reuse the same Supabase backend.
+A rebuild of SportsEngine Team Management's core loop (schedule, RSVP, chat), refocused on **adult players and clubs** and extended with club operations taken from the Athletic Kerala FC feature list: attendance, availability, carpools, dues, seasons, points, results and player of the match. Platform name is a placeholder ("Areno") until the brand is chosen.
+
+**What changed from the first plan:** no kids, guardians or households. Every player has their own account and answers for themselves. Captains, coaches and managers are players or members with permissions.
 
 ## Stack
 
 | layer | choice | why |
 | --- | --- | --- |
-| web | Next.js (App Router) + TypeScript | server actions for writes, best-documented React framework for building with AI help |
-| styling | Tailwind + tokens from replica-design | fast to iterate on mobile layouts; tokens keep the rebrand in one file |
-| database | Postgres on Supabase | rosters, guardians and RSVPs are relational; RLS enforces "who can see which kid" in the database |
-| ORM | Supabase JS client + generated types (Drizzle only if queries get complex) | RLS works through the client automatically; one less layer |
-| auth | Supabase Auth (email magic link + password, Google) | same database as the data, so `auth.uid()` drives every policy |
-| realtime | Supabase Realtime (Postgres changes + presence) | chat, live scores and RSVP counts without running a socket server |
-| files | Supabase Storage (private bucket per team, signed URLs) | chat photos/videos and avatars behind the same access rules |
-| push | Web Push (VAPID) via the `web-push` npm package | free, works on Android/desktop, and on iPhone once the PWA is added to the home screen |
-| email | Resend | simple API, React email templates, good deliverability for invites and RSVP links |
-| SMS | none at launch; Twilio later (a "could" row) | per-message cost, and Canadian sender registration takes time |
-| jobs | Supabase pg_cron + Edge Functions | runs every minute on the free tier (Vercel Hobby cron is daily only) |
-| payments | none in this slice; Stripe Billing later for club plans | HQ-style registration/billing is out of scope |
-| hosting | Vercel | zero-config for Next.js App Router; Netlify also works if you'd rather stay there |
-| monitoring | Sentry (free tier) + Supabase logs | catch failed sends and RLS errors early |
-
-Not reused from Areno's FastAPI + MongoDB stack on purpose: this app is mostly permissions over related rows (guardian → kid → roster → event → RSVP), which Postgres + RLS handles in one place, and Supabase gives realtime chat, auth and storage without extra services.
+| web | Next.js (App Router) + TypeScript | server actions for writes; best-documented React framework for AI-assisted building |
+| styling | Tailwind + tokens from replica-design | team and club colours flow through one token set |
+| database | Postgres on Supabase | relational data (teams, events, answers, attendance, dues); RLS enforces who sees what |
+| auth | Supabase Auth (magic link, Google) | `auth.uid()` drives every access rule |
+| realtime | Supabase Realtime | chat, live scores, RSVP counts, carpool seats |
+| files | Supabase Storage | chat photos, club and team logos |
+| push | Web Push (VAPID) | free; iPhone needs Add to Home Screen; email is the fallback |
+| email | Resend | invites, game emails with one-tap answers, dues reminders |
+| jobs | Supabase pg_cron + Edge Functions | outbox sending, reminders, recurring events, points |
+| payments | none (manual dues tracking) | e-Transfer and cash are how amateur clubs actually collect; Stripe can come later |
+| hosting | Vercel | zero-config Next.js |
+| monitoring | Sentry + Supabase logs | |
 
 ## Club accounts (one app, each club's own look)
 
-There is one app. A club owner creates a club account and adds the club's name, logo and colours, and from then on the app becomes that club's app for its members:
-
-- **Top bar and sign-in:** the club logo and name replace the platform name. A small "Powered by Areno" sits in Account and on the sign-in page (the platform name is a placeholder until the brand is chosen).
-- **Colours:** the club colour becomes the app accent everywhere outside a team, through the same readable-colour code as team colours (`team-theme.ts`). Inside a team, the team's own colours still apply, and a new club team starts with the club's colours.
-- **Teams:** all of the club's teams appear together; club admins run every team in the club without being added to each roster.
-- **Join link:** each club gets `/c/<slug>`, a branded page listing its teams, for posters, WhatsApp groups and the club website.
-- **More than one club:** a family with kids in two clubs sees a club switcher; the app takes the look of whichever club they're viewing. Independent teams (no club) keep the standard look.
-- **Home-screen icon:** "Add to home screen" from a club's link uses the club logo and name (a per-club web app manifest), so it looks like the club's app on the phone. No separate App Store listing per club.
-
-Tables added: `clubs` (name, slug, colours, logo, welcome text), `club_admins` (owner / admin), and `teams.club_id`. Club branding is readable by anyone, so the join page shows before sign-in; only club admins can change it; only the owner can add or remove admins. Tested: a club admin can schedule for any club team and see its roster, a parent can see the branding but can't change it or make themselves an admin, and the owner can add a second admin.
-
-Routes added: action `createClub`, `updateClubBranding`, `addClubAdmin`, `removeClubAdmin`, `moveTeamToClub`; GET `/c/[slug]` (public join page); GET `/c/[slug]/manifest.webmanifest` (club name and icon for the home screen).
+One app. A club owner creates a club account and adds the club's name, logo and colours, and the app becomes that club's app for its members: club logo and name in the top bar and on sign-in, club colour as the accent, all club teams together, "Powered by Areno" in a small line. Each club gets a join page at `/c/<slug>`; "Add to home screen" from it shows the club's icon and name. Club admins run every team in the club; a club treasurer handles dues for all of them. Teams without a club keep the standard look.
 
 ## Schema
 
-Tables: 26 (+1 view). Access rules: Postgres row level security on every table, via security-definer helper functions (`is_team_member`, `is_team_staff`, `has_team_perm`, `is_guardian`, `can_view_team`). Full SQL in `schema.sql`, written as the first migration.
+Tables: 36 (+3 views). Full SQL in `schema.sql`. Access rules: row level security on every table, through security-definer helpers (`is_team_member`, `is_team_staff`, `has_team_perm`, `has_event_perm`, `is_club_admin`, `played_in`).
 
-| table | for | key rules |
+| area | tables | key rules |
 | --- | --- | --- |
-| profiles | signed-up users (S01, S23) | id = auth.users.id |
-| people | anyone on a roster, kids included | kids have no account; `user_id` set for adults |
-| people_private | DOB, gender, medical notes | guardians and that person's coaches only |
-| guardians | who acts for whom; the "household" | adult is own guardian (`is_self`); one primary per person; invites by email |
-| clubs, club_admins | club accounts | public branding; admins run all club teams; owner manages admins |
-| teams | S05 | `join_code` for search/follow; `is_public`, `roster_visible` switches; `color`, `color_secondary`, `logo_path` theme the team's screens |
-| roster_members | players and staff (S12, S13, S15) | six staff permissions as a checked `text[]`; one active row per person per kind |
-| follows | fans (F10) | |
-| venues | S09 | per team |
-| event_series | recurring practices | RRULE + IANA zone + local wall-clock time |
-| events | S07–S09 | type game/practice/event; status active/postponed/cancelled; `tz` stored |
-| rsvps | S10, S11 | unique (event, person); note visible to staff + guardians only |
-| rsvps_public (view) | team availability | responses without notes, for teammates |
-| scores | S20 | `version` for optimistic locking between scorers |
-| conversations | S16 | exactly one `team` chat per team |
-| chat_messages | S16 | `unique(author_id, client_id)` makes retries idempotent; pins, soft delete |
-| chat_reactions, chat_reads | reactions, read receipts | reads are a per-conversation high-water mark |
-| poll_options, poll_votes | chat polls | one vote per user per poll |
-| messages, message_recipients | S17 | recipients resolved at send time (players → their guardians) |
-| notification_prefs | S22 | per user per team |
-| push_subscriptions | web push | one per browser |
-| calendar_feeds | S19 | token stored hashed; household or per team |
-| outbox | every notification | `dedupe_key` unique → no double sends; service role only |
+| accounts | profiles, member_private | emergency contact and health notes: the player and their team staff only |
+| clubs | clubs, club_admins | owner, admin, treasurer; branding public; only the owner manages admins |
+| teams | teams, roster_members, follows | roles: player, captain, vice captain, coach, manager, treasurer; 9 permissions; a playing captain is a player with permissions |
+| availability | availability_periods (+ availability_public view) | away, injured, vacation; teammates see "unavailable", only staff see the reason |
+| schedule | seasons, venues, event_series, events, event_managers | types: training, match, tournament, social; competition: league, cup, friendly; one open season per team; an event manager runs one event without team-wide rights |
+| answers | rsvps (+ rsvps_public view) | answer for yourself; staff can set one for a player; notes for staff only |
+| attendance | attendance | present, late (minutes), absent, excused; recorded by staff or the event manager |
+| results | scores, match_events | live score with compare-and-set version; goals, assists, cards, wickets |
+| player of the match | potm_votes (+ potm_results view) | one vote, only if you played, never for yourself; results shown after voting closes |
+| points | points_ledger | off unless the team turns it on; automatic rows once per event and reason; manual rows by staff with a note |
+| carpools | ride_offers, ride_requests | seats enforced in the database ("This car is full") |
+| dues | fees, dues, payments | players see only their own; a player can report "I sent it"; only someone with the payments permission verifies |
+| chat | conversations (team, staff, event, direct), chat_messages (replies, pins, soft delete), chat_reactions, chat_reads, poll_options, poll_votes | staff chat hidden from players |
+| messages | messages, message_recipients | subject-line messages to all or chosen players |
+| delivery | notification_prefs, push_subscriptions, calendar_feeds, outbox | outbox dedupe key prevents double sends |
 
-Hard constraints in the database, not the UI: one RSVP per person per event (unique), RSVP only for someone on that team's active roster (policy check), only staff with `schedule_games` create games, chat posting blocked for non-members and for families when the coach makes the chat announcement-only, `end_at > start_at`, opponent only on games, one team chat per team.
+**Permissions** (on a roster row): edit_settings, roster, schedule_games, schedule_events, attendance, scoring, payments, messages, manage_permissions. Default for a new captain: schedule_events, attendance, scoring, messages.
 
-Checked: the schema loads cleanly on Postgres 16 with a Supabase auth stub, and a test run confirmed parent A can answer for their kid but not another family's, parents can't create events, other parents see answers but not notes or birthdays, fans see the schedule but not the roster or chat, and duplicate RSVPs are rejected.
+**Points rules** (per team, editable): training 1, match 2, away bonus 10, late penalty −1 when more than 15 minutes late, excused 0, player of the match 3. Applied by the server when attendance is saved; the unique index means re-saving attendance never double-awards.
+
+**Tested** on Postgres 16 with a Supabase auth stub (`tests/schema_access_test.sql`), all passing:
+- a player answers for themselves but not a teammate; can't add events, record attendance, give themselves points or read the staff chat
+- a captain can add trainings but not matches without that permission, records attendance, adds manual points
+- an event manager records attendance for their own trip but not another game
+- a teammate sees a player is unavailable but not that they're injured or why; the captain sees the reason
+- a full car rejects another rider
+- a player sees only their own dues, can report an e-Transfer, can't mark it verified; a captain without the payments permission sees no dues; the club treasurer verifies
+- player of the match: no self-votes, no votes from players who didn't play
 
 ## API
 
-Reads go straight from the browser through the Supabase client, guarded by RLS. Writes that touch more than one row or send notifications are Next.js server actions (`'use server'`), which check permission, write in one transaction (a Postgres function via `rpc`), then queue notifications in `outbox`.
+Reads go through the Supabase client under RLS. Multi-row writes and anything that notifies are server actions.
 
-Who: **anon** (not signed in), **user** (any signed-in), **guardian** (acts for that person), **member** (on the team), **staff+perm** (staff holding that permission; the team creator holds all).
+| area | actions and routes |
+| --- | --- |
+| accounts | `signIn` (magic link / Google), `updateProfile`, `updatePrivateInfo`, `deleteAccount` |
+| clubs | `createClub`, `updateClubBranding`, `addClubAdmin`, `removeClubAdmin`, `moveTeamToClub`; GET `/c/[slug]`, `/c/[slug]/manifest.webmanifest`; `requestToJoin`, `approveJoinRequest` |
+| teams | `createTeam`, `updateTeam`, `invitePlayers` (form or pasted list), `acceptInvite`, `setRole`, `setPermissions`, `setMemberStatus` (active / inactive / removed) |
+| seasons | `startSeason`, `closeSeason` (archives, freezes points and attendance totals), `copyRosterToNewSeason` |
+| schedule | `createEvent` (one-off or weekly), `updateEvent`, `setEventStatus`, `assignEventManager` |
+| availability | `setAvailability`, `clearAvailability` (player or staff) |
+| answers | RLS upsert `rsvps`; GET `/r/[signed]` one-tap from email; `remindNoReplies` |
+| attendance | `saveAttendance` (whole squad at once; computes points in the same transaction) |
+| results | `updateScore` (versioned), `addMatchEvent`, `finishMatch`, `openPotmVoting`, `closePotmVoting` (awards points) |
+| carpools | `offerRide`, `requestRide`, `assignRider`, `markPickedUp`, `cancelRide` |
+| dues | `createFee` (for all or chosen players), `waiveDue`, `reportPayment` (player), `recordPayment` / `verifyPayment` (payments permission), `sendDuesReminders` |
+| points | `addManualPoints`, `updatePointsRules`, `togglePoints` |
+| chat, messages | as before, plus staff chat and replies |
+| exports | GET `/t/[id]/export/{players,attendance,dues,events}.csv` (staff; streamed) |
+| analytics | `getTeamStats` / `getClubStats` (attendance rate, no-show rate, dues collected and owed, carpool use) from SQL views |
 
-### F01 Create a team and invite the roster
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| action `createTeam` | team + creator as head coach + team chat | user | name, sport, age_group, location, color, org_name | team | F01 |
-| action `invitePeople` | create people (kids) + roster rows + guardian invites, email each | staff+roster | team_id, rows[{first, last, email, kind, jersey, position, role, perms}] (one or many, from a form or pasted list) | roster rows, invite count | F01 |
-| GET `/invite/[token]` | invite landing: sign up / sign in, then accept | anon | token | page | F01 |
-| action `acceptInvite` | activate roster row or guardian row, link to account | user | token | team | F01, F09 |
-| action `resendInvite` / `removeMember` | | staff+roster | roster_member_id | ok | F01 |
-| action `updateStaffPermissions` | | staff+manage_permissions | roster_member_id, permissions[] | row | S15 |
-| action `updateTeam` | settings, colour, public/roster switches | staff+edit_settings | team_id, fields | team | S05 |
-
-### F02 / F05 Schedule, change, cancel
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| action `createEvent` | one event, or a series + materialised occurrences | staff+schedule_games / schedule_events | team_id, type, local date/time, tz, duration, venue, opponent, home_away, notes, rrule?, notify | event(s) | F02 |
-| action `updateEvent` | edit one, or this-and-following in a series | same | event_id, fields, scope (one / following), notify | event(s) | F05 |
-| action `setEventStatus` | postpone / cancel / reinstate, with reason | same | event_id, status, reason, notify | event | F05 |
-| action `deleteEvent` | | same | event_id | ok | F05 |
-| action `upsertVenue` | | same | team_id, name, address | venue | S09 |
-
-### F03 / F04 RSVP and availability
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| RLS upsert `rsvps` | answer for self or a kid | guardian | event_id, person_id, response, note | rsvp | F03 |
-| GET `/r/[signed]` | one-tap RSVP from email, no login; then shows the event | anon with signed link | HMAC-signed {event, person, response, exp} | page | F03 |
-| select `rsvps_public` / `rsvps` | team availability (notes for staff only) | member / staff | event_id | list + counts | F04 |
-| action `nudgeNonResponders` | push/email to guardians who haven't answered | staff | event_id | sent count | F04 (gap feature) |
-
-### F06 Chat and messages
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| RLS insert `chat_messages` | send; realtime pushes it to everyone | member | conversation_id, client_id, body, attachments | message | F06 |
-| action `uploadChatFile` | signed upload URL into the team bucket | member | conversation_id, mime, size | upload URL + path | F06 |
-| action `createPoll` | message + options | member | conversation_id, question, options[] | message | F06 |
-| RLS upsert `poll_votes`, `chat_reactions`, `chat_reads` | vote, react, mark read | member | | row | F06 |
-| action `pinMessage` / `deleteMessage` | | staff (delete: author too) | message_id | message | F06 |
-| action `sendMessage` | subject + body to all or selected; resolve guardians; email + push | staff | team_id, subject, body, to_all or person_ids | message | S17 |
-
-### F07 / F08 Family calendar and subscriptions
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| select `events` for my teams | family calendar, filter by kid | user | date range, person_ids? | events | F07 |
-| action `createCalendarFeed` / `revokeCalendarFeed` | | user | team_id? | feed URL (token shown once) | F08 |
-| GET `/cal/[token].ics` | iCal feed, cached 15 min | anon with token | | text/calendar | F08 |
-
-### F09 Household
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| action `addChild` | person + people_private + guardian(self as primary) | user | first, last, dob | person | S21 |
-| action `inviteGuardian` | second parent | guardian (primary) | person_id, email | invite | F09 |
-
-### F10 / F11 Follow and score
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| select `teams` by name / join_code | search | user | query | teams | F10 |
-| RLS insert/delete `follows` | follow / unfollow | user | team_id | ok | F10 |
-| action `updateScore` | +/− score, period, status; rejects stale `version` | staff+scoring | event_id, version, changes | score | F11 |
-
-### Settings and push
-
-| method path | does | who | input | output | flow |
-| --- | --- | --- | --- | --- | --- |
-| RLS upsert `notification_prefs` | | user | team_id, push, email, sms, chat_muted | prefs | S22 |
-| action `savePushSubscription` / `removePushSubscription` | | user | endpoint, keys | ok | S22 |
-| action `deleteAccount` | delete auth user; cascades; reassign team ownership first | user | confirm | ok | S23 |
-
-Count: 26 server actions, 4 public routes (`/invite`, `/r`, `/cal`, plus the auth callback), and RLS-guarded direct reads/writes on the rest.
-
-Webhooks in: Resend delivery and bounce events → mark outbox rows and flag bad emails on the roster. (No Stripe in this slice.)
-Webhooks out: none.
-
-Jobs (Supabase pg_cron → Edge Function):
-
-| job | schedule | does |
-| --- | --- | --- |
-| `send-outbox` | every minute (and kicked right after each write) | sends pending push/email, backs off on failure, gives up after 5 attempts, deletes dead push endpoints (HTTP 410) |
-| `materialise-series` | nightly | keeps 26 weeks of occurrences ahead for each recurring practice |
-| `event-reminders` | every 15 min | reminder before events (default 24h), and RSVP nudge to non-responders if the coach turned it on |
-| `cleanup` | daily | expire invites after 30 days, purge outbox rows older than 30 days, remove orphaned uploads |
-
-Only official, public APIs with your own keys (Supabase, Resend, Web Push). Nothing from SportsEngine's private endpoints.
+Jobs: `send-outbox` (every minute), `event-reminders` (every 15 min; skips players marked unavailable), `materialise-series` (nightly), `dues-reminders` (weekly, opt-in per fee), `cleanup` (daily).
 
 ## The parts that bite
 
-- **Time zones and daylight saving:** store `start_at` in UTC plus the event's IANA `tz`. Recurring practices store local wall-clock time and expand per date, so a 6 pm Tuesday practice stays 6 pm across the November clock change. Render in the event's zone, labelled when it differs from the viewer's.
-- **Idempotency:** chat sends carry a browser-generated `client_id`; notifications go through `outbox.dedupe_key`; invite acceptance is a no-op if already active; Resend webhooks are matched by message id.
-- **Races:** two scorers → `scores.version` compare-and-set; RSVP changed on two devices → upsert on (event, person), last write wins; editing an event while families are answering → RSVPs stay, but a time change re-notifies and marks answers "may be outdated".
-- **Notification fan-out:** one event change for a 20-player team can be ~60 sends (two guardians each, plus staff, two channels). Queue it; never send inline in the request.
-- **iPhone push:** web push on iOS only works after "Add to Home Screen" (iOS 16.4+). Onboarding must prompt it, and email stays the fallback. This is the strongest argument for the Expo app later.
-- **Email deliverability:** verify your domain in Resend (SPF, DKIM, DMARC) before the first invite; invites from a new domain land in spam otherwise.
-- **Kids' privacy:** DOB and medical notes live in `people_private`; teammates see names only. Signed RSVP links carry no personal data and expire.
-- **Realtime limits:** Supabase free tier caps concurrent realtime connections (check current limits at signup); subscribe per open conversation, not per team list.
-- **File sizes:** cap uploads (e.g. 25 MB images/files, 200 MB video) and compress images in the browser before upload; video is the storage cost to watch.
-- **Multi-tenancy:** every row hangs off a team; every policy goes through the helper functions. Add a test for each new table that a stranger reads zero rows.
-- **Deletion and privacy law (PIPEDA, GDPR):** `deleteAccount` cascades; kid records are deleted when their last guardian leaves and they're on no active roster; chat messages keep the text with the author shown as "Former member".
-- **Team colours:** coaches pick any colour, so contrast can't be trusted. Compute text colour (black or white) from the colour's luminance, and darken or lighten the accent until it passes WCAG AA against the page in light and dark mode. Status colours (going / not going / cancelled) never take the team colour.
-- **Search:** team search is `ilike` on name plus exact `join_code`; fine until thousands of teams, then add `pg_trgm`.
+- **Time zones:** UTC plus the event's zone; weekly trainings keep their local time across the clock change.
+- **Idempotency:** client ids on chat sends, outbox dedupe keys, points unique per event and reason.
+- **Races:** two scorers (version check), two riders taking the last seat (trigger with row lock), attendance saved twice (upsert).
+- **Points fairness:** rules are explicit numbers, every change is a ledger row with a reason, and staff edits need a note. Show players how their total was earned.
+- **Money:** this version only records payments made elsewhere. No card data ever touches the app. Verification is limited to the payments permission or the club treasurer.
+- **Privacy:** health notes and injury reasons are staff-only. Location for carpools is a typed meeting point, not GPS. GPS pickup confirmation (from the AKFC list) is deferred: if added, capture location once at "I've arrived", never track continuously, and get consent first.
+- **Notifications:** queue fan-out; iPhone push needs the home-screen install; cancellations always send.
+- **Email deliverability:** SPF, DKIM and DMARC on the sending domain before the first invite.
+- **Deletion (PIPEDA):** deleting an account removes private info and answers; chat keeps text as "Former member"; ledger and payment rows keep amounts with the name removed, so club totals still add up.
 
 ## Build order
 
-1. **Vertical slice (week 1):** sign up → create team → invite one parent by email → create a game → parent RSVPs from the email link → coach sees the answer.
-   Screens S01, S02, S05, S06, S07, S08, S10, S12, S13. Tables profiles, people, guardians, teams, roster_members, events, rsvps, outbox. Actions createTeam, invitePeople, acceptInvite, createEvent, `/r/[signed]`, send-outbox job (email only). Ugly is fine.
-2. **Must-haves (weeks 2–4), by area:**
-   - roster: staff invites with role, Players/Staff tabs, guardian answers for child (S12–S14, S21, addChild)
-   - schedule: edit, postpone/cancel with status, venue map link, list view (updateEvent, setEventStatus, upsertVenue)
-   - RSVP: in-app RSVP with private note, My RSVPs across kids, availability view (S11, rsvps_public)
-   - chat: real-time team chat with text and photos (S16, chat_messages, storage)
-   - notifications: web push + PWA install prompt (push_subscriptions, savePushSubscription)
-   - home: upcoming across teams (S02)
-3. **Should-haves:** family calendar and iCal feeds (S18, S19), recurring practices (event_series, materialise-series), second guardian, staff permissions (S15), subject messages (S17), reactions, read receipts, pins, polls, video/files, notification prefs (S22), live scoring (S20).
-   **Could-haves:** follow as a fan, print roster, dark mode, passkeys, chat moderation, SMS, venue library, and the two gaps already designed in: nudge non-responders and paste-a-list bulk roster add.
-3b. **Club accounts:** club setup, club look across the app, club join page, club admin view, home-screen manifest. After the must-haves, since a single team must work first.
-4. **Fixes from replica-entrepreneur:** to be added once it reads SportsEngine's reviews.
+1. **Vertical slice:** sign up → create team → invite a player → add a match → player taps Going in the email → captain sees the answer.
+2. **Must-haves:** roster and roles, schedule with edit and cancel, availability, RSVP and Who's coming, attendance, team chat, push, home.
+3. **Club accounts:** club setup and look, join page, club admin, treasurer.
+4. **Should-haves:** dues, seasons, carpools, results and player of the match, points and leaderboard, subject messages, calendar feeds, exports.
+5. **Could-haves:** analytics dashboard, follow a team, membership cards and sponsor rewards, GPS pickup confirmation.
+6. **Fixes from replica-entrepreneur.**

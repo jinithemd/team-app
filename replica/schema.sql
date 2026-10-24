@@ -1,14 +1,14 @@
--- Schema: team management clone (rebuild of SportsEngine Team Management core features)
+-- Schema: team and club app for ADULT players (rebuild of SportsEngine Team Management's
+-- core loop, extended with club operations: attendance, availability, carpools, dues,
+-- seasons, points, results and player of the match).
+-- Every player has their own account. No guardians, no child profiles.
 -- Target: Supabase Postgres. Access rules: row level security (RLS) on every table.
--- Times are timestamptz (UTC). Every event also stores the IANA time zone it happens in.
--- Run as the first migration (supabase/migrations/0001_init.sql).
+-- Times are timestamptz (UTC); every event also stores the IANA zone it happens in.
+-- Money is integer cents plus a currency code.
 
 create extension if not exists pgcrypto;
 create extension if not exists citext;
 
--- ---------------------------------------------------------------------------
--- shared: updated_at trigger
--- ---------------------------------------------------------------------------
 create or replace function set_updated_at() returns trigger
 language plpgsql as $$
 begin
@@ -17,84 +17,47 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- accounts and people
+-- accounts
 -- ---------------------------------------------------------------------------
 
--- One row per signed-up user, same id as auth.users. (S01, S23)
 create table profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   first_name text not null,
   last_name text not null,
   email citext not null unique,
   phone text,
-  theme text not null default 'system' check (theme in ('system','light','dark')),
-  use_team_colors boolean not null default true,  -- viewer can switch team theming off
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
--- Anyone who can be on a roster: adults with accounts and kids without.
--- user_id is set when the person is the account holder themself. (S14, S21)
-create table people (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid unique references profiles(id) on delete set null,
-  first_name text not null,
-  last_name text not null,
   avatar_path text,
-  created_by uuid references profiles(id) on delete set null,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-create index on people (created_by);
-
--- Sensitive fields split out so teammates see a name, not a birthday.
--- Readable only by the person's guardians and staff of teams they're on.
-create table people_private (
-  person_id uuid primary key references people(id) on delete cascade,
-  dob date,
-  gender text,
-  medical_notes text,
+  theme text not null default 'system' check (theme in ('system','light','dark')),
+  use_team_colors boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
--- Who can act for a person (answer RSVPs, see their messages).
--- An adult is their own guardian (is_self). The household is "everyone I'm guardian of". (F09)
-create table guardians (
-  id uuid primary key default gen_random_uuid(),
-  person_id uuid not null references people(id) on delete cascade,
-  user_id uuid references profiles(id) on delete cascade,
-  invited_email citext,
-  invite_token_hash text unique,
-  is_primary boolean not null default false,
-  is_self boolean not null default false,
-  status text not null default 'invited' check (status in ('invited','active')),
+-- Emergency contact and health notes: the player and staff of their teams only.
+create table member_private (
+  user_id uuid primary key references profiles(id) on delete cascade,
+  emergency_name text,
+  emergency_phone text,
+  medical_notes text check (length(medical_notes) <= 500),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint guardian_target check (user_id is not null or invited_email is not null),
-  constraint active_has_user check (status <> 'active' or user_id is not null)
+  updated_at timestamptz not null default now()
 );
-create unique index guardians_person_user on guardians (person_id, user_id) where user_id is not null;
-create unique index guardians_one_primary on guardians (person_id) where is_primary;
-create index on guardians (user_id);
-create index on guardians (invited_email) where status = 'invited';
 
 -- ---------------------------------------------------------------------------
--- clubs: a club account inside the one app. When a member opens the app, it takes on
--- their club's name, logo and colours ("Limestone City FC", powered by the platform).
--- One club has many teams; independent teams (club_id null) keep the standard look.
+-- clubs: the app takes on a club's name, logo and colours for its members
 -- ---------------------------------------------------------------------------
 
 create table clubs (
   id uuid primary key default gen_random_uuid(),
   name text not null check (length(name) between 2 and 80),
-  slug text not null unique check (slug ~ '^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$'),  -- join link: /c/<slug>
+  slug text not null unique check (slug ~ '^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$'),
   color text not null default '#2563eb' check (color ~ '^#[0-9a-fA-F]{6}$'),
   color_secondary text check (color_secondary ~ '^#[0-9a-fA-F]{6}$'),
   logo_path text,
   welcome_text text check (length(welcome_text) <= 280),
   sport text,
   location text,
+  currency text not null default 'CAD' check (currency ~ '^[A-Z]{3}$'),
   created_by uuid not null references profiles(id) on delete restrict,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -104,7 +67,7 @@ create index on clubs (created_by);
 create table club_admins (
   club_id uuid not null references clubs(id) on delete cascade,
   user_id uuid not null references profiles(id) on delete cascade,
-  role text not null default 'admin' check (role in ('owner','admin')),
+  role text not null default 'admin' check (role in ('owner','admin','treasurer')),
   created_at timestamptz not null default now(),
   primary key (club_id, user_id)
 );
@@ -117,18 +80,22 @@ create unique index one_club_owner on club_admins (club_id) where role = 'owner'
 
 create table teams (
   id uuid primary key default gen_random_uuid(),
+  club_id uuid references clubs(id) on delete set null,
   name text not null check (length(name) between 1 and 80),
   sport text not null,
-  age_group text,
+  level text,                                   -- e.g. Premier division, Over-35s, Rec
   location text,
-  color text not null default '#2563eb' check (color ~ '^#[0-9a-fA-F]{6}$'),           -- team primary: themes the team's screens
-  color_secondary text check (color_secondary ~ '^#[0-9a-fA-F]{6}$'),                 -- optional accent (stripes, badges)
-  logo_path text,                                                                      -- crest in the team storage bucket
-  org_name text,
-  club_id uuid references clubs(id) on delete set null,   -- null = independent team on the main app
+  color text not null default '#2563eb' check (color ~ '^#[0-9a-fA-F]{6}$'),
+  color_secondary text check (color_secondary ~ '^#[0-9a-fA-F]{6}$'),
+  logo_path text,
   join_code text not null unique default upper(substr(encode(gen_random_bytes(6),'hex'),1,8)),
-  is_public boolean not null default true,      -- followers can see schedule and scores
-  roster_visible boolean not null default true, -- families can see the roster
+  is_public boolean not null default true,      -- followers see games and scores
+  roster_visible boolean not null default true, -- teammates see each other
+  members_can_post boolean not null default true,
+  -- Points: off unless the team turns it on. Rules are numbers, applied when attendance is recorded.
+  points_enabled boolean not null default false,
+  points_public boolean not null default true,  -- leaderboard visible to the whole team
+  points_rules jsonb not null default '{"training":1,"match":2,"away_bonus":10,"late_penalty":-1,"late_after_minutes":15,"excused":0,"potm":3}',
   created_by uuid not null references profiles(id) on delete restrict,
   archived_at timestamptz,
   created_at timestamptz not null default now(),
@@ -137,31 +104,33 @@ create table teams (
 create index on teams (created_by);
 create index on teams (club_id);
 
--- Players and staff. Staff permissions mirror the original's six (S15).
+-- What a person can do on a team. Captains, coaches and managers are just members with
+-- permissions; a playing captain has is_player = true and permissions too.
 create table roster_members (
   id uuid primary key default gen_random_uuid(),
   team_id uuid not null references teams(id) on delete cascade,
-  person_id uuid not null references people(id) on delete cascade,
-  kind text not null check (kind in ('player','staff')),
-  jersey text,
-  position text,
-  staff_role text check (staff_role in ('head_coach','assistant_coach','manager','other')),
-  permissions text[] not null default '{}'
-    check (permissions <@ array['edit_settings','roster','schedule_games','schedule_events','scoring','manage_permissions']),
-  status text not null default 'invited' check (status in ('invited','active','removed')),
+  user_id uuid references profiles(id) on delete cascade,      -- null until the invite is accepted
   invited_email citext,
   invite_token_hash text unique,
+  invited_name text,
+  is_player boolean not null default true,
+  role text not null default 'player' check (role in ('player','captain','vice_captain','coach','manager','treasurer')),
+  jersey text,
+  position text,
+  permissions text[] not null default '{}'
+    check (permissions <@ array['edit_settings','roster','schedule_games','schedule_events','attendance','scoring','payments','messages','manage_permissions']),
+  status text not null default 'invited' check (status in ('invited','active','inactive','removed')),
   joined_at timestamptz,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint staff_role_only_for_staff check (kind = 'staff' or staff_role is null),
-  constraint perms_only_for_staff check (kind = 'staff' or permissions = '{}')
+  constraint member_target check (user_id is not null or invited_email is not null),
+  constraint active_has_user check (status not in ('active','inactive') or user_id is not null)
 );
-create unique index roster_one_row_per_kind on roster_members (team_id, person_id, kind) where status <> 'removed';
-create index on roster_members (person_id);
-create index on roster_members (team_id, kind, status);
+create unique index roster_one_per_user on roster_members (team_id, user_id) where user_id is not null and status <> 'removed';
+create unique index roster_one_invite on roster_members (team_id, invited_email) where status = 'invited';
+create index on roster_members (user_id);
+create index on roster_members (team_id, status);
 
--- Fans following a team they're not on (F10).
 create table follows (
   user_id uuid not null references profiles(id) on delete cascade,
   team_id uuid not null references teams(id) on delete cascade,
@@ -170,9 +139,41 @@ create table follows (
 );
 create index on follows (team_id);
 
+-- Away, injured or on vacation: skipped for reminders and shown as unavailable.
+-- team_id null = all of the player's teams. Teammates see "unavailable"; the reason and
+-- note are for the player and staff (see the availability_public view).
+create table availability_periods (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references profiles(id) on delete cascade,
+  team_id uuid references teams(id) on delete cascade,
+  kind text not null check (kind in ('away','injured','vacation','other')),
+  starts_on date not null,
+  ends_on date,
+  note text check (length(note) <= 200),
+  set_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint ends_after_starts check (ends_on is null or ends_on >= starts_on)
+);
+create index on availability_periods (user_id, starts_on);
+create index on availability_periods (team_id);
+
 -- ---------------------------------------------------------------------------
--- schedule and RSVPs
+-- seasons and schedule
 -- ---------------------------------------------------------------------------
+
+create table seasons (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references teams(id) on delete cascade,
+  name text not null check (length(name) between 1 and 60),   -- "Summer 2026"
+  starts_on date not null,
+  ends_on date,
+  closed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index on seasons (team_id, starts_on);
+create unique index one_open_season on seasons (team_id) where closed_at is null;
 
 create table venues (
   id uuid primary key default gen_random_uuid(),
@@ -186,13 +187,11 @@ create table venues (
 );
 create index on venues (team_id);
 
--- A repeating practice. Occurrences are materialised into events (up to 26 weeks ahead)
--- so RSVPs, cancellations and edits attach to a real row.
 create table event_series (
   id uuid primary key default gen_random_uuid(),
   team_id uuid not null references teams(id) on delete cascade,
-  rrule text not null,          -- RFC 5545, e.g. FREQ=WEEKLY;BYDAY=TU,TH
-  tz text not null,             -- IANA zone the wall-clock times are in
+  rrule text not null,
+  tz text not null,
   local_start_time time not null,
   duration_minutes int not null check (duration_minutes between 5 and 1440),
   starts_on date not null,
@@ -206,12 +205,14 @@ create index on event_series (team_id);
 create table events (
   id uuid primary key default gen_random_uuid(),
   team_id uuid not null references teams(id) on delete cascade,
+  season_id uuid references seasons(id) on delete set null,
   series_id uuid references event_series(id) on delete set null,
-  type text not null check (type in ('game','practice','event')),
+  type text not null check (type in ('training','match','tournament','social','other')),
+  competition text check (competition in ('league','cup','friendly','tournament')),
   title text,
   start_at timestamptz not null,
   end_at timestamptz not null,
-  arrive_at timestamptz,
+  meet_at timestamptz,
   tz text not null,
   time_tbd boolean not null default false,
   venue_id uuid references venues(id) on delete set null,
@@ -219,33 +220,61 @@ create table events (
   opponent text,
   home_away text check (home_away in ('home','away','neutral')),
   notes text,
+  squad_size int check (squad_size between 1 and 60),   -- how many the captain needs
   status text not null default 'active' check (status in ('active','postponed','cancelled')),
   status_reason text,
+  potm_open boolean not null default false,
   created_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint end_after_start check (end_at > start_at),
-  constraint opponent_only_for_games check (type = 'game' or (opponent is null and home_away is null))
+  constraint opponent_only_for_matches check (type in ('match','tournament') or (opponent is null and home_away is null))
 );
 create index on events (team_id, start_at);
+create index on events (season_id);
 create index on events (series_id);
 create index on events (venue_id);
 
--- One answer per person per event; parents answer for kids (responded_by). (F03)
+-- Someone put in charge of one event (an away trip, a tournament) without team-wide rights.
+create table event_managers (
+  event_id uuid not null references events(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  permissions text[] not null default '{attendance,scoring}'
+    check (permissions <@ array['attendance','scoring','edit_event','carpools']),
+  created_at timestamptz not null default now(),
+  primary key (event_id, user_id)
+);
+create index on event_managers (user_id);
+
+-- What players said they'd do.
 create table rsvps (
   id uuid primary key default gen_random_uuid(),
   event_id uuid not null references events(id) on delete cascade,
-  person_id uuid not null references people(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
   response text not null check (response in ('going','not_going','maybe')),
-  note text check (length(note) <= 500),   -- visible to staff and the person's guardians only
+  note text check (length(note) <= 500),
   responded_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  unique (event_id, person_id)
+  unique (event_id, user_id)
 );
-create index on rsvps (person_id);
+create index on rsvps (user_id);
 
--- Live score for a game (F11). version guards against two scorers overwriting each other.
+-- What actually happened, recorded by staff or the event manager.
+create table attendance (
+  event_id uuid not null references events(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  status text not null check (status in ('present','late','absent','excused')),
+  minutes_late int check (minutes_late between 0 and 600),
+  recorded_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (event_id, user_id),
+  constraint late_has_minutes check (status <> 'late' or minutes_late is not null)
+);
+create index on attendance (user_id);
+
+-- Live score and result.
 create table scores (
   event_id uuid primary key references events(id) on delete cascade,
   team_score int not null default 0 check (team_score >= 0),
@@ -258,30 +287,177 @@ create table scores (
   updated_at timestamptz not null default now()
 );
 
+create table match_events (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  minute int check (minute between 0 and 200),
+  kind text not null check (kind in ('goal','own_goal','assist','yellow','red','sub_on','sub_off','wicket','note')),
+  side text not null default 'us' check (side in ('us','them')),
+  user_id uuid references profiles(id) on delete set null,   -- our player, when known
+  note text,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create index on match_events (event_id);
+create index on match_events (user_id);
+
+-- Player of the match: one vote per player who played; no voting for yourself.
+create table potm_votes (
+  event_id uuid not null references events(id) on delete cascade,
+  voter_id uuid not null references profiles(id) on delete cascade,
+  nominee_id uuid not null references profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (event_id, voter_id),
+  constraint no_self_vote check (voter_id <> nominee_id)
+);
+create index on potm_votes (nominee_id);
+
+-- ---------------------------------------------------------------------------
+-- points: a ledger, so every change is explained and can be reversed
+-- ---------------------------------------------------------------------------
+
+create table points_ledger (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references teams(id) on delete cascade,
+  season_id uuid references seasons(id) on delete set null,
+  user_id uuid not null references profiles(id) on delete cascade,
+  event_id uuid references events(id) on delete cascade,
+  points int not null check (points between -100 and 100),
+  reason text not null check (reason in ('training','match','away_bonus','late_penalty','potm','manual')),
+  note text,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+-- Automatic rows are unique per event and reason, so re-recording attendance can't double-award.
+create unique index points_once_per_reason on points_ledger (event_id, user_id, reason) where reason <> 'manual';
+create index on points_ledger (team_id, season_id, user_id);
+
+-- ---------------------------------------------------------------------------
+-- carpools
+-- ---------------------------------------------------------------------------
+
+create table ride_offers (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  driver_id uuid not null references profiles(id) on delete cascade,
+  seats int not null check (seats between 1 and 8),
+  leaves_from text not null check (length(leaves_from) <= 120),
+  leaves_at timestamptz,
+  return_trip boolean not null default true,
+  note text check (length(note) <= 200),
+  status text not null default 'open' check (status in ('open','full','cancelled')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (event_id, driver_id)
+);
+create index on ride_offers (event_id);
+
+create table ride_requests (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references events(id) on delete cascade,
+  rider_id uuid not null references profiles(id) on delete cascade,
+  pickup_area text check (length(pickup_area) <= 120),
+  offer_id uuid references ride_offers(id) on delete set null,
+  status text not null default 'looking' check (status in ('looking','matched','cancelled')),
+  picked_up_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (event_id, rider_id),
+  constraint matched_has_offer check (status <> 'matched' or offer_id is not null)
+);
+create index on ride_requests (offer_id);
+create index on ride_requests (rider_id);
+
+-- Seats are a database rule, not a UI rule: block a match beyond the driver's seats.
+create or replace function check_ride_seats() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare cap int; taken int;
+begin
+  if new.status = 'matched' and new.offer_id is not null then
+    select seats into cap from ride_offers where id = new.offer_id for update;
+    select count(*) into taken from ride_requests
+      where offer_id = new.offer_id and status = 'matched' and id <> new.id;
+    if cap is null or taken >= cap then
+      raise exception 'This car is full' using errcode = 'check_violation';
+    end if;
+  end if;
+  return new;
+end $$;
+create trigger ride_seats before insert or update on ride_requests
+  for each row execute function check_ride_seats();
+
+-- ---------------------------------------------------------------------------
+-- dues: manual tracking (cash, e-Transfer). No card payments in this version.
+-- ---------------------------------------------------------------------------
+
+create table fees (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references teams(id) on delete cascade,
+  season_id uuid references seasons(id) on delete set null,
+  name text not null check (length(name) between 1 and 80),   -- "Season fee", "Kit", "Tournament entry"
+  amount_cents int not null check (amount_cents > 0),
+  currency text not null default 'CAD' check (currency ~ '^[A-Z]{3}$'),
+  due_on date,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index on fees (team_id, season_id);
+
+-- What each player owes for a fee (lets a captain waive or discount one player).
+create table dues (
+  id uuid primary key default gen_random_uuid(),
+  fee_id uuid not null references fees(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  amount_cents int not null check (amount_cents >= 0),
+  waived boolean not null default false,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (fee_id, user_id)
+);
+create index on dues (user_id);
+
+create table payments (
+  id uuid primary key default gen_random_uuid(),
+  due_id uuid not null references dues(id) on delete cascade,
+  amount_cents int not null check (amount_cents > 0),
+  method text not null check (method in ('etransfer','cash','card_elsewhere','other')),
+  paid_on date not null,
+  reference text check (length(reference) <= 80),
+  reported_by uuid references profiles(id) on delete set null,   -- the player can report "I sent it"
+  verified_by uuid references profiles(id) on delete set null,   -- only someone with payments permission
+  verified_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint verified_pair check ((verified_by is null) = (verified_at is null))
+);
+create index on payments (due_id);
+
 -- ---------------------------------------------------------------------------
 -- chat and messages
 -- ---------------------------------------------------------------------------
 
--- Every team gets one 'team' conversation on creation; 'group' and 'direct' are later.
 create table conversations (
   id uuid primary key default gen_random_uuid(),
   team_id uuid not null references teams(id) on delete cascade,
-  kind text not null default 'team' check (kind in ('team','group','direct')),
+  kind text not null default 'team' check (kind in ('team','staff','event','direct')),
+  event_id uuid references events(id) on delete cascade,
   title text,
-  families_can_post boolean not null default true,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 create unique index one_team_chat on conversations (team_id) where kind = 'team';
+create unique index one_staff_chat on conversations (team_id) where kind = 'staff';
 
 create table chat_messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null references conversations(id) on delete cascade,
   author_id uuid references profiles(id) on delete set null,
-  client_id uuid not null,    -- generated by the browser; makes retries idempotent
+  client_id uuid not null,
+  reply_to uuid references chat_messages(id) on delete set null,
   kind text not null default 'text' check (kind in ('text','poll','system')),
   body text check (length(body) <= 4000),
-  attachments jsonb not null default '[]',  -- [{path, mime, size, width, height}]
+  attachments jsonb not null default '[]',
   pinned_at timestamptz,
   pinned_by uuid references profiles(id) on delete set null,
   edited_at timestamptz,
@@ -303,7 +479,6 @@ create table chat_reactions (
 );
 create index on chat_reactions (user_id);
 
--- Read receipts as a per-conversation high-water mark, not one row per message.
 create table chat_reads (
   conversation_id uuid not null references conversations(id) on delete cascade,
   user_id uuid not null references profiles(id) on delete cascade,
@@ -325,12 +500,11 @@ create table poll_votes (
   option_id uuid not null references poll_options(id) on delete cascade,
   user_id uuid not null references profiles(id) on delete cascade,
   created_at timestamptz not null default now(),
-  primary key (message_id, user_id)   -- single choice; changing a vote is an upsert
+  primary key (message_id, user_id)
 );
 create index on poll_votes (option_id);
 create index on poll_votes (user_id);
 
--- Email-style messages with a subject (S17).
 create table messages (
   id uuid primary key default gen_random_uuid(),
   team_id uuid not null references teams(id) on delete cascade,
@@ -344,7 +518,6 @@ create table messages (
 create index on messages (team_id, created_at desc);
 create index on messages (author_id);
 
--- Resolved recipients: one row per user at send time (guardians of selected players included).
 create table message_recipients (
   message_id uuid not null references messages(id) on delete cascade,
   user_id uuid not null references profiles(id) on delete cascade,
@@ -362,8 +535,9 @@ create table notification_prefs (
   team_id uuid not null references teams(id) on delete cascade,
   push boolean not null default true,
   email boolean not null default true,
-  sms boolean not null default false,
-  chat_muted boolean not null default false,
+  reminders boolean not null default true,
+  chat text not null default 'mentions' check (chat in ('all','mentions','off')),
+  live_scores boolean not null default true,
   updated_at timestamptz not null default now(),
   primary key (user_id, team_id)
 );
@@ -381,11 +555,10 @@ create table push_subscriptions (
 );
 create index on push_subscriptions (user_id);
 
--- Secret iCal feed URLs: one per user (whole household) or per team.
 create table calendar_feeds (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references profiles(id) on delete cascade,
-  team_id uuid references teams(id) on delete cascade,  -- null = household feed
+  team_id uuid references teams(id) on delete cascade,   -- null = all my teams
   token_hash text not null unique,
   revoked_at timestamptz,
   created_at timestamptz not null default now()
@@ -393,8 +566,6 @@ create table calendar_feeds (
 create index on calendar_feeds (user_id);
 create index on calendar_feeds (team_id);
 
--- Every notification goes through here. dedupe_key makes fan-out idempotent:
--- e.g. 'event_changed:<event_id>:<updated_at>:<user_id>:push'.
 create table outbox (
   id uuid primary key default gen_random_uuid(),
   kind text not null,
@@ -416,8 +587,9 @@ create index on outbox (user_id);
 do $$
 declare t text;
 begin
-  foreach t in array array['clubs','profiles','people','people_private','guardians','teams','roster_members',
-    'venues','event_series','events','rsvps','scores','conversations','chat_messages','messages','outbox']
+  foreach t in array array['profiles','member_private','clubs','teams','roster_members','availability_periods',
+    'seasons','venues','event_series','events','rsvps','attendance','scores','ride_offers','ride_requests',
+    'fees','dues','payments','conversations','chat_messages','messages','outbox']
   loop
     execute format('create trigger %I_updated before update on %I for each row execute function set_updated_at()', t, t);
   end loop;
@@ -426,36 +598,6 @@ end $$;
 -- ---------------------------------------------------------------------------
 -- access helpers (security definer so policies don't recurse through RLS)
 -- ---------------------------------------------------------------------------
-
--- Persons the current user can act for: themself and their kids.
-create or replace function my_people() returns setof uuid
-language sql stable security definer set search_path = public as $$
-  select person_id from guardians where user_id = auth.uid() and status = 'active'
-$$;
-
-create or replace function is_guardian(p uuid) returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (select 1 from guardians where person_id = p and user_id = auth.uid() and status = 'active')
-$$;
-
--- On the team as a player, staff, or guardian of a player.
-create or replace function is_team_member(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from roster_members r
-    join guardians g on g.person_id = r.person_id
-    where r.team_id = t and r.status = 'active' and g.user_id = auth.uid() and g.status = 'active'
-  ) or exists (select 1 from teams where id = t and created_by = auth.uid())
-$$;
-
--- Club admins run every team in their club.
-create or replace function is_club_admin_of_team(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from teams tm join club_admins ca on ca.club_id = tm.club_id
-    where tm.id = t and ca.user_id = auth.uid()
-  )
-$$;
 
 create or replace function is_club_admin(c uuid) returns boolean
 language sql stable security definer set search_path = public as $$
@@ -467,27 +609,69 @@ language sql stable security definer set search_path = public as $$
   select exists (select 1 from club_admins where club_id = c and user_id = auth.uid() and role = 'owner')
 $$;
 
-create or replace function is_team_staff(t uuid) returns boolean
+create or replace function is_club_admin_of_team(t uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from teams tm join club_admins ca on ca.club_id = tm.club_id
+    where tm.id = t and ca.user_id = auth.uid() and ca.role in ('owner','admin')
+  )
+$$;
+
+create or replace function is_club_treasurer_of_team(t uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from teams tm join club_admins ca on ca.club_id = tm.club_id
+    where tm.id = t and ca.user_id = auth.uid()
+  )
+$$;
+
+create or replace function is_team_member(t uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from roster_members r
-    join guardians g on g.person_id = r.person_id and g.is_self
-    where r.team_id = t and r.kind = 'staff' and r.status = 'active' and g.user_id = auth.uid() and g.status = 'active'
-  ) or exists (select 1 from teams where id = t and created_by = auth.uid())
+    where r.team_id = t and r.user_id = auth.uid() and r.status in ('active','inactive')
+  )
+  or exists (select 1 from teams where id = t and created_by = auth.uid())
   or is_club_admin_of_team(t)
 $$;
 
--- The team creator has every permission.
 create or replace function has_team_perm(t uuid, perm text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from teams where id = t and created_by = auth.uid())
+  or is_club_admin_of_team(t)
+  or (perm = 'payments' and is_club_treasurer_of_team(t))
+  or exists (
+    select 1 from roster_members r
+    where r.team_id = t and r.user_id = auth.uid() and r.status = 'active' and perm = any (r.permissions)
+  )
+$$;
+
+-- Staff = anyone with at least one permission on the team.
+create or replace function is_team_staff(t uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from teams where id = t and created_by = auth.uid())
   or is_club_admin_of_team(t)
   or exists (
     select 1 from roster_members r
-    join guardians g on g.person_id = r.person_id and g.is_self
-    where r.team_id = t and r.kind = 'staff' and r.status = 'active'
-      and g.user_id = auth.uid() and g.status = 'active' and perm = any (r.permissions)
+    where r.team_id = t and r.user_id = auth.uid() and r.status = 'active' and r.permissions <> '{}'
   )
+$$;
+
+create or replace function event_team(e uuid) returns uuid
+language sql stable security definer set search_path = public as $$
+  select team_id from events where id = e
+$$;
+
+-- Team-wide permission, or this person manages this one event.
+create or replace function has_event_perm(e uuid, perm text) returns boolean
+language sql stable security definer set search_path = public as $$
+  select has_team_perm(event_team(e), perm)
+  or exists (select 1 from event_managers m where m.event_id = e and m.user_id = auth.uid() and perm = any (m.permissions))
+$$;
+
+create or replace function played_in(e uuid, u uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from attendance where event_id = e and user_id = u and status in ('present','late'))
 $$;
 
 create or replace function can_view_team(t uuid) returns boolean
@@ -496,20 +680,20 @@ language sql stable security definer set search_path = public as $$
   or exists (select 1 from teams where id = t and is_public and archived_at is null)
 $$;
 
-create or replace function is_staff_of_person(p uuid) returns boolean
+-- Teammates: share an active team where the roster is visible (or I'm staff there).
+create or replace function shares_team_with(u uuid) returns boolean
 language sql stable security definer set search_path = public as $$
-  select exists (
-    select 1 from roster_members r where r.person_id = p and r.status <> 'removed' and is_team_staff(r.team_id)
+  select u = auth.uid() or exists (
+    select 1 from roster_members r join teams tm on tm.id = r.team_id
+    where r.user_id = u and r.status in ('active','inactive') and is_team_member(r.team_id)
+      and (tm.roster_visible or is_team_staff(r.team_id))
   )
 $$;
 
-create or replace function shares_team_with(p uuid) returns boolean
+create or replace function is_staff_of_user(u uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
-    select 1 from roster_members r
-    join teams tm on tm.id = r.team_id
-    where r.person_id = p and r.status = 'active' and is_team_member(r.team_id)
-      and (tm.roster_visible or is_team_staff(r.team_id))
+    select 1 from roster_members r where r.user_id = u and r.status <> 'removed' and is_team_staff(r.team_id)
   )
 $$;
 
@@ -518,89 +702,93 @@ language sql stable security definer set search_path = public as $$
   select team_id from conversations where id = c
 $$;
 
+create or replace function can_read_conversation(c uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case (select kind from conversations where id = c)
+    when 'staff' then is_team_staff(conversation_team(c))
+    else is_team_member(conversation_team(c))
+  end
+$$;
+
+create or replace function fee_team(f uuid) returns uuid
+language sql stable security definer set search_path = public as $$
+  select team_id from fees where id = f
+$$;
+
+create or replace function due_team(d uuid) returns uuid
+language sql stable security definer set search_path = public as $$
+  select f.team_id from dues du join fees f on f.id = du.fee_id where du.id = d
+$$;
+
 -- ---------------------------------------------------------------------------
 -- row level security
--- Writes that fan out (create event + notify, send invite, send message) go through
--- server actions using the service role; RLS still guards every direct client read/write.
 -- ---------------------------------------------------------------------------
 
-alter table clubs enable row level security;
-alter table club_admins enable row level security;
-alter table profiles enable row level security;
-alter table people enable row level security;
-alter table people_private enable row level security;
-alter table guardians enable row level security;
-alter table teams enable row level security;
-alter table roster_members enable row level security;
-alter table follows enable row level security;
-alter table venues enable row level security;
-alter table event_series enable row level security;
-alter table events enable row level security;
-alter table rsvps enable row level security;
-alter table scores enable row level security;
-alter table conversations enable row level security;
-alter table chat_messages enable row level security;
-alter table chat_reactions enable row level security;
-alter table chat_reads enable row level security;
-alter table poll_options enable row level security;
-alter table poll_votes enable row level security;
-alter table messages enable row level security;
-alter table message_recipients enable row level security;
-alter table notification_prefs enable row level security;
-alter table push_subscriptions enable row level security;
-alter table calendar_feeds enable row level security;
-alter table outbox enable row level security;  -- no policies: service role only
+do $$
+declare t text;
+begin
+  foreach t in array array['profiles','member_private','clubs','club_admins','teams','roster_members','follows',
+    'availability_periods','seasons','venues','event_series','events','event_managers','rsvps','attendance',
+    'scores','match_events','potm_votes','points_ledger','ride_offers','ride_requests','fees','dues','payments',
+    'conversations','chat_messages','chat_reactions','chat_reads','poll_options','poll_votes','messages',
+    'message_recipients','notification_prefs','push_subscriptions','calendar_feeds','outbox']
+  loop
+    execute format('alter table %I enable row level security', t);
+  end loop;
+end $$;
+-- outbox has no policies: service role only.
 
--- clubs: name, logo and colours are public so the club join page shows before sign-in
+-- profiles
+create policy profiles_self on profiles for all using (id = auth.uid()) with check (id = auth.uid());
+create policy profiles_teammates on profiles for select using (shares_team_with(id) or is_staff_of_user(id));
+
+create policy private_self on member_private for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy private_staff on member_private for select using (is_staff_of_user(user_id));
+
+-- clubs
 create policy clubs_read on clubs for select using (true);
 create policy clubs_insert on clubs for insert with check (created_by = auth.uid());
 create policy clubs_update on clubs for update using (is_club_admin(id)) with check (is_club_admin(id));
 create policy club_admins_read on club_admins for select using (user_id = auth.uid() or is_club_admin(club_id));
 create policy club_admins_write on club_admins for all using (is_club_owner(club_id)) with check (is_club_owner(club_id));
 
--- profiles: yourself, plus names of people you share a team with
-create policy profiles_self on profiles for all using (id = auth.uid()) with check (id = auth.uid());
-create policy profiles_teammates on profiles for select using (
-  exists (select 1 from people p where p.user_id = profiles.id and shares_team_with(p.id))
-);
-
--- people
-create policy people_read on people for select using (
-  id in (select my_people()) or shares_team_with(id) or is_staff_of_person(id)
-);
-create policy people_write on people for update using (is_guardian(id)) with check (is_guardian(id));
-create policy people_insert on people for insert with check (created_by = auth.uid());
-
-create policy people_private_rw on people_private for all
-  using (is_guardian(person_id) or is_staff_of_person(person_id))
-  with check (is_guardian(person_id));
-
--- guardians: see the guardians of people you act for or coach
-create policy guardians_read on guardians for select using (
-  user_id = auth.uid() or is_guardian(person_id) or is_staff_of_person(person_id)
-);
-
 -- teams
 create policy teams_read on teams for select using (can_view_team(id));
-create policy teams_insert on teams for insert with check (created_by = auth.uid());
+create policy teams_insert on teams for insert with check (
+  created_by = auth.uid() and (club_id is null or is_club_admin(club_id))
+);
 create policy teams_update on teams for update
   using (has_team_perm(id, 'edit_settings')) with check (has_team_perm(id, 'edit_settings'));
 
 -- roster
 create policy roster_read on roster_members for select using (
-  is_team_staff(team_id)
-  or person_id in (select my_people())
-  or (is_team_member(team_id) and status = 'active'
+  user_id = auth.uid()
+  or is_team_staff(team_id)
+  or (is_team_member(team_id) and status in ('active','inactive')
       and exists (select 1 from teams t where t.id = team_id and t.roster_visible))
 );
 create policy roster_write on roster_members for all
   using (has_team_perm(team_id, 'roster')) with check (has_team_perm(team_id, 'roster'));
 
--- follows
 create policy follows_self on follows for all using (user_id = auth.uid())
   with check (user_id = auth.uid() and can_view_team(team_id));
 
--- venues, series, events
+-- availability: own rows, staff rows; teammates read through availability_public
+create policy avail_own on availability_periods for all using (user_id = auth.uid())
+  with check (user_id = auth.uid() and (team_id is null or is_team_member(team_id)));
+create policy avail_staff on availability_periods for all
+  using (is_staff_of_user(user_id)) with check (is_staff_of_user(user_id));
+
+create view availability_public with (security_invoker = false) as
+  select a.user_id, a.team_id, a.starts_on, a.ends_on
+  from availability_periods a
+  where shares_team_with(a.user_id);
+
+-- seasons, venues, series, events
+create policy seasons_read on seasons for select using (is_team_member(team_id));
+create policy seasons_write on seasons for all
+  using (has_team_perm(team_id, 'edit_settings')) with check (has_team_perm(team_id, 'edit_settings'));
+
 create policy venues_read on venues for select using (can_view_team(team_id));
 create policy venues_write on venues for all
   using (has_team_perm(team_id, 'schedule_events') or has_team_perm(team_id, 'schedule_games'))
@@ -610,84 +798,145 @@ create policy series_read on event_series for select using (is_team_member(team_
 create policy series_write on event_series for all
   using (has_team_perm(team_id, 'schedule_events')) with check (has_team_perm(team_id, 'schedule_events'));
 
-create policy events_read on events for select using (can_view_team(team_id));
-create policy events_write on events for all
-  using (has_team_perm(team_id, case when type = 'game' then 'schedule_games' else 'schedule_events' end))
-  with check (has_team_perm(team_id, case when type = 'game' then 'schedule_games' else 'schedule_events' end));
-
--- rsvps: guardians answer for their people; staff can set them too (taking attendance).
--- Responses are visible to the team; notes are stripped for non-staff by the rsvps_public view.
-create policy rsvps_read on rsvps for select using (
-  person_id in (select my_people())
-  or is_team_staff((select team_id from events e where e.id = event_id))
+-- Followers see matches only; members see everything.
+create policy events_read on events for select using (
+  is_team_member(team_id) or (type in ('match','tournament') and can_view_team(team_id))
 );
+create policy events_write on events for all
+  using (has_team_perm(team_id, case when type in ('match','tournament') then 'schedule_games' else 'schedule_events' end))
+  with check (has_team_perm(team_id, case when type in ('match','tournament') then 'schedule_games' else 'schedule_events' end));
+create policy events_manager_update on events for update
+  using (exists (select 1 from event_managers m where m.event_id = id and m.user_id = auth.uid() and 'edit_event' = any (m.permissions)))
+  with check (exists (select 1 from event_managers m where m.event_id = id and m.user_id = auth.uid() and 'edit_event' = any (m.permissions)));
+
+create policy managers_read on event_managers for select using (is_team_member(event_team(event_id)));
+create policy managers_write on event_managers for all
+  using (has_team_perm(event_team(event_id), 'schedule_events') or has_team_perm(event_team(event_id), 'schedule_games'))
+  with check (has_team_perm(event_team(event_id), 'schedule_events') or has_team_perm(event_team(event_id), 'schedule_games'));
+
+-- rsvps: answer for yourself; staff can set them (e.g. a player who texted the captain)
+create policy rsvps_read on rsvps for select using (user_id = auth.uid() or is_team_staff(event_team(event_id)));
 create policy rsvps_write on rsvps for all
-  using (is_guardian(person_id) or is_team_staff((select team_id from events e where e.id = event_id)))
+  using (user_id = auth.uid() or is_team_staff(event_team(event_id)))
   with check (
-    (is_guardian(person_id) or is_team_staff((select team_id from events e where e.id = event_id)))
-    and exists (
-      select 1 from events e join roster_members r on r.team_id = e.team_id
-      where e.id = event_id and r.person_id = rsvps.person_id and r.status = 'active'
-    )
+    (user_id = auth.uid() or is_team_staff(event_team(event_id)))
+    and exists (select 1 from roster_members r where r.team_id = event_team(event_id)
+                and r.user_id = rsvps.user_id and r.status = 'active' and r.is_player)
   );
 
--- Team members see everyone's answer but not the private note.
 create view rsvps_public with (security_invoker = false) as
-  select r.event_id, r.person_id, r.response, r.updated_at
-  from rsvps r join events e on e.id = r.event_id
-  where is_team_member(e.team_id);
+  select r.event_id, r.user_id, r.response, r.updated_at
+  from rsvps r where is_team_member(event_team(r.event_id));
 
--- scores
-create policy scores_read on scores for select using (
-  can_view_team((select team_id from events e where e.id = event_id))
-);
+-- attendance: own row, plus whoever can record attendance for that event
+create policy attendance_read on attendance for select
+  using (user_id = auth.uid() or is_team_staff(event_team(event_id)) or has_event_perm(event_id, 'attendance'));
+create policy attendance_write on attendance for all
+  using (has_event_perm(event_id, 'attendance')) with check (has_event_perm(event_id, 'attendance'));
+
+-- scores and match events
+create policy scores_read on scores for select using (can_view_team(event_team(event_id)));
 create policy scores_write on scores for all
-  using (has_team_perm((select team_id from events e where e.id = event_id), 'scoring'))
-  with check (has_team_perm((select team_id from events e where e.id = event_id), 'scoring'));
+  using (has_event_perm(event_id, 'scoring')) with check (has_event_perm(event_id, 'scoring'));
+create policy match_events_read on match_events for select using (can_view_team(event_team(event_id)));
+create policy match_events_write on match_events for all
+  using (has_event_perm(event_id, 'scoring')) with check (has_event_perm(event_id, 'scoring'));
+
+-- player of the match: vote once, only if you were marked present or late, only while open
+create policy potm_own on potm_votes for select using (voter_id = auth.uid() or is_team_staff(event_team(event_id)));
+create policy potm_vote on potm_votes for insert with check (
+  voter_id = auth.uid()
+  and exists (select 1 from events e where e.id = event_id and e.potm_open)
+  and played_in(event_id, auth.uid())
+  and played_in(event_id, nominee_id)
+);
+create policy potm_change on potm_votes for update using (voter_id = auth.uid()) with check (voter_id = auth.uid());
+
+create view potm_results with (security_invoker = false) as
+  select v.event_id, v.nominee_id, count(*) as votes
+  from potm_votes v join events e on e.id = v.event_id
+  where is_team_member(e.team_id) and not e.potm_open
+  group by v.event_id, v.nominee_id;
+
+-- points: own rows; whole team if the leaderboard is public; staff all. Written by staff
+-- (manual) or by the server action that records attendance (automatic, service role).
+create policy points_read on points_ledger for select using (
+  user_id = auth.uid() or is_team_staff(team_id)
+  or (is_team_member(team_id) and exists (select 1 from teams t where t.id = team_id and t.points_enabled and t.points_public))
+);
+create policy points_manual on points_ledger for insert with check (
+  reason = 'manual' and created_by = auth.uid() and has_team_perm(team_id, 'attendance')
+);
+
+-- carpools: anyone on the team; drivers manage their offer; riders their request
+create policy offers_read on ride_offers for select using (is_team_member(event_team(event_id)));
+create policy offers_own on ride_offers for all
+  using (driver_id = auth.uid() or has_event_perm(event_id, 'carpools') or is_team_staff(event_team(event_id)))
+  with check ((driver_id = auth.uid() and is_team_member(event_team(event_id))) or has_event_perm(event_id, 'carpools') or is_team_staff(event_team(event_id)));
+create policy requests_read on ride_requests for select using (is_team_member(event_team(event_id)));
+create policy requests_own on ride_requests for all
+  using (rider_id = auth.uid()
+         or exists (select 1 from ride_offers o where o.id = offer_id and o.driver_id = auth.uid())
+         or has_event_perm(event_id, 'carpools') or is_team_staff(event_team(event_id)))
+  with check ((rider_id = auth.uid() and is_team_member(event_team(event_id)))
+         or exists (select 1 from ride_offers o where o.id = offer_id and o.driver_id = auth.uid())
+         or has_event_perm(event_id, 'carpools') or is_team_staff(event_team(event_id)));
+
+-- dues: players see their own; the payments permission sees and verifies all
+create policy fees_read on fees for select using (is_team_member(team_id));
+create policy fees_write on fees for all using (has_team_perm(team_id, 'payments')) with check (has_team_perm(team_id, 'payments'));
+create policy dues_read on dues for select using (user_id = auth.uid() or has_team_perm(fee_team(fee_id), 'payments'));
+create policy dues_write on dues for all using (has_team_perm(fee_team(fee_id), 'payments')) with check (has_team_perm(fee_team(fee_id), 'payments'));
+create policy payments_read on payments for select using (
+  exists (select 1 from dues d where d.id = due_id and d.user_id = auth.uid()) or has_team_perm(due_team(due_id), 'payments')
+);
+-- A player may report a payment for their own due, never as verified.
+create policy payments_report on payments for insert with check (
+  (reported_by = auth.uid() and verified_by is null
+   and exists (select 1 from dues d where d.id = due_id and d.user_id = auth.uid()))
+  or has_team_perm(due_team(due_id), 'payments')
+);
+create policy payments_verify on payments for update
+  using (has_team_perm(due_team(due_id), 'payments')) with check (has_team_perm(due_team(due_id), 'payments'));
+create policy payments_delete on payments for delete using (has_team_perm(due_team(due_id), 'payments'));
 
 -- chat
-create policy conversations_read on conversations for select using (is_team_member(team_id));
-create policy conversations_staff on conversations for all
-  using (is_team_staff(team_id)) with check (is_team_staff(team_id));
+create policy conversations_read on conversations for select using (can_read_conversation(id));
+create policy conversations_staff on conversations for all using (is_team_staff(team_id)) with check (is_team_staff(team_id));
 
-create policy chat_read on chat_messages for select using (is_team_member(conversation_team(conversation_id)));
+create policy chat_read on chat_messages for select using (can_read_conversation(conversation_id));
 create policy chat_insert on chat_messages for insert with check (
-  author_id = auth.uid()
-  and is_team_member(conversation_team(conversation_id))
+  author_id = auth.uid() and can_read_conversation(conversation_id)
   and (is_team_staff(conversation_team(conversation_id))
-       or exists (select 1 from conversations c where c.id = conversation_id and c.families_can_post))
+       or exists (select 1 from teams t where t.id = conversation_team(conversation_id) and t.members_can_post))
 );
-create policy chat_update_own on chat_messages for update
+create policy chat_update on chat_messages for update
   using (author_id = auth.uid() or is_team_staff(conversation_team(conversation_id)))
   with check (author_id = auth.uid() or is_team_staff(conversation_team(conversation_id)));
 
 create policy reactions_read on chat_reactions for select using (
-  exists (select 1 from chat_messages m where m.id = message_id and is_team_member(conversation_team(m.conversation_id)))
+  exists (select 1 from chat_messages m where m.id = message_id and can_read_conversation(m.conversation_id))
 );
 create policy reactions_own on chat_reactions for all using (user_id = auth.uid())
-  with check (user_id = auth.uid() and exists (
-    select 1 from chat_messages m where m.id = message_id and is_team_member(conversation_team(m.conversation_id))));
-
-create policy reads_read on chat_reads for select using (is_team_member(conversation_team(conversation_id)));
+  with check (user_id = auth.uid() and exists (select 1 from chat_messages m where m.id = message_id and can_read_conversation(m.conversation_id)));
+create policy reads_read on chat_reads for select using (can_read_conversation(conversation_id));
 create policy reads_own on chat_reads for all using (user_id = auth.uid())
-  with check (user_id = auth.uid() and is_team_member(conversation_team(conversation_id)));
-
+  with check (user_id = auth.uid() and can_read_conversation(conversation_id));
 create policy poll_options_read on poll_options for select using (
-  exists (select 1 from chat_messages m where m.id = message_id and is_team_member(conversation_team(m.conversation_id)))
+  exists (select 1 from chat_messages m where m.id = message_id and can_read_conversation(m.conversation_id))
 );
 create policy poll_options_author on poll_options for insert with check (
   exists (select 1 from chat_messages m where m.id = message_id and m.author_id = auth.uid())
 );
 create policy poll_votes_read on poll_votes for select using (
-  exists (select 1 from chat_messages m where m.id = message_id and is_team_member(conversation_team(m.conversation_id)))
+  exists (select 1 from chat_messages m where m.id = message_id and can_read_conversation(m.conversation_id))
 );
 create policy poll_votes_own on poll_votes for all using (user_id = auth.uid())
   with check (user_id = auth.uid() and exists (
     select 1 from poll_options o join chat_messages m on m.id = o.message_id
-    where o.id = option_id and o.message_id = poll_votes.message_id
-      and is_team_member(conversation_team(m.conversation_id))));
+    where o.id = option_id and o.message_id = poll_votes.message_id and can_read_conversation(m.conversation_id)));
 
--- messages: author, staff, and recipients
+-- messages
 create policy messages_read on messages for select using (
   author_id = auth.uid() or is_team_staff(team_id)
   or exists (select 1 from message_recipients mr where mr.message_id = messages.id and mr.user_id = auth.uid())
@@ -696,15 +945,12 @@ create policy recipients_read on message_recipients for select using (
   user_id = auth.uid()
   or exists (select 1 from messages m where m.id = message_id and (m.author_id = auth.uid() or is_team_staff(m.team_id)))
 );
-create policy recipients_mark_read on message_recipients for update
-  using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy recipients_mark_read on message_recipients for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- personal settings
 create policy prefs_own on notification_prefs for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy push_own on push_subscriptions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy feeds_own on calendar_feeds for select using (user_id = auth.uid());
 
--- ---------------------------------------------------------------------------
--- realtime: tables the browser subscribes to
--- ---------------------------------------------------------------------------
--- alter publication supabase_realtime add table chat_messages, chat_reactions, chat_reads, poll_votes, scores, rsvps, events;
+-- realtime:
+-- alter publication supabase_realtime add table chat_messages, chat_reactions, chat_reads, poll_votes, scores, match_events, rsvps, events, ride_offers, ride_requests;
