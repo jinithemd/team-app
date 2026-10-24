@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import * as data from "@/lib/data";
-import type { ActionResult, RsvpResponse, StaffPermission } from "@/lib/data/types";
+import type { ActionResult, RsvpResponse } from "@/lib/data/types";
 
 // Thin server-action wrappers. Permission checks live in the data layer (and in RLS later).
 
@@ -40,36 +40,53 @@ export async function createTeamAction(_: FormState, f: FormData): Promise<FormS
   const res = await data.createTeam({
     name: str(f, "name"),
     sport: str(f, "sport"),
-    ageGroup: str(f, "ageGroup"),
+    level: str(f, "level"),
     location: str(f, "location"),
     color: str(f, "color"),
     colorSecondary: str(f, "colorSecondary") || null,
-    orgName: str(f, "orgName"),
+    clubId: str(f, "clubId") || null,
   });
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath("/", "layout");
-  redirect(`/t/${res.data.id}/roster?created=1`);
+  redirect(`/t/${res.data.id}/you?new=1`);
+}
+
+export async function createClubAction(_: FormState, f: FormData): Promise<FormState> {
+  const res = await data.createClub({ name: str(f, "name"), color: str(f, "color"), colorSecondary: str(f, "colorSecondary") || null });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  redirect(`/teams/new?club=${res.data.id}&clubCreated=1`);
+}
+
+export async function setMyPartAction(teamId: string, next: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.setMyPart(teamId, {
+    isPlayer: str(f, "plays") === "yes",
+    jersey: str(f, "jersey"),
+    position: str(f, "position"),
+    roles: f.getAll("role").map(String),
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  if (next) redirect(next);
+  return { ok: true, message: "Saved." };
 }
 
 export async function invitePeopleAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
   const count = Number(f.get("count") ?? 0);
-  const kind = str(f, "kind") === "staff" ? "staff" : "player";
   const rows = Array.from({ length: count }, (_, i) => ({
     firstName: str(f, `${i}.firstName`),
     lastName: str(f, `${i}.lastName`),
     email: str(f, `${i}.email`),
     jersey: str(f, `${i}.jersey`),
     position: str(f, `${i}.position`),
-    kind: kind as "player" | "staff",
-    emailIsParent: str(f, `${i}.emailFor`) !== "self",
-    staffRole: (str(f, `${i}.staffRole`) || undefined) as "assistant_coach" | "manager" | "other" | undefined,
-    permissions: kind === "staff" ? (f.getAll(`${i}.perm`).map(String) as StaffPermission[]) : undefined,
+    isPlayer: str(f, `${i}.plays`) !== "no",
+    roles: f.getAll(`${i}.role`).map(String),
   })).filter((r) => r.firstName || r.lastName || r.email);
   if (!rows.length) return { error: "Add at least one person." };
   const res = await data.invitePeople(teamId, rows);
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath(`/t/${teamId}`, "layout");
-  redirect(`/t/${teamId}/roster?invited=${rows.length}`);
+  redirect(`/t/${teamId}/roster?invited=${res.data.count}`);
 }
 
 export async function createEventAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
@@ -101,11 +118,11 @@ export async function setEventStatusAction(eventId: string, teamId: string, _: F
 
 export async function setRsvpAction(
   eventId: string,
-  personId: string,
+  userId: string,
   response: RsvpResponse,
   note?: string | null,
 ): Promise<ActionResult<{ response: RsvpResponse; note: string | null }>> {
-  const res = await data.setRsvp(eventId, personId, response, note);
+  const res = await data.setRsvp(eventId, userId, response, note);
   if (!res.ok) return res;
   revalidatePath("/", "layout");
   return { ok: true, data: { response: res.data.response, note: res.data.note } };
@@ -116,7 +133,7 @@ export async function nudgeAction(eventId: string, _: FormState): Promise<FormSt
   if (!res.ok) return { error: res.error };
   return {
     ok: true,
-    message: res.data.sent ? `Reminder sent to ${res.data.sent} ${res.data.sent === 1 ? "family" : "families"}.` : "Everyone has answered already.",
+    message: res.data.sent ? `Reminder sent to ${res.data.sent} ${res.data.sent === 1 ? "player" : "players"}.` : "Everyone has answered already.",
   };
 }
 

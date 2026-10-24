@@ -12,7 +12,7 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
     return (
       <main className="gutter mx-auto grid max-w-md gap-3 py-12">
         <h1 className="text-xl font-bold">This invite link doesn&apos;t work any more</h1>
-        <p className="text-muted">It may have expired or been cancelled. Ask the coach to send you a new one.</p>
+        <p className="text-muted">It may have expired or been cancelled. Ask your captain to send you a new one.</p>
       </main>
     );
   const signedInAsOther = user && user.email !== invite.email;
@@ -27,12 +27,10 @@ export default async function InvitePage({ params }: { params: Promise<{ token: 
       </div>
       <div className="gutter mx-auto grid max-w-md gap-4 py-6">
         <p>
-          {invite.kind === "staff"
-            ? "Join as staff to see the schedule, the roster and who's coming."
-            : invite.forChild
-              ? `${invite.person.firstName} ${invite.person.lastName} is on the roster. Join to see the schedule and answer for games and practices.`
-              : "You're on the roster. Join to see the schedule and answer for games and practices."}
+          {invite.person.firstName ? `${invite.person.firstName}, you're` : "You're"} on the roster
+          {invite.hats.length ? ` as ${invite.hats.join(", ").toLowerCase()}` : ""}. Join to see the schedule and say if you&apos;re in for each game and training.
         </p>
+        <p className="text-sm text-muted">Already on another team with us? Use the same email and it all sits under one account.</p>
         {invite.accepted && !signedInAsOther ? (
           <a href={`/t/${invite.team.id}/schedule`} className="font-semibold text-team-ink underline">
             You&apos;ve already joined. Open the team.

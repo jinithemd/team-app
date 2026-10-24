@@ -20,105 +20,150 @@ def step(msg): print("✓", msg, flush=True)
 with sync_playwright() as p:
     b = p.chromium.launch()
     phone = dict(viewport={"width": 390, "height": 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
-    coach = b.new_context(**phone); c = coach.new_page(); watch(c, "coach")
-    parent = b.new_context(**phone); par = parent.new_page(); watch(par, "parent")
+    cap = b.new_context(**phone); c = cap.new_page(); watch(c, "founder")
+    player = b.new_context(**phone); par = player.new_page(); watch(par, "player")
 
-    # S01 sign up as a new coach
+    # S01 one sign-up for everyone
     c.goto(f"{BASE}/login"); shot(c, "S01-login")
-    c.fill("#firstName", "Jordan"); c.fill("#lastName", "Lee"); c.fill("#email", "jordan.coach@example.com")
+    c.fill("#firstName", "Jin"); c.fill("#lastName", "Varghese"); c.fill("#email", "jin.founder@example.com")
     c.click("text=Create account"); c.wait_for_url(f"{BASE}/")
-    expect(c.get_by_text("You're not on a team yet")).to_be_visible(); shot(c, "S02-home-empty"); step("new coach signs up, sees empty home")
+    expect(c.get_by_text("You're not on a team yet")).to_be_visible(); shot(c, "S02-home-empty"); step("founder signs up once, sees empty home")
 
-    # S05 create team with an orange colour
-    c.goto(f"{BASE}/teams/new")
-    c.fill("#name", "Riverside U11 Rockets")
-    c.get_by_role("radio", name="Orange").first.click()
-    shot(c, "S05-create-team")
-    c.click("text=Create team"); c.wait_for_url(re.compile(r"/roster\?created=1"))
-    expect(c.get_by_text("Nobody's on the roster yet")).to_be_visible(); shot(c, "S12-roster-empty"); step("team created with colour, lands on empty roster")
+    # set up a club: makes you its owner
+    c.get_by_role("link", name="Set up a club").click(); c.wait_for_url(f"{BASE}/clubs/new")
+    c.click("text=Create club"); expect(c.get_by_text("Give the club a name.")).to_be_visible(); step("validation: club needs a name")
+    c.fill("#name", "Riverside FC"); shot(c, "club-new")
+    c.click("text=Create club"); c.wait_for_url(re.compile(r"/teams/new\?club="))
+    expect(c.get_by_text("Riverside FC is set up and you're its owner")).to_be_visible(); step("club created, founder is owner")
+
+    # create a team inside the club
+    expect(c.locator("#clubId")).to_have_value(re.compile(".+"))
+    c.fill("#name", "Riverside First Team"); shot(c, "S05-create-team")
+    c.click("text=Create team"); c.wait_for_url(re.compile(r"/you\?new=1"))
+    expect(c.get_by_text("Step 2 of 3")).to_be_visible()
+    expect(c.get_by_role("radio", name="Yes, I play")).to_have_attribute("aria-checked", "true"); step("Your part step opens, 'I play' preselected")
+
+    # player + captain + manager
+    c.fill("#jersey", "9"); c.fill("#position", "Forward")
+    c.locator("label", has_text="Manager").click()
+    prev = c.get_by_role("region", name="How you'll show on the roster")
+    for hat in ["Player #9", "Captain", "Manager", "Club owner"]:
+        expect(prev.get_by_text(hat, exact=True)).to_be_visible()
+    shot(c, "your-part"); step("preview shows Player #9, Captain, Manager, Club owner")
+    c.click("text=Next: add players"); c.wait_for_url(re.compile(r"/roster\?created=1"))
+    me = c.locator("li", has_text="(you)")
+    for hat in ["Captain", "Manager", "Club owner"]:
+        expect(me.get_by_text(hat, exact=True)).to_be_visible()
+    expect(c.get_by_text("1 player")).to_be_visible(); shot(c, "S12-roster-me"); step("founder is on the roster once, with every hat")
 
     team_id = re.search(r"/t/([^/]+)/", c.url).group(1)
 
-    # S13 paste two players
+    # the team header shows the hats too
+    hdr = c.locator("header").first
+    expect(hdr.get_by_text("Player #9", exact=True)).to_be_visible(); step("team header shows your roles")
+
+    # S13 paste two players, give one a role
     c.goto(f"{BASE}/t/{team_id}/roster/add")
     c.click("text=Paste a whole list instead")
-    c.fill("#paste", "Kai Morgan, morgan.family@example.com, 9\nLila Osei, osei.family@example.com, 14, Goalkeeper")
+    c.fill("#paste", "Kai Morgan, kai.morgan@example.com, 14\nLila Osei, lila.osei@example.com, 1, Goalkeeper")
     c.get_by_role("button", name=re.compile("Add 2 to the list")).click()
     expect(c.locator("input[name='1.firstName']")).to_have_value("Lila")
+    c.locator("li", has_text="Person 2").locator("label", has_text="Vice captain").click()
     shot(c, "S13-add-players")
     c.get_by_role("button", name="Send 2 invites").click(); c.wait_for_url(re.compile(r"invited=2"))
-    expect(c.get_by_text("Invite sent").first).to_be_visible(); shot(c, "S12-roster-invited"); step("pasted list of 2 players, invites pending")
+    expect(c.get_by_text("Invite sent").first).to_be_visible()
+    expect(c.locator("li", has_text="Lila Osei").get_by_text("Vice captain", exact=True)).to_be_visible()
+    shot(c, "S12-roster-invited"); step("pasted 2 players, Lila invited as vice captain")
 
-    # parent opens invite email from sample inbox, joins
+    # player opens the invite from the sample inbox and joins
     par.goto(f"{BASE}/dev/outbox")
-    inv = par.locator("li", has_text="morgan.family@example.com").first
+    inv = par.locator("li", has_text="kai.morgan@example.com").first
     inv.get_by_role("link", name="Join the team").click()
-    par.wait_for_url(re.compile(r"/invite/")); shot(par, "invite-landing")
-    par.fill("#firstName", "Dana"); par.fill("#lastName", "Morgan"); par.get_by_role("button", name="Join the team").click()
+    par.wait_for_url(re.compile(r"/invite/")); expect(par.get_by_text("Kai, you're on the roster as player #14")).to_be_visible(); shot(par, "invite-landing")
+    par.fill("#firstName", "Kai"); par.fill("#lastName", "Morgan"); par.get_by_role("button", name="Join the team").click()
     par.wait_for_url(re.compile(r"/schedule\?joined=1"))
-    expect(par.get_by_text("No games or practices yet")).to_be_visible(); step("parent joins from email invite, sees empty schedule")
+    expect(par.get_by_text("No games or practices yet")).to_be_visible(); step("player joins from the email invite")
 
-    # S09 coach adds a game, notify on
+    # S09 founder adds a match
     c.goto(f"{BASE}/t/{team_id}/e/new"); shot(c, "S09-new-event")
-    c.click("text=Add game"); expect(c.get_by_text("Add who you're playing.")).to_be_visible(); step("validation: game needs an opponent")
+    c.click("text=Add game"); expect(c.get_by_text("Add who you're playing.")).to_be_visible(); step("validation: match needs an opponent")
     c.fill("#opponent", "Cataraqui Cobras")
     c.fill("#date", "2026-11-07"); c.fill("#startTime", "10:00")
     c.fill("#locationText", "Caraco Park, Field 1")
     c.click("text=Add game"); c.wait_for_url(re.compile(r"/e/[^/]+\?created=1"))
     event_url = c.url.split("?")[0]
-    expect(c.get_by_text("0 going")).to_be_visible(); step("coach adds game; 0 going so far")
-    expect(c.get_by_text("10:00 am – 11:30 am", exact=False)).to_be_visible(); step("end time defaulted to 90 min, shown in Toronto time")
+    expect(c.get_by_text("0 going")).to_be_visible(); step("founder adds a match; 0 going so far")
 
-    # parent answers Going from the email button
+    # the founder plays too, so they're asked as well
+    expect(c.get_by_role("heading", name="Are you in?")).to_be_visible()
+    c.get_by_role("button", name="Going", exact=True).click(); expect(c.get_by_text("Saved")).to_be_visible()
+    c.reload(); expect(c.get_by_text("1 going")).to_be_visible(); step("playing captain answers for themselves on the same screen as the captain tools")
+    expect(c.get_by_role("button", name="Cancel event")).to_be_visible()
+
+    # player answers from the email button
     par.goto(f"{BASE}/dev/outbox")
-    mail = par.locator("li", has_text="Cataraqui Cobras").filter(has_text="morgan.family@example.com").first
+    mail = par.locator("li", has_text="Cataraqui Cobras").filter(has_text="kai.morgan@example.com").first
     mail.get_by_role("link", name="Going", exact=True).click()
-    expect(par.get_by_text("Kai is going")).to_be_visible(); shot(par, "email-rsvp-landing"); step("parent taps Going in email: one-tap answer, no sign-in")
+    expect(par.get_by_text("You're in, Kai")).to_be_visible(); shot(par, "email-rsvp-landing"); step("player taps Going in the email, no sign-in")
+    c.goto(event_url); expect(c.get_by_text("2 going")).to_be_visible(); step("founder sees 2 going")
 
-    # coach sees it
-    c.goto(event_url); expect(c.get_by_text("1 going")).to_be_visible(); step("coach sees 1 going")
-    c.goto(event_url + "/rsvps"); expect(c.get_by_text("Kai Morgan")).to_be_visible(); shot(c, "S10-availability"); step("availability list shows Kai under Going")
-
-    # parent changes answer in-app with keyboard, adds note
+    # player adds a note; founder sees it
     par.goto(event_url)
     par.get_by_role("button", name="Maybe", exact=True).focus(); par.keyboard.press("Enter")
     expect(par.get_by_text("Saved")).to_be_visible()
-    par.get_by_role("button", name="+ Add a note for the coach").click()
-    par.get_by_placeholder("e.g. Might be 10 minutes late").fill("Has a dentist appointment at 9")
-    par.keyboard.press("Enter"); expect(par.get_by_text("Note sent to the coach")).to_be_visible()
-    shot(par, "S08-event-parent"); step("parent switches to Maybe with keyboard and adds a private note")
-    c.goto(event_url + "/rsvps"); expect(c.get_by_text("Has a dentist appointment at 9")).to_be_visible(); step("coach sees the note")
+    par.get_by_role("button", name="+ Add a note for your captains").click()
+    par.get_by_placeholder("e.g. Might be 10 minutes late").fill("Working till 9, might be late")
+    par.keyboard.press("Enter"); expect(par.get_by_text("Note sent to your captains")).to_be_visible()
+    shot(par, "S08-event-player"); step("player switches to Maybe with the keyboard and adds a note")
+    c.goto(event_url + "/rsvps"); expect(c.get_by_text("Working till 9, might be late")).to_be_visible(); shot(c, "S10-availability"); step("founder sees the note")
 
-    # permission: parent can't add events
-    par.goto(f"{BASE}/t/{team_id}/e/new"); expect(par.get_by_text("Only staff can add events")).to_be_visible(); step("parent blocked from adding events")
+    # permissions: a plain player can't add events or give themself roles
+    par.goto(f"{BASE}/t/{team_id}/e/new"); expect(par.get_by_text("Only captains and managers can add events")).to_be_visible(); step("player blocked from adding events")
+    par.goto(f"{BASE}/t/{team_id}/you"); expect(par.get_by_text("Only someone who manages permissions can change roles")).to_be_visible()
+    expect(par.locator("input[value='captain']")).to_be_disabled(); step("player can't make themself captain")
+    par.goto(f"{BASE}/account"); expect(par.locator("li", has_text="Riverside First Team").get_by_text("Player #14", exact=True)).to_be_visible(); step("player's account lists Player #14")
 
-    # coach cancels the game
+    # founder cancels
     c.goto(event_url); c.get_by_role("button", name="Cancel event").click()
     c.fill("#reason", "Field flooded"); c.click("text=Cancel and tell the team")
     expect(c.get_by_text("Marked cancelled")).to_be_visible(); c.reload()
-    expect(c.get_by_text("Cancelled: Field flooded")).to_be_visible(); step("coach cancels with a reason")
-    par.goto(f"{BASE}/t/{team_id}/schedule"); expect(par.get_by_text("Field flooded")).to_be_visible(); step("parent sees it cancelled on the schedule")
+    expect(c.get_by_text("Cancelled: Field flooded")).to_be_visible(); step("founder cancels with a reason")
+    par.goto(f"{BASE}/t/{team_id}/schedule"); expect(par.get_by_text("Field flooded")).to_be_visible(); step("player sees it cancelled")
 
-    # seeded accounts: multi-kid parent, team colours, screens
-    demo = b.new_context(**phone); d = demo.new_page(); watch(d, "anita")
-    d.goto(f"{BASE}/login"); d.get_by_role("button", name=re.compile("Anita Nair")).click(); d.wait_for_url(f"{BASE}/")
-    shot(d, "S02-home"); step("Anita (2 kids, 2 teams) home")
+    # founder's account lists every hat
+    c.goto(f"{BASE}/account")
+    expect(c.locator("li", has_text="Riverside FC").get_by_text("Club owner", exact=True)).to_be_visible()
+    row = c.locator("li", has_text="Riverside First Team")
+    for hat in ["Player #9", "Captain", "Manager"]:
+        expect(row.get_by_text(hat, exact=True)).to_be_visible()
+    shot(c, "S23-account-founder"); step("founder's account: Club owner, and Player #9 + Captain + Manager")
+
+    # seeded accounts
+    demo = b.new_context(**phone); d = demo.new_page(); watch(d, "rahul")
+    d.goto(f"{BASE}/login"); d.get_by_role("button", name=re.compile("Rahul Menon")).click(); d.wait_for_url(f"{BASE}/")
+    shot(d, "S02-home"); step("Rahul (2 teams) home")
     d.goto(f"{BASE}/rsvps"); shot(d, "S11-my-rsvps")
     d.goto(f"{BASE}/calendar"); shot(d, "S18-calendar")
+    d.goto(f"{BASE}/calendar?team=t-reserves"); expect(d.get_by_text("Napanee Rovers").first).to_be_visible()
+    assert d.get_by_text("Frontenac FC").count() == 0; step("calendar filters by team")
     d.goto(f"{BASE}/teams"); shot(d, "S03-teams")
     d.goto(f"{BASE}/t/t-strikers/schedule"); shot(d, "S07-schedule")
     d.goto(f"{BASE}/t/t-strikers/schedule?view=month"); shot(d, "S07-schedule-month")
     d.goto(f"{BASE}/t/t-strikers/e/e-s-g1"); shot(d, "S08-event")
     d.goto(f"{BASE}/t/t-strikers/roster"); shot(d, "S12-roster")
-    d.goto(f"{BASE}/t/t-comets/schedule"); shot(d, "S07-schedule-comets")
     d.goto(f"{BASE}/account"); shot(d, "S23-account")
-    # another family's notes are hidden from Anita
     d.goto(f"{BASE}/t/t-strikers/e/e-s-g1/rsvps")
-    assert d.get_by_text("Away at a family wedding").count() == 0; step("other families' notes hidden from parents")
-    # dark mode
+    assert d.get_by_text("Away at a wedding").count() == 0; step("teammates' notes hidden from players")
     d.goto(f"{BASE}/account"); d.get_by_role("button", name="Dark").click(); d.wait_for_timeout(500)
     d.goto(f"{BASE}/t/t-strikers/e/e-s-g1"); shot(d, "S08-event-dark")
     d.goto(f"{BASE}/"); shot(d, "S02-home-dark"); step("dark mode via account setting")
+
+    # Dan: club owner who plays, captains and manages the First Team
+    dan = b.new_context(**phone).new_page(); watch(dan, "dan")
+    dan.goto(f"{BASE}/login"); dan.get_by_role("button", name=re.compile("Dan Kowalski")).click(); dan.wait_for_url(f"{BASE}/")
+    dan.goto(f"{BASE}/t/t-reserves/roster"); expect(dan.get_by_text("Marcus Lee")).to_be_visible(); step("club owner sees a club team he isn't on")
+    dan.goto(f"{BASE}/t/t-first/roster"); shot(dan, "S12-roster-dan")
+    dan.goto(f"{BASE}/t/t-first/e/e-f-g1"); expect(dan.get_by_role("heading", name="Are you in?")).to_be_visible(); step("Dan is asked to answer as a player on his own team")
 
     # desktop
     desk = b.new_context(viewport={"width": 1440, "height": 900}); k = desk.new_page(); watch(k, "priya")
@@ -127,8 +172,7 @@ with sync_playwright() as p:
     k.goto(f"{BASE}/t/t-strikers/schedule"); shot(k, "S07-schedule-1440")
     k.goto(f"{BASE}/t/t-strikers/e/e-s-g1"); shot(k, "S08-event-staff-1440")
     k.goto(f"{BASE}/t/t-strikers/e/e-s-g1/rsvps"); shot(k, "S10-availability-1440")
-    assert k.get_by_text("Away at a family wedding").count() == 1; step("coach sees notes")
-    k.goto(f"{BASE}/teams/new"); k.fill("#name", "Lemon Test FC"); k.get_by_role("radio", name="Yellow").first.click(); shot(k, "S05-create-team-yellow-1440")
+    assert k.get_by_text("Away at a wedding").count() == 1; step("captain sees notes")
 
     # horizontal overflow check on all phone screenshots' pages
     for path in ["/", "/rsvps", "/calendar", "/teams", "/t/t-strikers/schedule", "/t/t-strikers/e/e-s-g1", "/t/t-strikers/roster", "/account"]:

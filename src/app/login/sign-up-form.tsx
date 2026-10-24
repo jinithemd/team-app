@@ -28,6 +28,7 @@ export function SignUpForm() {
       <button className={buttonClass("primary", "lg", "w-full")} disabled={pending} aria-busy={pending}>
         {pending ? "Creating your account…" : "Create account"}
       </button>
+      <p className="text-xs text-muted">Player, captain, manager or club owner, it&apos;s one account. You pick your roles when you start or join a team.</p>
     </form>
   );
 }

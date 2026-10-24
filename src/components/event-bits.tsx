@@ -71,9 +71,7 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
   const cancelled = e.status === "cancelled";
   const today = isToday(e.startAt, e.tz);
   const past = Date.parse(e.endAt) < Date.now();
-  const mineLabel = e.mine.length
-    ? e.mine.map((m) => `${e.mine.length > 1 ? m.person.firstName + " " : ""}${m.response ? RSVP_LABEL[m.response] : "no answer yet"}`).join(", ")
-    : "";
+  const mineLabel = e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : "no answer yet") : "";
   return (
     <Link
       href={`/t/${e.teamId}/e/${e.id}`}
@@ -114,11 +112,10 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
             </>
           )}
         </div>
-        {(showTeam || (!cancelled && e.mine.length > 0)) && (
+        {(showTeam || (!cancelled && e.mine)) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {showTeam && <TeamDot name={e.team.name} />}
-            {!cancelled &&
-              e.mine.map((m) => <RsvpChip key={m.person.id} response={m.response} name={e.mine.length > 1 ? m.person.firstName : undefined} />)}
+            {!cancelled && e.mine && <RsvpChip response={e.mine.response} />}
           </div>
         )}
       </div>

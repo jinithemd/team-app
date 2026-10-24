@@ -20,7 +20,7 @@ export default async function OutboxPage() {
           Back to the app
         </Link>
       </div>
-      <p className="text-sm text-muted">Emails the app would send. Links work, so you can join a team or answer from here the way a parent would.</p>
+      <p className="text-sm text-muted">Emails the app would send. Links work, so you can join a team or answer from here the way a player would.</p>
       {mail.length === 0 ? (
         <EmptyState icon={<Mail />} title="No emails yet" hint="Invite someone or add a game with “Tell the team” on." />
       ) : (

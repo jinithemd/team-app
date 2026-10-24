@@ -8,7 +8,7 @@ import { deriveTeamTheme, teamThemeVars, type Mode } from "@/lib/team-theme";
 
 const SPORTS = ["Soccer", "Cricket", "Basketball", "Hockey", "Baseball", "Volleyball", "Rugby", "Lacrosse", "Football", "Other"];
 
-const PRESETS: [string, string][] = [
+export const PRESETS: [string, string][] = [
   ["Deep purple", "#2D0A3E"],
   ["Navy", "#0B1F4B"],
   ["Royal blue", "#1D4ED8"],
@@ -23,19 +23,44 @@ const PRESETS: [string, string][] = [
   ["White", "#FFFFFF"],
 ];
 
-export function CreateTeamForm() {
+type ClubOption = { id: string; name: string; color: string; colorSecondary: string | null };
+
+export function CreateTeamForm({ clubs, defaultClubId }: { clubs: ClubOption[]; defaultClubId?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(createTeamAction, null);
   const fe = state?.fieldErrors ?? {};
+  const startClub = clubs.find((c) => c.id === defaultClubId);
+  const [clubId, setClubId] = useState(startClub?.id ?? "");
   const [name, setName] = useState("");
-  const [color, setColor] = useState<string>(PRESETS[0][1]);
-  const [secondary, setSecondary] = useState<string | null>("#B8964A");
+  const [color, setColor] = useState<string>(startClub?.color ?? PRESETS[0][1]);
+  const [secondary, setSecondary] = useState<string | null>(startClub ? startClub.colorSecondary : "#B8964A");
+
+  function pickClub(cid: string) {
+    setClubId(cid);
+    const c = clubs.find((x) => x.id === cid);
+    if (c) {
+      setColor(c.color);
+      setSecondary(c.colorSecondary);
+    }
+  }
 
   return (
     <form action={action} className="grid gap-6" noValidate>
       <fieldset className="grid gap-4">
         <legend className="sr-only">Team details</legend>
+        {clubs.length > 0 && (
+          <Field id="clubId" label="Part of a club?" error={fe.clubId} hint="Club teams use the club's colours and show under the club.">
+            <select id="clubId" name="clubId" value={clubId} onChange={(e) => pickClub(e.target.value)} className={inputClass}>
+              <option value="">No, an independent team</option>
+              {clubs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
         <Field id="name" label="Team name" error={fe.name}>
-          <Input id="name" name="name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kingston U12 Strikers" error={fe.name} />
+          <Input id="name" name="name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} placeholder={clubId ? "e.g. First Team, Reserves, Over-35s" : "e.g. Kingston Strikers"} error={fe.name} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field id="sport" label="Sport" error={fe.sport}>
@@ -45,14 +70,11 @@ export function CreateTeamForm() {
               ))}
             </select>
           </Field>
-          <Field id="ageGroup" label="Age group" hint="Optional, like U12 or Adult rec">
-            <Input id="ageGroup" name="ageGroup" maxLength={30} />
+          <Field id="level" label="Level or league" hint="Optional, like Sunday league or Division 2">
+            <Input id="level" name="level" maxLength={40} />
           </Field>
           <Field id="location" label="Where you play" hint="City or area">
             <Input id="location" name="location" maxLength={60} placeholder="Kingston, ON" />
-          </Field>
-          <Field id="orgName" label="Club or league" hint="Optional">
-            <Input id="orgName" name="orgName" maxLength={80} />
           </Field>
         </div>
       </fieldset>
@@ -74,7 +96,7 @@ export function CreateTeamForm() {
   );
 }
 
-function ColorField({
+export function ColorField({
   label,
   name,
   value,

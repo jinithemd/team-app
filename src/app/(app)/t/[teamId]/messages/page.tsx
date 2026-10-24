@@ -10,7 +10,7 @@ export default function TeamMessagesPage() {
     <EmptyState
       icon={<Mail />}
       title="Messages are on the way"
-      hint="Send an email-style message to the whole team or chosen families. Arrives after team chat."
+      hint="Send an email-style message to the whole team or chosen players. Arrives after team chat."
     />
   );
 }

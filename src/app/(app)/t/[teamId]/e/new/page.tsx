@@ -15,8 +15,8 @@ export default async function NewEventPage({ params }: { params: Promise<{ teamI
   if (!team.isStaff)
     return (
       <div className="grid gap-2">
-        <h2 className="text-xl font-bold">Only staff can add events</h2>
-        <p className="text-muted">Ask your coach if something is missing from the schedule.</p>
+        <h2 className="text-xl font-bold">Only captains and managers can add events</h2>
+        <p className="text-muted">Ask your captain if something is missing from the schedule.</p>
       </div>
     );
   const today = utcToZoned(new Date().toISOString(), DEFAULT_TZ).date;

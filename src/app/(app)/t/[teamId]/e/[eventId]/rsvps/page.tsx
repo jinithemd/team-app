@@ -34,7 +34,7 @@ export default async function AvailabilityPage({ params }: { params: Promise<{ t
         </p>
       </div>
       <Counts counts={a.counts} />
-      {a.canSeeNotes && <p className="text-xs text-muted">Notes from families are only visible to staff.</p>}
+      {a.canSeeNotes && <p className="text-xs text-muted">Notes are only visible to captains and managers.</p>}
       {groups.map((gr) => {
         const rows = a.rows.filter((r) => (r.response ?? "none") === gr.key);
         if (!rows.length) return null;

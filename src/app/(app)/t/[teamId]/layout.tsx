@@ -1,12 +1,14 @@
 import { notFound } from "next/navigation";
 import { getSessionUser, getTeam } from "@/lib/data";
 import { TeamTabs } from "@/components/nav";
+import { HatBadges } from "@/components/hats";
+import { hatLabels } from "@/lib/data/types";
 
 export default async function TeamLayout({ children, params }: { children: React.ReactNode; params: Promise<{ teamId: string }> }) {
   const { teamId } = await params;
   const [team, user] = await Promise.all([getTeam(teamId), getSessionUser()]);
   if (!team) notFound();
-  const subtitle = [team.sport, team.ageGroup, team.location].filter(Boolean).join(" · ");
+  const subtitle = [team.club?.name, team.level, team.location].filter(Boolean).join(" · ");
   return (
     // Team colour vars for this id are already emitted by the app layout.
     <div data-team={team.id} className="min-h-full">
@@ -23,10 +25,10 @@ export default async function TeamLayout({ children, params }: { children: React
           </span>
           <div className="min-w-0">
             <h1 className="font-display text-2xl leading-tight font-bold break-words uppercase">{team.name}</h1>
-            <p className="text-sm opacity-90">
-              {subtitle}
-              {team.isStaff ? " · You're staff" : team.myPeople.length ? ` · ${team.myPeople.map((p) => p.firstName).join(", ")}` : ""}
-            </p>
+            <p className="text-sm opacity-90">{subtitle}</p>
+            <div className="mt-1.5">
+              <HatBadges labels={hatLabels(team.hats, team.me?.jersey)} onTeam />
+            </div>
           </div>
         </div>
       </header>

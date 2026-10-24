@@ -4,6 +4,7 @@ import { useActionState, useState } from "react";
 import { ClipboardPaste, Plus, Trash2 } from "lucide-react";
 import { invitePeopleAction, type FormState } from "@/app/actions";
 import { Button, buttonClass, inputClass } from "@/components/ui";
+import { ROLE_LABEL, TEAM_ROLES, type TeamRole } from "@/lib/data/types";
 
 interface Row {
   key: number;
@@ -12,19 +13,12 @@ interface Row {
   email: string;
   jersey: string;
   position: string;
+  plays: boolean;
+  roles: TeamRole[];
 }
 
-const PERMS: [string, string][] = [
-  ["schedule_games", "Schedule games"],
-  ["schedule_events", "Schedule practices and events"],
-  ["roster", "Manage the roster"],
-  ["scoring", "Keep score"],
-  ["edit_settings", "Edit team settings"],
-  ["manage_permissions", "Manage staff permissions"],
-];
-
 let nextKey = 1;
-const blank = (): Row => ({ key: nextKey++, firstName: "", lastName: "", email: "", jersey: "", position: "" });
+const blank = (): Row => ({ key: nextKey++, firstName: "", lastName: "", email: "", jersey: "", position: "", plays: true, roles: [] });
 
 /** Parse pasted lines: "Maya Patel, sam@example.com, 7" (comma or tab separated, any order). */
 function parseList(text: string): Row[] {
@@ -43,34 +37,32 @@ function parseList(text: string): Row[] {
     });
 }
 
-export function InviteForm({ teamId, kind }: { teamId: string; kind: "player" | "staff" }) {
+export function InviteForm({ teamId, canGiveRoles }: { teamId: string; canGiveRoles: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(invitePeopleAction.bind(null, teamId), null);
   const fe = state?.fieldErrors ?? {};
   const [rows, setRows] = useState<Row[]>([blank()]);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [paste, setPaste] = useState("");
 
-  const update = (i: number, k: keyof Row, v: string) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const update = (i: number, k: keyof Row, v: Row[keyof Row]) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
 
   return (
     <form action={action} className="grid gap-5" noValidate>
       <input type="hidden" name="count" value={rows.length} />
-      <input type="hidden" name="kind" value={kind} />
-
-      {kind === "player" && (
+      {(
         <div className="grid gap-2 rounded-md bg-surface p-3">
           {pasteOpen ? (
             <>
               <label htmlFor="paste" className="text-sm font-semibold">
                 Paste your list
               </label>
-              <p className="text-xs text-muted">One player per line: name, parent email, number (number optional). Copy straight from a spreadsheet or WhatsApp.</p>
+              <p className="text-xs text-muted">One player per line: name, email, number (number optional). Copy straight from a spreadsheet or WhatsApp.</p>
               <textarea
                 id="paste"
                 rows={5}
                 value={paste}
                 onChange={(e) => setPaste(e.target.value)}
-                placeholder={"Maya Patel, sam.patel@example.com, 7\nArjun Nair, anita.nair@example.com, 11"}
+                placeholder={"Rahul Menon, rahul.menon@gmail.com, 10\nSam Okafor, sam.okafor@gmail.com, 1"}
                 className={`${inputClass} py-2.5 font-mono text-sm`}
               />
               <div className="flex gap-2">
@@ -105,7 +97,7 @@ export function InviteForm({ teamId, kind }: { teamId: string; kind: "player" | 
         {rows.map((r, i) => (
           <li key={r.key} className="grid gap-3 rounded-lg border border-border p-3.5">
             <div className="flex items-center justify-between">
-              <span className="eyebrow">{kind === "staff" ? "Staff member" : "Player"} {i + 1}</span>
+              <span className="eyebrow">Person {i + 1}</span>
               {rows.length > 1 && (
                 <button
                   type="button"
@@ -123,40 +115,53 @@ export function InviteForm({ teamId, kind }: { teamId: string; kind: "player" | 
             </div>
             <Cell
               id={`${i}.email`}
-              label={kind === "staff" ? "Email" : "Parent or guardian email"}
+              label="Their email"
               type="email"
               value={r.email}
               onChange={(v) => update(i, "email", v)}
               error={fe[`${i}.email`]}
-              hint={kind === "player" ? "For adult players, use their own email and tick the box below." : undefined}
+              hint="Their own email. That's their account."
             />
-            {kind === "player" ? (
-              <>
-                <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
-                  <Cell id={`${i}.jersey`} label="Number" inputMode="numeric" maxLength={3} value={r.jersey} onChange={(v) => update(i, "jersey", v)} />
-                  <Cell id={`${i}.position`} label="Position" value={r.position} onChange={(v) => update(i, "position", v)} placeholder="Optional" />
+            <input type="hidden" name={`${i}.plays`} value={r.plays ? "yes" : "no"} />
+            <label className="flex min-h-9 items-center gap-2 text-sm">
+              <input type="checkbox" checked={r.plays} onChange={(e) => update(i, "plays", e.target.checked)} className="size-4 accent-[var(--team)]" />
+              Plays on the team
+            </label>
+            {r.plays && (
+              <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
+                <Cell id={`${i}.jersey`} label="Number" inputMode="numeric" maxLength={3} value={r.jersey} onChange={(v) => update(i, "jersey", v)} />
+                <Cell id={`${i}.position`} label="Position" value={r.position} onChange={(v) => update(i, "position", v)} placeholder="Optional" />
+              </div>
+            )}
+            {canGiveRoles && (
+              <fieldset className="grid gap-1.5">
+                <legend className="mb-1 text-sm font-semibold">
+                  Roles <span className="font-normal text-muted">(optional, pick any)</span>
+                </legend>
+                <div className="flex flex-wrap gap-2">
+                  {TEAM_ROLES.map((role) => {
+                    const on = r.roles.includes(role);
+                    return (
+                      <label
+                        key={role}
+                        className={`inline-flex min-h-9 cursor-pointer items-center rounded-pill border px-3 text-xs font-semibold has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-focus ${
+                          on ? "border-team bg-team text-on-team" : "border-border-input"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          name={`${i}.role`}
+                          value={role}
+                          checked={on}
+                          onChange={() => update(i, "roles", on ? r.roles.filter((x) => x !== role) : [...r.roles, role])}
+                          className="sr-only"
+                        />
+                        {ROLE_LABEL[role]}
+                      </label>
+                    );
+                  })}
                 </div>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name={`${i}.emailFor`} value="self" className="size-4 accent-[var(--team)]" />
-                  This is the player&apos;s own email (adult player)
-                </label>
-              </>
-            ) : (
-              <fieldset className="grid gap-2">
-                <legend className="mb-1 text-sm font-semibold">Role and permissions</legend>
-                <select name={`${i}.staffRole`} defaultValue="assistant_coach" aria-label="Role" className={`${inputClass} sm:max-w-xs`}>
-                  <option value="assistant_coach">Assistant coach</option>
-                  <option value="manager">Team manager</option>
-                  <option value="other">Other staff</option>
-                </select>
-                <div className="grid gap-1.5 sm:grid-cols-2">
-                  {PERMS.map(([v, label]) => (
-                    <label key={v} className="flex min-h-9 items-center gap-2 text-sm">
-                      <input type="checkbox" name={`${i}.perm`} value={v} defaultChecked={["schedule_games", "schedule_events", "scoring"].includes(v)} className="size-4 accent-[var(--team)]" />
-                      {label}
-                    </label>
-                  ))}
-                </div>
+                {fe[`${i}.roles`] && <p className="text-xs font-medium text-danger">{fe[`${i}.roles`]}</p>}
               </fieldset>
             )}
           </li>

@@ -10,7 +10,7 @@ export default async function ChatListPage() {
   const teams = await listMyTeams();
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl gap-5 py-6">
-      <PageHeader title="Chat" subtitle="Each team has one group chat for coaches and families." />
+      <PageHeader title="Chat" subtitle="Each team has one group chat for the whole squad." />
       {teams.length ? (
         <ul className="grid gap-2">
           {teams.map((t) => (
@@ -29,7 +29,7 @@ export default async function ChatListPage() {
           ))}
         </ul>
       ) : (
-        <EmptyState icon={<MessageCircle />} title="No chats yet" hint="Join or start a team to chat with coaches and families." />
+        <EmptyState icon={<MessageCircle />} title="No chats yet" hint="Join or start a team to chat with your teammates." />
       )}
     </main>
   );

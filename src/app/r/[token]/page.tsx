@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Your answer", robots: { index: false
 /**
  * One-tap answer from an email button, no sign-in needed.
  * The answer is saved by the browser after the page loads (not on the GET itself),
- * so email security scanners that pre-open links don't answer for families.
+ * so email security scanners that pre-open links don't answer for players.
  */
 export default async function RsvpLinkPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;

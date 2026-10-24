@@ -3,6 +3,8 @@ import Link from "next/link";
 import { ChevronRight, Plus, Search, Users } from "lucide-react";
 import { listMyTeams } from "@/lib/data";
 import { ButtonLink, EmptyState, PageHeader } from "@/components/ui";
+import { HatBadges } from "@/components/hats";
+import { hatLabels } from "@/lib/data/types";
 
 export const metadata: Metadata = { title: "Teams" };
 
@@ -39,10 +41,10 @@ export default async function TeamsPage() {
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold break-words">{t.name}</span>
                   <span className="block text-sm text-muted">
-                    {[t.sport, t.ageGroup, t.location].filter(Boolean).join(" · ")}
+                    {[t.club?.name, t.level].filter(Boolean).join(" · ")}
                   </span>
-                  <span className="mt-0.5 block text-xs font-semibold text-team-ink">
-                    {t.isStaff ? "Staff" : t.myPeople.map((p) => p.firstName).join(", ")}
+                  <span className="mt-1 block">
+                    <HatBadges labels={hatLabels(t.hats, t.me?.jersey)} />
                   </span>
                 </span>
                 <ChevronRight aria-hidden className="size-5 shrink-0 text-muted" />
@@ -54,7 +56,7 @@ export default async function TeamsPage() {
         <EmptyState
           icon={<Users />}
           title="No teams yet"
-          hint="Start a team and invite your players. If your coach invited you, open the link in their email."
+          hint="Start a team and invite your players. If your captain invited you, open the link in their email."
           action={
             <ButtonLink href="/teams/new" size="sm">
               <Plus aria-hidden />

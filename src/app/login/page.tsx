@@ -26,7 +26,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <h1 id="demo-h" className="text-lg font-semibold">
               Try it as someone on a team
             </h1>
-            <p className="text-sm text-muted">Sample accounts with real-looking teams, games and answers.</p>
+            <p className="text-sm text-muted">Sample accounts. Dan owns a club and plays for, captains and manages one of its teams.</p>
           </div>
           <ul className="grid gap-2">
             {accounts.map((a) => (
@@ -49,7 +49,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
         <section aria-labelledby="new-h" className="grid gap-3 rounded-lg border border-border bg-bg p-4">
           <h2 id="new-h" className="text-lg font-semibold">
-            Or start your own team
+            New here? Create your account
           </h2>
           <SignUpForm />
           <Banner>

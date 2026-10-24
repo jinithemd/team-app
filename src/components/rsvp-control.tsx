@@ -12,12 +12,12 @@ const OPTIONS: { v: RsvpResponse; label: string; icon: React.ReactNode; on: stri
 ];
 
 /**
- * Three-way answer for one person, with an optional private note to staff.
+ * Three-way answer for one player, with an optional private note to the captains.
  * Optimistic: the choice fills immediately and reverts with a message if saving fails.
  */
 export function RsvpControl({
   eventId,
-  personId,
+  userId,
   personName,
   showName,
   initial,
@@ -26,7 +26,7 @@ export function RsvpControl({
   size = "md",
 }: {
   eventId: string;
-  personId: string;
+  userId: string;
   personName: string;
   showName?: boolean;
   initial: RsvpResponse | null;
@@ -49,7 +49,7 @@ export function RsvpControl({
     start(async () => {
       setOptimistic(v);
       setStatus(null);
-      const res = await setRsvpAction(eventId, personId, v);
+      const res = await setRsvpAction(eventId, userId, v);
       if (res.ok) {
         setSaved(res.data.response);
         setStatus({ tone: "ok", text: "Saved" });
@@ -62,11 +62,11 @@ export function RsvpControl({
   function saveNote() {
     const choice = optimistic ?? "going";
     start(async () => {
-      const res = await setRsvpAction(eventId, personId, choice, note);
+      const res = await setRsvpAction(eventId, userId, choice, note);
       if (res.ok) {
         setSaved(res.data.response);
         setNoteSaved(res.data.note ?? "");
-        setStatus({ tone: "ok", text: note.trim() ? "Note sent to the coach" : "Note removed" });
+        setStatus({ tone: "ok", text: note.trim() ? "Note sent to your captains" : "Note removed" });
       } else setStatus({ tone: "error", text: res.error });
     });
   }
@@ -76,7 +76,7 @@ export function RsvpControl({
     <div className="grid gap-2">
       <div className="flex items-baseline justify-between gap-2">
         <span id={labelId} className={showName ? "text-sm font-semibold" : "sr-only"}>
-          {showName ? personName : `${personName}'s answer`}
+          {showName ? personName : `Answer for ${personName}`}
         </span>
         <span role="status" aria-live="polite" className={`text-xs font-medium ${status?.tone === "error" ? "text-danger" : "text-muted"}`}>
           {pending ? "Saving…" : status?.text}
@@ -107,7 +107,7 @@ export function RsvpControl({
       ) : noteOpen ? (
         <div className="grid gap-1.5">
           <label htmlFor={noteId} className="text-xs font-semibold text-muted">
-            Note for the coach (only staff see this)
+            Note for your captains (only they see it)
           </label>
           <div className="flex gap-2">
             <input
@@ -131,7 +131,7 @@ export function RsvpControl({
         </div>
       ) : (
         <button type="button" onClick={() => setNoteOpen(true)} className="justify-self-start text-sm font-semibold text-team-ink min-h-8">
-          + Add a note for the coach
+          + Add a note for your captains
         </button>
       )}
     </div>

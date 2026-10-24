@@ -23,7 +23,7 @@ export default async function SchedulePage({
 
   return (
     <div className="grid gap-5">
-      {sp.joined && <Banner>You&apos;re on the team. Answer below to let the coach know who&apos;s coming.</Banner>}
+      {sp.joined && <Banner>You&apos;re on the team. Answer below so your captains know if you&apos;re in.</Banner>}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="group" aria-label="Schedule view" className="inline-flex gap-1 rounded-md bg-sunken p-1">
@@ -52,7 +52,7 @@ export default async function SchedulePage({
         <EmptyState
           icon={<CalendarPlus />}
           title="No games or practices yet"
-          hint={team.isStaff ? "Add the first one and everyone on the roster gets a heads-up." : "Your coach hasn't added anything yet. You'll get a notification when they do."}
+          hint={team.isStaff ? "Add the first one and everyone on the roster gets a heads-up." : "Your captains haven't added anything yet. You'll get a notification when they do."}
           action={
             team.isStaff && (
               <ButtonLink href={`/t/${teamId}/e/new`} size="sm">

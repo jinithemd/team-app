@@ -4,6 +4,7 @@ import { CalendarPlus, ChevronRight, Plus, Users } from "lucide-react";
 import { getSessionUser, listMyTeams, listPendingRsvps, listUpcomingForMe } from "@/lib/data";
 import { EventCard } from "@/components/event-bits";
 import { ButtonLink, EmptyState, SectionTitle } from "@/components/ui";
+import { hatLabels } from "@/lib/data/types";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -44,7 +45,7 @@ export default async function HomePage() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-display text-lg leading-tight font-bold uppercase">{t.name}</span>
                     <span className="block truncate text-xs opacity-90">
-                      {t.isStaff ? "You coach" : t.myPeople.map((p) => p.firstName).join(", ")}
+                      {hatLabels(t.hats, t.me?.jersey).join(" · ")}
                     </span>
                   </span>
                   <ChevronRight aria-hidden className="size-4 shrink-0" />
@@ -96,7 +97,7 @@ export default async function HomePage() {
           <EmptyState
             icon={<CalendarPlus />}
             title="Nothing on the schedule yet"
-            hint={staffTeams.length ? "Add a game or practice and your team gets a heads-up." : "Your coach hasn't added any games or practices yet."}
+            hint={staffTeams.length ? "Add a game or training and your team gets a heads-up." : "Your captains haven't added any games or trainings yet."}
             action={
               staffTeams[0] && (
                 <ButtonLink href={`/t/${staffTeams[0].id}/e/new`} size="sm">
@@ -110,12 +111,17 @@ export default async function HomePage() {
           <EmptyState
             icon={<Users />}
             title="You're not on a team yet"
-            hint="Start a team and invite your players, or ask your coach for an invite."
+            hint="Start a team or a club, or open the invite link from your captain."
             action={
-              <ButtonLink href="/teams/new" size="sm">
-                <Plus aria-hidden />
-                Start a team
-              </ButtonLink>
+              <div className="flex flex-wrap justify-center gap-2">
+                <ButtonLink href="/teams/new" size="sm">
+                  <Plus aria-hidden />
+                  Start a team
+                </ButtonLink>
+                <ButtonLink href="/clubs/new" variant="secondary" size="sm">
+                  Set up a club
+                </ButtonLink>
+              </div>
             }
           />
         )}

@@ -100,10 +100,10 @@ export function NewEventForm({ teamId, defaultDate, tz }: { teamId: string; defa
         Times are in {city} time{viewerTz && viewerTz !== tz ? ` (you're in ${viewerTz.split("/").pop()!.replace(/_/g, " ")} time)` : ""}.
       </p>
 
-      <Field id="locationText" label="Where" hint="Families get a map link">
+      <Field id="locationText" label="Where" hint="Players get a map link">
         <Input id="locationText" name="locationText" maxLength={120} placeholder="e.g. Invista Centre, Field 2" />
       </Field>
-      <Field id="notes" label="Notes for families" hint="Optional: kit colour, arrival time, what to bring">
+      <Field id="notes" label="Notes for the team" hint="Optional: kit colour, arrival time, what to bring">
         <textarea id="notes" name="notes" rows={3} maxLength={1000} className={`${inputClass} py-2.5`} />
       </Field>
 
@@ -111,7 +111,7 @@ export function NewEventForm({ teamId, defaultDate, tz }: { teamId: string; defa
         <input type="checkbox" name="notify" defaultChecked className="mt-0.5 size-5 shrink-0 accent-[var(--team)]" />
         <span>
           <span className="block text-sm font-semibold">Tell the team</span>
-          <span className="block text-xs text-muted">Every family gets an email with Going / Maybe / Can&apos;t make it buttons.</span>
+          <span className="block text-xs text-muted">Every player gets an email with Going / Maybe / Can&apos;t make it buttons.</span>
         </span>
       </label>
 

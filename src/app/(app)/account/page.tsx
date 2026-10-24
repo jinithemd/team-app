@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
-import { getSessionUser } from "@/lib/data";
+import Link from "next/link";
+import { getSessionUser, listMyHats } from "@/lib/data";
+import { HatBadges } from "@/components/hats";
+import { CLUB_ROLE_LABEL } from "@/lib/data/types";
 import { signOutAction, updatePreferencesAction } from "@/app/actions";
 import { Avatar, PageHeader, buttonClass } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
-  const user = (await getSessionUser())!;
+  const [user0, hats] = await Promise.all([getSessionUser(), listMyHats()]);
+  const user = user0!;
   const name = `${user.firstName} ${user.lastName}`;
   return (
     <main id="main" className="gutter mx-auto grid max-w-2xl gap-6 py-6">
@@ -16,6 +20,40 @@ export default async function AccountPage() {
         <div className="min-w-0">
           <p className="text-lg font-semibold break-words">{name}</p>
           <p className="text-sm break-all text-muted">{user.email}</p>
+        </div>
+      </section>
+
+      <section aria-labelledby="hats-h" className="grid gap-3 rounded-lg border border-border p-4">
+        <div>
+          <h2 id="hats-h" className="text-lg font-semibold">
+            Your roles
+          </h2>
+          <p className="text-sm text-muted">One account for everything you do.</p>
+        </div>
+        <ul className="grid gap-2.5">
+          {hats.clubs.map((c) => (
+            <li key={c.clubId} className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-semibold">{c.name}</span>
+              <HatBadges labels={[CLUB_ROLE_LABEL[c.role]]} />
+            </li>
+          ))}
+          {hats.teams.map((t) => (
+            <li key={t.teamId} data-team={t.teamId} className="flex flex-wrap items-center justify-between gap-2">
+              <Link href={`/t/${t.teamId}/you`} className="font-semibold text-fg hover:underline">
+                {t.name}
+              </Link>
+              <HatBadges labels={t.labels} />
+            </li>
+          ))}
+          {!hats.clubs.length && !hats.teams.length && <li className="text-sm text-muted">You&apos;re not on a team yet.</li>}
+        </ul>
+        <div className="flex flex-wrap gap-3 border-t border-border pt-3 text-sm font-semibold">
+          <Link href="/teams/new" className="text-team-ink">
+            Start a team
+          </Link>
+          <Link href="/clubs/new" className="text-team-ink">
+            Set up a club
+          </Link>
         </div>
       </section>
 

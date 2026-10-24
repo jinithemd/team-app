@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight, Clock, MapPin, StickyNote } from "lucide-react";
-import { getAvailability, getEvent, getTeam } from "@/lib/data";
+import { getAvailability, getEvent, getSessionUser, getTeam } from "@/lib/data";
 import { RsvpControl } from "@/components/rsvp-control";
 import { Counts, StatusBadge, TypeTag } from "@/components/event-bits";
 import { Banner } from "@/components/ui";
@@ -24,7 +24,7 @@ export default async function EventPage({
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
-  const [team, e, avail] = await Promise.all([getTeam(teamId), getEvent(eventId), getAvailability(eventId)]);
+  const [team, e, avail, user] = await Promise.all([getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser()]);
   if (!team || !e || e.teamId !== teamId) notFound();
 
   const title = eventTitle(e);
@@ -40,11 +40,11 @@ export default async function EventPage({
         Schedule
       </Link>
 
-      {sp.created && <Banner>Added to the schedule. Everyone on the roster got an email with one-tap answers.</Banner>}
+      {sp.created && <Banner>Added to the schedule. Every player got an email with one-tap answers.</Banner>}
 
       <section aria-labelledby="ev-h" className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="eyebrow">{e.type === "game" ? "Game" : e.type === "practice" ? "Practice" : "Event"}</span>
+          <span className="eyebrow">{e.type === "game" ? "Match" : e.type === "practice" ? "Training" : "Event"}</span>
           <TypeTag e={e} />
           <StatusBadge status={e.status} />
         </div>
@@ -86,23 +86,19 @@ export default async function EventPage({
         </dl>
       </section>
 
-      {e.mine.length > 0 && (
+      {e.mine && user && (
         <section aria-labelledby="mine-h" className="grid gap-4 rounded-lg border border-border p-4">
           <h2 id="mine-h" className="text-lg font-semibold">
-            {e.mine.length > 1 ? "Who's coming from your family?" : `Is ${e.mine[0].person.firstName} coming?`}
+            Are you in?
           </h2>
-          {e.mine.map((m) => (
-            <RsvpControl
-              key={m.person.id}
-              eventId={e.id}
-              personId={m.person.id}
-              personName={m.person.firstName}
-              showName={e.mine.length > 1}
-              initial={m.response}
-              initialNote={m.note}
-              locked={lockReason}
-            />
-          ))}
+          <RsvpControl
+            eventId={e.id}
+            userId={user.id}
+            personName={user.firstName}
+            initial={e.mine.response}
+            initialNote={e.mine.note}
+            locked={lockReason}
+          />
         </section>
       )}
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
-import { listPendingRsvps } from "@/lib/data";
+import { getSessionUser, listPendingRsvps } from "@/lib/data";
 import { RsvpControl } from "@/components/rsvp-control";
 import { TeamDot } from "@/components/event-bits";
 import { EmptyState, PageHeader } from "@/components/ui";
@@ -10,14 +10,14 @@ import { formatLongDate, formatTimeRange } from "@/lib/time";
 
 export const metadata: Metadata = { title: "Your answers" };
 
-// S11: every unanswered invitation across all teams and kids, answerable in place.
+// S11: every unanswered game and training across all my teams, answerable in place.
 export default async function MyRsvpsPage() {
-  const pending = await listPendingRsvps();
+  const [pending, user] = await Promise.all([listPendingRsvps(), getSessionUser()]);
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl gap-5 py-6">
-      <PageHeader title="Your answers" subtitle={pending.length ? "Let coaches know who's coming. Answers save as you tap." : undefined} />
+      <PageHeader title="Your answers" subtitle={pending.length ? "Let your captains know if you're in. Answers save as you tap." : undefined} />
       {pending.length === 0 ? (
-        <EmptyState icon={<CheckCircle2 />} title="You've answered everything" hint="New games and practices show up here when coaches add them." />
+        <EmptyState icon={<CheckCircle2 />} title="You've answered everything" hint="New games and trainings show up here when your captains add them." />
       ) : (
         <ul className="grid gap-3">
           {pending.map((e) => (
@@ -32,18 +32,16 @@ export default async function MyRsvpsPage() {
                   {e.locationText ? ` · ${e.locationText}` : ""}
                 </p>
               </div>
-              {e.mine.map((m) => (
+              {e.mine && (
                 <RsvpControl
-                  key={m.person.id}
                   eventId={e.id}
-                  personId={m.person.id}
-                  personName={m.person.firstName}
-                  showName={e.mine.length > 1 || true}
-                  initial={m.response}
-                  initialNote={m.note}
+                  userId={user!.id}
+                  personName={eventTitle(e)}
+                  initial={e.mine.response}
+                  initialNote={e.mine.note}
                   size="sm"
                 />
-              ))}
+              )}
             </li>
           ))}
         </ul>

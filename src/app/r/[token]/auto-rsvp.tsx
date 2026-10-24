@@ -7,9 +7,9 @@ import { rsvpFromLinkAction } from "@/app/actions";
 type Result = Awaited<ReturnType<typeof rsvpFromLinkAction>>;
 
 const COPY = {
-  going: { icon: CheckCircle2, cls: "text-success", text: (n: string) => `${n} is going` },
-  maybe: { icon: HelpCircle, cls: "text-warning", text: (n: string) => `${n} is a maybe` },
-  not_going: { icon: XCircle, cls: "text-danger", text: (n: string) => `${n} can't make it` },
+  going: { icon: CheckCircle2, cls: "text-success", text: (n: string) => `You're in, ${n}` },
+  maybe: { icon: HelpCircle, cls: "text-warning", text: (n: string) => `Marked as maybe, ${n}` },
+  not_going: { icon: XCircle, cls: "text-danger", text: (n: string) => `Got it, ${n}: you can't make it` },
 };
 
 export function AutoRsvp({ token }: { token: string }) {
@@ -40,7 +40,7 @@ export function AutoRsvp({ token }: { token: string }) {
     <div role="status" className="grid gap-3">
       <Icon aria-hidden className={`size-12 ${c.cls}`} />
       <h1 className="text-2xl font-bold">{c.text(res.personName)}</h1>
-      <p className="text-muted">Thanks. The coach can see your answer. Tap another button in the email any time to change it.</p>
+      <p className="text-muted">Thanks. Your captains can see your answer. Tap another button in the email any time to change it.</p>
       <a href={`/t/${res.teamId}/e/${res.eventId}`} className="justify-self-start font-semibold text-team-ink underline">
         See the event and add a note
       </a>

@@ -45,7 +45,7 @@ export function StaffEventActions({
         mode ? (
           <form action={statusAction} className="grid gap-3">
             <input type="hidden" name="status" value={mode} />
-            <Field id="reason" label={mode === "cancelled" ? "Why is it cancelled?" : "Why is it postponed?"} hint="Families see this in the email and on the schedule.">
+            <Field id="reason" label={mode === "cancelled" ? "Why is it cancelled?" : "Why is it postponed?"} hint="Players see this in the email and on the schedule.">
               <input id="reason" name="reason" maxLength={140} placeholder={mode === "cancelled" ? "e.g. Field closed for frost" : "e.g. Waiting on a new field booking"} className={inputClass} />
             </Field>
             <div className="flex flex-wrap gap-2">

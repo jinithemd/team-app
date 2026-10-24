@@ -6,10 +6,14 @@ import { DEFAULT_TZ, utcToZoned, zonedToUtc, formatLongDate, formatTimeRange } f
 import type {
   ActionResult,
   Availability,
+  Club,
+  ClubAdmin,
+  ClubRole,
   EventType,
   EventWithMine,
-  Guardian,
+  Hats,
   ID,
+  MyClub,
   MyTeam,
   OutboxEmail,
   Person,
@@ -18,12 +22,12 @@ import type {
   RosterRow,
   Rsvp,
   RsvpResponse,
-  StaffPermission,
-  StaffRole,
   Team,
   TeamEvent,
+  TeamPermission,
+  TeamRole,
 } from "./types";
-import { STAFF_PERMISSIONS } from "./types";
+import { TEAM_PERMISSIONS, TEAM_ROLES, hatLabels, permissionsForRoles } from "./types";
 import { eventTitle } from "../event-title";
 
 /*
@@ -35,8 +39,8 @@ import { eventTitle } from "../event-title";
 
 interface Store {
   profiles: Profile[];
-  people: Person[];
-  guardians: Guardian[];
+  clubs: Club[];
+  clubAdmins: ClubAdmin[];
   teams: Team[];
   roster: RosterMember[];
   events: TeamEvent[];
@@ -44,44 +48,54 @@ interface Store {
   outbox: OutboxEmail[];
 }
 
-const g = globalThis as unknown as { __teamAppStore?: Store };
+const g = globalThis as unknown as { __teamAppStoreV2?: Store };
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 const now = () => new Date().toISOString();
 const id = () => randomUUID();
 const norm = (e: string) => e.trim().toLowerCase();
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 // ---------------------------------------------------------------------------
 // access rules (mirror the SQL helper functions)
 // ---------------------------------------------------------------------------
 
-function myPeopleIds(uid: ID): ID[] {
-  return db.guardians.filter((x) => x.userId === uid && x.status === "active").map((x) => x.personId);
+function teamById(teamId: ID) {
+  return db.teams.find((t) => t.id === teamId);
 }
-function selfPersonId(uid: ID): ID | null {
-  return db.guardians.find((x) => x.userId === uid && x.isSelf && x.status === "active")?.personId ?? null;
+function clubRoleFor(uid: ID, clubId: ID | null): ClubRole | null {
+  if (!clubId) return null;
+  return db.clubAdmins.find((a) => a.clubId === clubId && a.userId === uid)?.role ?? null;
 }
-function isGuardian(uid: ID, personId: ID) {
-  return myPeopleIds(uid).includes(personId);
+function isClubAdminOfTeam(uid: ID, teamId: ID) {
+  const r = clubRoleFor(uid, teamById(teamId)?.clubId ?? null);
+  return r === "owner" || r === "admin";
+}
+function myRow(uid: ID, teamId: ID) {
+  return db.roster.find((r) => r.teamId === teamId && r.userId === uid && (r.status === "active" || r.status === "inactive"));
+}
+function hasTeamPerm(uid: ID, teamId: ID, perm: TeamPermission) {
+  const team = teamById(teamId);
+  if (!team) return false;
+  if (team.createdBy === uid || isClubAdminOfTeam(uid, teamId)) return true;
+  if (perm === "payments" && clubRoleFor(uid, team.clubId) === "treasurer") return true;
+  const row = myRow(uid, teamId);
+  return !!row && row.status === "active" && row.permissions.includes(perm);
 }
 function isTeamStaff(uid: ID, teamId: ID) {
-  const team = db.teams.find((t) => t.id === teamId);
-  if (team?.createdBy === uid) return true;
-  const me = selfPersonId(uid);
-  return db.roster.some((r) => r.teamId === teamId && r.personId === me && r.kind === "staff" && r.status === "active");
-}
-function hasTeamPerm(uid: ID, teamId: ID, perm: StaffPermission) {
-  const team = db.teams.find((t) => t.id === teamId);
-  if (team?.createdBy === uid) return true;
-  const me = selfPersonId(uid);
-  return db.roster.some(
-    (r) => r.teamId === teamId && r.personId === me && r.kind === "staff" && r.status === "active" && r.permissions.includes(perm),
-  );
+  const team = teamById(teamId);
+  if (!team) return false;
+  if (team.createdBy === uid || isClubAdminOfTeam(uid, teamId)) return true;
+  const row = myRow(uid, teamId);
+  return !!row && row.status === "active" && row.permissions.length > 0;
 }
 function isTeamMember(uid: ID, teamId: ID) {
-  if (isTeamStaff(uid, teamId)) return true;
-  const mine = myPeopleIds(uid);
-  return db.roster.some((r) => r.teamId === teamId && r.status === "active" && mine.includes(r.personId));
+  return isTeamStaff(uid, teamId) || !!myRow(uid, teamId);
+}
+function isActivePlayer(userId: ID, teamId: ID) {
+  const row = myRow(userId, teamId);
+  return !!row && row.status === "active" && row.isPlayer;
 }
 
 async function requireUser(): Promise<Profile> {
@@ -89,6 +103,22 @@ async function requireUser(): Promise<Profile> {
   const user = uid ? db.profiles.find((p) => p.id === uid) : undefined;
   if (!user) throw new Error("Not signed in");
   return user;
+}
+
+function personFor(r: RosterMember): Person {
+  const p = r.userId ? db.profiles.find((x) => x.id === r.userId) : undefined;
+  if (p) return { id: p.id, firstName: p.firstName, lastName: p.lastName };
+  return { id: r.id, firstName: r.invitedName?.firstName ?? "", lastName: r.invitedName?.lastName ?? "" };
+}
+
+function hatsFor(uid: ID, team: Team): Hats {
+  const row = myRow(uid, team.id);
+  return {
+    isPlayer: !!row?.isPlayer,
+    roles: row ? TEAM_ROLES.filter((r) => row.roles.includes(r)) : [],
+    clubRole: clubRoleFor(uid, team.clubId),
+    isCreator: team.createdBy === uid,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -122,10 +152,11 @@ export async function signUp(input: { firstName: string; lastName: string; email
   const fieldErrors: Record<string, string> = {};
   if (!input.firstName.trim()) fieldErrors.firstName = "Add your first name.";
   if (!input.lastName.trim()) fieldErrors.lastName = "Add your last name.";
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) fieldErrors.email = "Enter an email like name@gmail.com.";
+  if (!EMAIL_RE.test(email)) fieldErrors.email = "Enter an email like name@gmail.com.";
   if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
   const existing = db.profiles.find((p) => p.email === email);
   if (existing) {
+    // Real build: this sends a sign-in link instead. Same account either way.
     await setSessionUserId(existing.id);
     return { ok: true, data: existing };
   }
@@ -138,9 +169,6 @@ export async function signUp(input: { firstName: string; lastName: string; email
 function createProfile(firstName: string, lastName: string, email: string): Profile {
   const profile: Profile = { id: id(), firstName, lastName, email: norm(email), theme: "system", useTeamColors: true };
   db.profiles.push(profile);
-  const person: Person = { id: id(), userId: profile.id, firstName, lastName };
-  db.people.push(person);
-  db.guardians.push({ id: id(), personId: person.id, userId: profile.id, invitedEmail: null, isPrimary: true, isSelf: true, status: "active" });
   return profile;
 }
 
@@ -151,20 +179,90 @@ export async function updatePreferences(input: { theme?: Profile["theme"]; useTe
   return user;
 }
 
+/** Every hat I wear, for the Account screen. */
+export async function listMyHats() {
+  const user = await requireUser();
+  const clubs = db.clubAdmins
+    .filter((a) => a.userId === user.id)
+    .map((a) => ({ clubId: a.clubId, name: db.clubs.find((c) => c.id === a.clubId)!.name, role: a.role }));
+  const teams = db.teams
+    .filter((t) => myRow(user.id, t.id) || t.createdBy === user.id)
+    .map((t) => {
+      const row = myRow(user.id, t.id);
+      return { teamId: t.id, name: t.name, labels: hatLabels({ ...hatsFor(user.id, t), clubRole: null }, row?.jersey) };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return { clubs, teams };
+}
+
+// ---------------------------------------------------------------------------
+// clubs
+// ---------------------------------------------------------------------------
+
+export async function listMyClubs(): Promise<MyClub[]> {
+  const user = await requireUser();
+  return db.clubAdmins
+    .filter((a) => a.userId === user.id)
+    .map((a) => {
+      const c = db.clubs.find((x) => x.id === a.clubId)!;
+      return { ...c, myRole: a.role, teamCount: db.teams.filter((t) => t.clubId === c.id).length };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function slugify(name: string) {
+  return (
+    name
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^\w\s-]/g, "")
+      .trim()
+      .replace(/[\s_-]+/g, "-")
+      .slice(0, 40) || "club"
+  );
+}
+
+/** Creating a club makes you its owner. One transaction in the real build (service role). */
+export async function createClub(input: { name: string; color: string; colorSecondary?: string | null }): Promise<ActionResult<Club>> {
+  const user = await requireUser();
+  const fieldErrors: Record<string, string> = {};
+  const name = input.name.trim();
+  if (!name) fieldErrors.name = "Give the club a name.";
+  else if (name.length > 80) fieldErrors.name = "Keep the name under 80 characters.";
+  if (!HEX_RE.test(input.color)) fieldErrors.color = "Pick a colour.";
+  if (input.colorSecondary && !HEX_RE.test(input.colorSecondary)) fieldErrors.colorSecondary = "Pick a valid colour.";
+  if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
+  let slug = slugify(name);
+  for (let n = 2; db.clubs.some((c) => c.slug === slug); n++) slug = `${slugify(name)}-${n}`;
+  const club: Club = {
+    id: id(),
+    name,
+    slug,
+    color: input.color.toUpperCase(),
+    colorSecondary: input.colorSecondary?.toUpperCase() || null,
+    createdBy: user.id,
+    createdAt: now(),
+  };
+  db.clubs.push(club);
+  db.clubAdmins.push({ clubId: club.id, userId: user.id, role: "owner" });
+  return { ok: true, data: club };
+}
+
 // ---------------------------------------------------------------------------
 // teams
 // ---------------------------------------------------------------------------
 
 function toMyTeam(uid: ID, team: Team): MyTeam {
-  const staff = isTeamStaff(uid, team.id);
-  const mine = myPeopleIds(uid);
-  const myPeople = db.roster
-    .filter((r) => r.teamId === team.id && r.kind === "player" && r.status === "active" && mine.includes(r.personId))
-    .map((r) => db.people.find((p) => p.id === r.personId)!)
-    .filter(Boolean);
-  const self = selfPersonId(uid);
-  const role: MyTeam["myRole"] = staff ? "staff" : myPeople.some((p) => p.id === self) ? "player" : "guardian";
-  return { ...team, myRole: role, myPeople, isStaff: staff };
+  const row = myRow(uid, team.id);
+  const club = team.clubId ? db.clubs.find((c) => c.id === team.clubId) : undefined;
+  return {
+    ...team,
+    club: club ? { id: club.id, name: club.name, slug: club.slug } : null,
+    me: row ? { id: row.id, isPlayer: row.isPlayer, roles: row.roles, jersey: row.jersey, position: row.position, permissions: row.permissions } : null,
+    hats: hatsFor(uid, team),
+    isStaff: isTeamStaff(uid, team.id),
+    canManagePermissions: hasTeamPerm(uid, team.id, "manage_permissions"),
+  };
 }
 
 export async function listMyTeams(): Promise<MyTeam[]> {
@@ -177,7 +275,7 @@ export async function listMyTeams(): Promise<MyTeam[]> {
 
 export async function getTeam(teamId: ID): Promise<MyTeam | null> {
   const user = await requireUser();
-  const team = db.teams.find((t) => t.id === teamId);
+  const team = teamById(teamId);
   if (!team || !isTeamMember(user.id, teamId)) return null;
   return toMyTeam(user.id, team);
 }
@@ -185,11 +283,11 @@ export async function getTeam(teamId: ID): Promise<MyTeam | null> {
 export async function createTeam(input: {
   name: string;
   sport: string;
-  ageGroup?: string;
+  level?: string;
   location?: string;
   color: string;
   colorSecondary?: string | null;
-  orgName?: string;
+  clubId?: string | null;
 }): Promise<ActionResult<Team>> {
   const user = await requireUser();
   const fieldErrors: Record<string, string> = {};
@@ -197,19 +295,24 @@ export async function createTeam(input: {
   if (!name) fieldErrors.name = "Give the team a name.";
   else if (name.length > 80) fieldErrors.name = "Keep the name under 80 characters.";
   if (!input.sport.trim()) fieldErrors.sport = "Pick a sport.";
-  if (!/^#[0-9a-fA-F]{6}$/.test(input.color)) fieldErrors.color = "Pick a colour.";
-  if (input.colorSecondary && !/^#[0-9a-fA-F]{6}$/.test(input.colorSecondary)) fieldErrors.colorSecondary = "Pick a valid colour.";
+  if (!HEX_RE.test(input.color)) fieldErrors.color = "Pick a colour.";
+  if (input.colorSecondary && !HEX_RE.test(input.colorSecondary)) fieldErrors.colorSecondary = "Pick a valid colour.";
+  const clubId = input.clubId || null;
+  if (clubId) {
+    const role = clubRoleFor(user.id, clubId);
+    if (role !== "owner" && role !== "admin") fieldErrors.clubId = "Only the club's owner or admins can add teams to it.";
+  }
   if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
 
   const team: Team = {
     id: id(),
+    clubId,
     name,
     sport: input.sport.trim(),
-    ageGroup: input.ageGroup?.trim() || null,
+    level: input.level?.trim() || null,
     location: input.location?.trim() || null,
     color: input.color.toUpperCase(),
     colorSecondary: input.colorSecondary?.toUpperCase() || null,
-    orgName: input.orgName?.trim() || null,
     joinCode: randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase(),
     isPublic: true,
     rosterVisible: true,
@@ -217,19 +320,52 @@ export async function createTeam(input: {
     createdAt: now(),
   };
   db.teams.push(team);
+  // You're on your own team from the start. The next step ("Your part on the team") sets
+  // whether you play and which roles you hold. Until then you're its manager.
   db.roster.push({
     id: id(),
     teamId: team.id,
-    personId: selfPersonId(user.id)!,
-    kind: "staff",
+    userId: user.id,
+    invitedEmail: null,
+    invitedName: null,
+    isPlayer: false,
+    roles: ["manager"],
     jersey: null,
     position: null,
-    staffRole: "head_coach",
-    permissions: [...STAFF_PERMISSIONS],
+    permissions: [...TEAM_PERMISSIONS],
     status: "active",
-    invitedEmail: null,
   });
   return { ok: true, data: team };
+}
+
+/** "Your part on the team": do you play, your number and position, and which roles you hold. */
+export async function setMyPart(
+  teamId: ID,
+  input: { isPlayer: boolean; jersey?: string; position?: string; roles: string[] },
+): Promise<ActionResult<RosterMember>> {
+  const user = await requireUser();
+  const row = myRow(user.id, teamId);
+  if (!row) return { ok: false, error: "You're not on this team." };
+  const roles = TEAM_ROLES.filter((r) => input.roles.includes(r));
+  const fieldErrors: Record<string, string> = {};
+  const jersey = input.jersey?.trim() || null;
+  if (!input.isPlayer && roles.length === 0) fieldErrors.roles = "Pick at least one: you play, or a role on the team.";
+  if (input.isPlayer && jersey && !/^\d{1,3}$/.test(jersey)) fieldErrors.jersey = "Use up to 3 digits.";
+  if (input.isPlayer && jersey && db.roster.some((r) => r.teamId === teamId && r.id !== row.id && r.status !== "removed" && r.isPlayer && r.jersey === jersey))
+    fieldErrors.jersey = `Someone already wears ${jersey}.`;
+  if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
+  const rolesChanged = roles.join() !== TEAM_ROLES.filter((r) => row.roles.includes(r)).join();
+  if (rolesChanged && !hasTeamPerm(user.id, teamId, "manage_permissions"))
+    return { ok: false, error: "Only someone who manages permissions can change roles. Ask your captain." };
+
+  row.isPlayer = input.isPlayer;
+  row.jersey = input.isPlayer ? jersey : null;
+  row.position = input.isPlayer ? input.position?.trim() || null : null;
+  row.roles = roles;
+  const team = teamById(teamId)!;
+  // The creator keeps every permission whatever roles they pick; everyone else gets their roles' defaults.
+  row.permissions = team.createdBy === user.id ? [...TEAM_PERMISSIONS] : permissionsForRoles(roles);
+  return { ok: true, data: row };
 }
 
 // ---------------------------------------------------------------------------
@@ -238,124 +374,107 @@ export async function createTeam(input: {
 
 export async function listRoster(teamId: ID): Promise<RosterRow[]> {
   const user = await requireUser();
-  const team = db.teams.find((t) => t.id === teamId);
+  const team = teamById(teamId);
   if (!team || !isTeamMember(user.id, teamId)) return [];
   const staff = isTeamStaff(user.id, teamId);
-  const mine = myPeopleIds(user.id);
   return db.roster
     .filter((r) => r.teamId === teamId && r.status !== "removed")
-    .filter((r) => staff || mine.includes(r.personId) || (r.status === "active" && team.rosterVisible))
+    .filter((r) => staff || r.userId === user.id || (r.status === "active" && team.rosterVisible))
     .map((r) => {
-      const person = db.people.find((p) => p.id === r.personId)!;
-      const guardians = staff
-        ? db.guardians
-            .filter((gd) => gd.personId === person.id && !gd.isSelf)
-            .map((gd) => {
-              const p = gd.userId ? db.profiles.find((x) => x.id === gd.userId) : undefined;
-              return { name: p ? `${p.firstName} ${p.lastName}` : gd.invitedEmail ?? "", email: p?.email ?? gd.invitedEmail, status: gd.status };
-            })
-        : [];
-      return { ...r, person, guardians };
+      const p = r.userId ? db.profiles.find((x) => x.id === r.userId) : undefined;
+      return {
+        ...r,
+        roles: TEAM_ROLES.filter((x) => r.roles.includes(x)),
+        person: personFor(r),
+        clubRole: r.userId ? clubRoleFor(r.userId, team.clubId) : null,
+        email: staff ? p?.email ?? r.invitedEmail : null,
+      };
     })
-    .sort((a, b) => (a.kind === b.kind ? (+(a.jersey ?? 999) - +(b.jersey ?? 999)) || a.person.lastName.localeCompare(b.person.lastName) : a.kind === "staff" ? 1 : -1));
+    .sort(
+      (a, b) =>
+        +b.isPlayer - +a.isPlayer ||
+        (+(a.jersey ?? 999) - +(b.jersey ?? 999)) ||
+        a.person.lastName.localeCompare(b.person.lastName),
+    );
 }
 
 export interface InviteRow {
   firstName: string;
   lastName: string;
   email: string;
-  kind: "player" | "staff";
   jersey?: string;
   position?: string;
-  staffRole?: StaffRole;
-  permissions?: StaffPermission[];
-  /** Player rows: is the email the player's own (an adult) or a parent's? */
-  emailIsParent?: boolean;
+  isPlayer: boolean;
+  roles?: string[];
 }
 
 export async function invitePeople(teamId: ID, rows: InviteRow[]): Promise<ActionResult<{ count: number }>> {
   const user = await requireUser();
   if (!hasTeamPerm(user.id, teamId, "roster")) return { ok: false, error: "You don't have permission to change this roster." };
-  const team = db.teams.find((t) => t.id === teamId)!;
+  const team = teamById(teamId)!;
+  const canRoles = hasTeamPerm(user.id, teamId, "manage_permissions");
   const inviter = `${user.firstName} ${user.lastName}`;
 
   const fieldErrors: Record<string, string> = {};
   rows.forEach((r, i) => {
     if (!r.firstName.trim()) fieldErrors[`${i}.firstName`] = "Add a first name.";
     if (!r.lastName.trim()) fieldErrors[`${i}.lastName`] = "Add a last name.";
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(norm(r.email))) fieldErrors[`${i}.email`] = "Enter an email like name@gmail.com.";
+    if (!EMAIL_RE.test(norm(r.email))) fieldErrors[`${i}.email`] = "Enter an email like name@gmail.com.";
+    if (!r.isPlayer && !(r.roles ?? []).length) fieldErrors[`${i}.roles`] = "Pick a role, or tick that they play.";
   });
   if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
+  if (!canRoles && rows.some((r) => (r.roles ?? []).length))
+    return { ok: false, error: "Only someone who manages permissions can give out roles. Invite them as players for now." };
 
+  let count = 0;
   for (const r of rows) {
     const email = norm(r.email);
     const existing = db.profiles.find((p) => p.email === email);
-    const isParentEmail = r.kind === "player" && r.emailIsParent !== false;
-
-    // The person on the roster: the invitee themself, or a child of the invitee.
-    let person: Person;
-    if (!isParentEmail && existing) {
-      person = db.people.find((p) => p.id === selfPersonId(existing.id))!;
-    } else {
-      person = { id: id(), userId: null, firstName: r.firstName.trim(), lastName: r.lastName.trim() };
-      db.people.push(person);
-    }
-    if (db.roster.some((x) => x.teamId === teamId && x.personId === person.id && x.kind === r.kind && x.status !== "removed")) continue;
-
-    // Who gets the invite: guardian row (invited until accepted).
-    const alreadyGuardian = existing && db.guardians.some((gd) => gd.personId === person.id && gd.userId === existing.id);
-    if (!alreadyGuardian) {
-      db.guardians.push({
-        id: id(),
-        personId: person.id,
-        userId: existing?.id ?? null,
-        invitedEmail: email,
-        isPrimary: true,
-        isSelf: !isParentEmail,
-        status: "invited",
-      });
-    }
+    const onTeam = db.roster.some(
+      (x) => x.teamId === teamId && x.status !== "removed" && (x.invitedEmail === email || (existing && x.userId === existing.id)),
+    );
+    if (onTeam) continue;
+    const roles = TEAM_ROLES.filter((x) => (r.roles ?? []).includes(x));
     const rm: RosterMember = {
       id: id(),
       teamId,
-      personId: person.id,
-      kind: r.kind,
-      jersey: r.kind === "player" ? r.jersey?.trim() || null : null,
-      position: r.kind === "player" ? r.position?.trim() || null : null,
-      staffRole: r.kind === "staff" ? r.staffRole ?? "assistant_coach" : null,
-      permissions: r.kind === "staff" ? r.permissions ?? ["schedule_events", "scoring"] : [],
-      status: "invited",
+      userId: null,
       invitedEmail: email,
+      invitedName: { firstName: r.firstName.trim(), lastName: r.lastName.trim() },
+      isPlayer: r.isPlayer,
+      roles,
+      jersey: r.isPlayer ? r.jersey?.trim() || null : null,
+      position: r.isPlayer ? r.position?.trim() || null : null,
+      permissions: permissionsForRoles(roles),
+      status: "invited",
     };
     db.roster.push(rm);
+    count++;
 
     const token = sign({ k: "invite", r: rm.id, e: email }, 60 * 60 * 24 * 30);
-    const who = r.kind === "staff" ? "you" : isParentEmail ? person.firstName : "you";
+    const as = hatLabels({ isPlayer: r.isPlayer, roles, clubRole: null, isCreator: false }).join(", ").toLowerCase();
     queueEmail({
       to: email,
-      subject: `${inviter} added ${who === "you" ? "you" : who} to ${team.name}`,
-      text: `${inviter} added ${who} to ${team.name}${r.kind === "staff" ? " as staff" : ""}. Join to see the schedule, answer for games and practices, and chat with the team.`,
+      subject: `${inviter} added you to ${team.name}`,
+      text: `${inviter} added you to ${team.name}${as ? ` (${as})` : ""}. Join to see the schedule, say if you're in for each game and training, and chat with the team.`,
       links: [{ label: "Join the team", href: `${APP_URL}/invite/${token}` }],
     });
   }
-  return { ok: true, data: { count: rows.length } };
+  return { ok: true, data: { count } };
 }
 
 export async function getInvite(token: string) {
   const data = verify<{ k: string; r: string; e: string }>(token);
   if (!data || data.k !== "invite") return null;
   const rm = db.roster.find((x) => x.id === data.r);
-  if (!rm) return null;
-  const team = db.teams.find((t) => t.id === rm.teamId)!;
-  const person = db.people.find((p) => p.id === rm.personId)!;
+  if (!rm || rm.status === "removed") return null;
+  const team = teamById(rm.teamId)!;
   const existing = db.profiles.find((p) => p.email === data.e);
-  const gd = db.guardians.find((x) => x.personId === person.id && (x.invitedEmail === data.e || x.userId === existing?.id));
   return {
     email: data.e,
     team: { id: team.id, name: team.name, color: team.color, colorSecondary: team.colorSecondary },
-    person: { firstName: person.firstName, lastName: person.lastName },
-    kind: rm.kind,
-    forChild: gd ? !gd.isSelf : true,
+    person: personFor(rm),
+    hats: hatLabels({ isPlayer: rm.isPlayer, roles: rm.roles, clubRole: null, isCreator: false }, rm.jersey),
     accepted: rm.status === "active",
     hasAccount: !!existing,
   };
@@ -366,9 +485,9 @@ export async function acceptInvite(
   profile?: { firstName: string; lastName: string },
 ): Promise<ActionResult<{ teamId: ID }>> {
   const data = verify<{ k: string; r: string; e: string }>(token);
-  if (!data || data.k !== "invite") return { ok: false, error: "This invite link has expired. Ask the coach to send a new one." };
+  if (!data || data.k !== "invite") return { ok: false, error: "This invite link has expired. Ask your captain to send a new one." };
   const rm = db.roster.find((x) => x.id === data.r);
-  if (!rm) return { ok: false, error: "This invite was cancelled by the team." };
+  if (!rm || rm.status === "removed") return { ok: false, error: "This invite was cancelled by the team." };
 
   let user = db.profiles.find((p) => p.email === data.e);
   if (!user) {
@@ -380,23 +499,16 @@ export async function acceptInvite(
   return { ok: true, data: { teamId: rm.teamId } };
 }
 
-/** Activate every pending invite sent to this email (both guardian and roster rows). */
+/** Activate every pending invite sent to this email. One account, one row per team. */
 function claimInvitesByEmail(user: Profile) {
-  for (const gd of db.guardians.filter((x) => x.invitedEmail === user.email && x.status === "invited")) {
-    if (gd.isSelf) {
-      // Invite was for the invitee as an adult player or staff: merge into their own person record.
-      const self = selfPersonId(user.id);
-      if (self && self !== gd.personId) {
-        db.roster.filter((r) => r.personId === gd.personId).forEach((r) => (r.personId = self));
-        db.guardians = db.guardians.filter((x) => x !== gd);
-        continue;
-      }
+  for (const r of db.roster.filter((x) => x.invitedEmail === user.email && x.status === "invited")) {
+    if (myRow(user.id, r.teamId)) {
+      r.status = "removed"; // already on that team: keep the row they have
+      continue;
     }
-    gd.userId = user.id;
-    gd.status = "active";
+    r.userId = user.id;
+    r.status = "active";
   }
-  const mine = myPeopleIds(user.id);
-  db.roster.filter((r) => r.status === "invited" && mine.includes(r.personId)).forEach((r) => (r.status = "active"));
 }
 
 // ---------------------------------------------------------------------------
@@ -404,18 +516,12 @@ function claimInvitesByEmail(user: Profile) {
 // ---------------------------------------------------------------------------
 
 function withMine(uid: ID, e: TeamEvent): EventWithMine {
-  const team = db.teams.find((t) => t.id === e.teamId)!;
-  const mine = myPeopleIds(uid);
-  const people = db.roster
-    .filter((r) => r.teamId === e.teamId && r.kind === "player" && r.status === "active" && mine.includes(r.personId))
-    .map((r) => db.people.find((p) => p.id === r.personId)!);
+  const team = teamById(e.teamId)!;
+  const r = db.rsvps.find((x) => x.eventId === e.id && x.userId === uid);
   return {
     ...e,
     team: { id: team.id, name: team.name, color: team.color, colorSecondary: team.colorSecondary },
-    mine: people.map((person) => {
-      const r = db.rsvps.find((x) => x.eventId === e.id && x.personId === person.id);
-      return { person, response: r?.response ?? null, note: r?.note ?? null };
-    }),
+    mine: isActivePlayer(uid, e.teamId) ? { response: r?.response ?? null, note: r?.note ?? null } : null,
   };
 }
 
@@ -452,7 +558,7 @@ export async function listUpcomingForMe(limit = 20): Promise<EventWithMine[]> {
 
 export async function listPendingRsvps(): Promise<EventWithMine[]> {
   const all = await listUpcomingForMe(200);
-  return all.filter((e) => e.status === "active" && e.mine.some((m) => m.response === null));
+  return all.filter((e) => e.status === "active" && e.mine && e.mine.response === null);
 }
 
 export async function getEvent(eventId: ID): Promise<EventWithMine | null> {
@@ -479,15 +585,17 @@ export interface EventInput {
 export async function createEvent(teamId: ID, input: EventInput): Promise<ActionResult<TeamEvent>> {
   const user = await requireUser();
   const perm = input.type === "game" ? "schedule_games" : "schedule_events";
-  if (!hasTeamPerm(user.id, teamId, perm)) return { ok: false, error: "You don't have permission to add this to the schedule." };
+  if (!hasTeamPerm(user.id, teamId, perm))
+    return { ok: false, error: input.type === "game" ? "You don't have permission to add matches. Ask your manager." : "You don't have permission to add this to the schedule." };
   const tz = input.tz || DEFAULT_TZ;
   const fieldErrors: Record<string, string> = {};
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) fieldErrors.date = "Pick a date.";
   if (!/^\d{2}:\d{2}$/.test(input.startTime)) fieldErrors.startTime = "Pick a start time.";
   if (!/^\d{2}:\d{2}$/.test(input.endTime)) fieldErrors.endTime = "Pick an end time.";
   if (input.type === "game" && !input.opponent?.trim()) fieldErrors.opponent = "Add who you're playing.";
-  if (input.type === "event" && !input.title?.trim()) fieldErrors.title = "Give the event a name, like Team photo day.";
-  let startAt = "", endAt = "";
+  if (input.type === "event" && !input.title?.trim()) fieldErrors.title = "Give the event a name, like End-of-season night.";
+  let startAt = "",
+    endAt = "";
   if (!fieldErrors.date && !fieldErrors.startTime && !fieldErrors.endTime) {
     startAt = zonedToUtc(input.date, input.startTime, tz);
     endAt = zonedToUtc(input.date, input.endTime, tz);
@@ -516,12 +624,7 @@ export async function createEvent(teamId: ID, input: EventInput): Promise<Action
   return { ok: true, data: e };
 }
 
-export async function setEventStatus(
-  eventId: ID,
-  status: TeamEvent["status"],
-  reason?: string,
-  notify = true,
-): Promise<ActionResult<TeamEvent>> {
+export async function setEventStatus(eventId: ID, status: TeamEvent["status"], reason?: string, notify = true): Promise<ActionResult<TeamEvent>> {
   const user = await requireUser();
   const e = db.events.find((x) => x.id === eventId);
   if (!e) return { ok: false, error: "That event no longer exists." };
@@ -533,32 +636,30 @@ export async function setEventStatus(
   return { ok: true, data: e };
 }
 
-
 // ---------------------------------------------------------------------------
-// RSVPs
+// RSVPs: players answer for themselves; captains can fill in for someone who told them
 // ---------------------------------------------------------------------------
 
-export async function setRsvp(eventId: ID, personId: ID, response: RsvpResponse, note?: string | null): Promise<ActionResult<Rsvp>> {
+export async function setRsvp(eventId: ID, userId: ID, response: RsvpResponse, note?: string | null): Promise<ActionResult<Rsvp>> {
   const user = await requireUser();
-  return writeRsvp(user.id, eventId, personId, response, note);
+  return writeRsvp(user.id, eventId, userId, response, note);
 }
 
-function writeRsvp(uid: ID, eventId: ID, personId: ID, response: RsvpResponse, note?: string | null): ActionResult<Rsvp> {
+function writeRsvp(uid: ID, eventId: ID, userId: ID, response: RsvpResponse, note?: string | null): ActionResult<Rsvp> {
   const e = db.events.find((x) => x.id === eventId);
   if (!e) return { ok: false, error: "That event no longer exists." };
-  if (!(isGuardian(uid, personId) || isTeamStaff(uid, e.teamId))) return { ok: false, error: "You can only answer for your own family." };
-  if (!db.roster.some((r) => r.teamId === e.teamId && r.personId === personId && r.status === "active"))
-    return { ok: false, error: "This player isn't on the team." };
+  if (uid !== userId && !isTeamStaff(uid, e.teamId)) return { ok: false, error: "You can only answer for yourself." };
+  if (!isActivePlayer(userId, e.teamId)) return { ok: false, error: "Only players on the team can answer." };
   if (e.status === "cancelled") return { ok: false, error: "This event was cancelled." };
   if (note && note.length > 500) return { ok: false, error: "Keep the note under 500 characters." };
-  let r = db.rsvps.find((x) => x.eventId === eventId && x.personId === personId);
+  let r = db.rsvps.find((x) => x.eventId === eventId && x.userId === userId);
   if (r) {
     r.response = response;
     if (note !== undefined) r.note = note?.trim() || null;
     r.respondedBy = uid;
     r.updatedAt = now();
   } else {
-    r = { id: id(), eventId, personId, response, note: note?.trim() || null, respondedBy: uid, updatedAt: now() };
+    r = { id: id(), eventId, userId, response, note: note?.trim() || null, respondedBy: uid, updatedAt: now() };
     db.rsvps.push(r);
   }
   return { ok: true, data: r };
@@ -569,17 +670,15 @@ export async function getAvailability(eventId: ID): Promise<Availability | null>
   const e = db.events.find((x) => x.id === eventId);
   if (!e || !isTeamMember(user.id, e.teamId)) return null;
   const staff = isTeamStaff(user.id, e.teamId);
-  const mine = myPeopleIds(user.id);
   const rows = db.roster
-    .filter((r) => r.teamId === e.teamId && r.kind === "player" && r.status === "active")
+    .filter((r) => r.teamId === e.teamId && r.isPlayer && r.status === "active" && r.userId)
     .map((r) => {
-      const person = db.people.find((p) => p.id === r.personId)!;
-      const rsvp = db.rsvps.find((x) => x.eventId === e.id && x.personId === person.id);
+      const rsvp = db.rsvps.find((x) => x.eventId === e.id && x.userId === r.userId);
       return {
-        person,
+        person: personFor(r),
         jersey: r.jersey,
         response: rsvp?.response ?? null,
-        note: staff || mine.includes(person.id) ? rsvp?.note ?? null : null,
+        note: staff || r.userId === user.id ? rsvp?.note ?? null : null,
       };
     })
     .sort((a, b) => a.person.firstName.localeCompare(b.person.firstName));
@@ -588,21 +687,24 @@ export async function getAvailability(eventId: ID): Promise<Availability | null>
   return { counts, rows, canSeeNotes: staff };
 }
 
-/** One-tap RSVP from an email link, no sign-in needed. */
+/** One-tap answer from an email link, no sign-in needed. The token names the player. */
 export async function rsvpFromLink(token: string): Promise<ActionResult<{ event: TeamEvent; person: Person; response: RsvpResponse; teamName: string }>> {
-  const data = verify<{ k: string; e: string; p: string; u: string; r: RsvpResponse }>(token);
+  const data = verify<{ k: string; e: string; u: string; r: RsvpResponse }>(token);
   if (!data || data.k !== "rsvp") return { ok: false, error: "This link has expired. Open the app to answer instead." };
-  const res = writeRsvp(data.u, data.e, data.p, data.r);
+  const res = writeRsvp(data.u, data.e, data.u, data.r);
   if (!res.ok) return res;
   const event = db.events.find((x) => x.id === data.e)!;
-  const person = db.people.find((x) => x.id === data.p)!;
-  return { ok: true, data: { event, person, response: data.r, teamName: db.teams.find((t) => t.id === event.teamId)!.name } };
+  const p = db.profiles.find((x) => x.id === data.u)!;
+  return {
+    ok: true,
+    data: { event, person: { id: p.id, firstName: p.firstName, lastName: p.lastName }, response: data.r, teamName: teamById(event.teamId)!.name },
+  };
 }
 
 export async function nudgeNonResponders(eventId: ID): Promise<ActionResult<{ sent: number }>> {
   const user = await requireUser();
   const e = db.events.find((x) => x.id === eventId);
-  if (!e || !isTeamStaff(user.id, e.teamId)) return { ok: false, error: "Only staff can send reminders." };
+  if (!e || !isTeamStaff(user.id, e.teamId)) return { ok: false, error: "Only captains and managers can send reminders." };
   const sent = notifyEvent(e, "nudge");
   return { ok: true, data: { sent } };
 }
@@ -616,36 +718,28 @@ function queueEmail(m: Omit<OutboxEmail, "id" | "createdAt">) {
 }
 
 function notifyEvent(e: TeamEvent, kind: "new" | "postponed" | "cancelled" | "reinstated" | "nudge"): number {
-  const team = db.teams.find((t) => t.id === e.teamId)!;
-  const players = db.roster.filter((r) => r.teamId === e.teamId && r.kind === "player" && r.status === "active");
-  const byUser = new Map<ID, Person[]>();
-  for (const r of players) {
-    if (kind === "nudge" && db.rsvps.some((x) => x.eventId === e.id && x.personId === r.personId)) continue;
-    for (const gd of db.guardians.filter((x) => x.personId === r.personId && x.status === "active" && x.userId)) {
-      const list = byUser.get(gd.userId!) ?? [];
-      list.push(db.people.find((p) => p.id === r.personId)!);
-      byUser.set(gd.userId!, list);
-    }
-  }
+  const team = teamById(e.teamId)!;
+  const players = db.roster.filter((r) => r.teamId === e.teamId && r.isPlayer && r.status === "active" && r.userId);
   const title = eventTitle(e);
   const when = `${formatLongDate(e.startAt, e.tz)}, ${formatTimeRange(e.startAt, e.endAt, e.tz)}`;
+  const noun = e.type === "game" ? "match" : e.type === "practice" ? "training" : "event";
   const subject = {
-    new: `New ${e.type === "game" ? "game" : e.type}: ${title} · ${formatLongDate(e.startAt, e.tz)}`,
+    new: `New ${noun}: ${title} · ${formatLongDate(e.startAt, e.tz)}`,
     postponed: `Postponed: ${title}`,
     cancelled: `Cancelled: ${title} · ${formatLongDate(e.startAt, e.tz)}`,
     reinstated: `Back on: ${title}`,
-    nudge: `Can you make it? ${title} · ${formatLongDate(e.startAt, e.tz)}`,
+    nudge: `Are you in? ${title} · ${formatLongDate(e.startAt, e.tz)}`,
   }[kind];
-  for (const [uid, people] of byUser) {
-    const u = db.profiles.find((p) => p.id === uid);
+  let sent = 0;
+  for (const r of players) {
+    if (kind === "nudge" && db.rsvps.some((x) => x.eventId === e.id && x.userId === r.userId)) continue;
+    const u = db.profiles.find((p) => p.id === r.userId);
     if (!u) continue;
     const links: OutboxEmail["links"] = [];
     if (kind !== "cancelled") {
-      for (const p of people) {
-        for (const [r, label] of [["going", "Going"], ["maybe", "Maybe"], ["not_going", "Can't make it"]] as const) {
-          const t = sign({ k: "rsvp", e: e.id, p: p.id, u: uid, r }, 60 * 60 * 24 * 21);
-          links.push({ label: people.length > 1 ? `${p.firstName}: ${label}` : label, href: `${APP_URL}/r/${t}` });
-        }
+      for (const [resp, label] of [["going", "Going"], ["maybe", "Maybe"], ["not_going", "Can't make it"]] as const) {
+        const t = sign({ k: "rsvp", e: e.id, u: u.id, r: resp }, 60 * 60 * 24 * 21);
+        links.push({ label, href: `${APP_URL}/r/${t}` });
       }
     }
     links.push({ label: "Open in the app", href: `${APP_URL}/t/${team.id}/e/${e.id}` });
@@ -655,11 +749,12 @@ function notifyEvent(e: TeamEvent, kind: "new" | "postponed" | "cancelled" | "re
       text:
         kind === "cancelled"
           ? `${title} on ${when} is cancelled.${e.statusReason ? ` Reason: ${e.statusReason}.` : ""}`
-          : `${title}\n${when}${e.locationText ? `\n${e.locationText}` : ""}${e.notes ? `\n\n${e.notes}` : ""}\n\nLet the coach know if ${people.map((p) => p.firstName).join(" and ")} can make it:`,
+          : `${title}\n${when}${e.locationText ? `\n${e.locationText}` : ""}${e.notes ? `\n\n${e.notes}` : ""}\n\nAre you in?`,
       links,
     });
+    sent++;
   }
-  return byUser.size;
+  return sent;
 }
 
 export async function listOutbox(): Promise<OutboxEmail[]> {
@@ -667,96 +762,75 @@ export async function listOutbox(): Promise<OutboxEmail[]> {
 }
 
 // ---------------------------------------------------------------------------
-// seed
+// seed: adult teams, one club, and people wearing several hats
 // ---------------------------------------------------------------------------
 
 const DEMO_ACCOUNTS = [
-  { id: "u-priya", blurb: "Head coach, Kingston U12 Strikers" },
-  { id: "u-anita", blurb: "Parent of Arjun (Strikers) and Diya (Comets)" },
-  { id: "u-sam", blurb: "Parent of Maya (Strikers)" },
-  { id: "u-marc", blurb: "Head coach, Ottawa U10 Comets" },
+  { id: "u-dan", blurb: "Club owner, and plays for, captains and manages the First Team" },
+  { id: "u-priya", blurb: "Plays for and captains Kingston Strikers" },
+  { id: "u-rahul", blurb: "Player on two teams: Strikers and Limestone City Reserves" },
+  { id: "u-marcus", blurb: "Plays for and captains Limestone City Reserves" },
 ];
 
 function seed(): Store {
-  const s: Store = { profiles: [], people: [], guardians: [], teams: [], roster: [], events: [], rsvps: [], outbox: [] };
+  const s: Store = { profiles: [], clubs: [], clubAdmins: [], teams: [], roster: [], events: [], rsvps: [], outbox: [] };
   const tz = DEFAULT_TZ;
 
-  const profile = (pid: string, first: string, last: string, email: string) => {
-    s.profiles.push({ id: pid, firstName: first, lastName: last, email, theme: "system", useTeamColors: true });
-    const person = { id: `p-${pid}`, userId: pid, firstName: first, lastName: last };
-    s.people.push(person);
-    s.guardians.push({ id: `g-${pid}`, personId: person.id, userId: pid, invitedEmail: null, isPrimary: true, isSelf: true, status: "active" });
-    return person;
+  const people: [string, string, string][] = [
+    ["u-dan", "Dan", "Kowalski"], ["u-priya", "Priya", "Raman"], ["u-rahul", "Rahul", "Menon"], ["u-marcus", "Marcus", "Lee"],
+    ["u-sam", "Sam", "Okafor"], ["u-jordan", "Jordan", "Blake"], ["u-chris", "Chris", "Wong"], ["u-tom", "Tom", "Reyes"],
+    ["u-ade", "Ade", "Bello"], ["u-leo", "Leo", "Grant"], ["u-femi", "Femi", "Ade"], ["u-aisha", "Aisha", "Shah"],
+    ["u-kofi", "Kofi", "Mensah"], ["u-dev", "Dev", "Kapoor"], ["u-owen", "Owen", "Park"],
+  ];
+  for (const [pid, f, l] of people)
+    s.profiles.push({ id: pid, firstName: f, lastName: l, email: `${f.toLowerCase()}.${l.toLowerCase()}@example.com`, theme: "system", useTeamColors: true });
+
+  s.clubs.push({ id: "c-lcfc", name: "Limestone City FC", slug: "limestone-city", color: "#0F5C3A", colorSecondary: "#F2C14E", createdBy: "u-dan", createdAt: now() });
+  s.clubAdmins.push({ clubId: "c-lcfc", userId: "u-dan", role: "owner" });
+
+  const team = (tid: string, name: string, clubId: string | null, level: string, color: string, color2: string, by: string, code: string): Team => {
+    const t: Team = {
+      id: tid, clubId, name, sport: "Soccer", level, location: "Kingston, ON", color, colorSecondary: color2,
+      joinCode: code, isPublic: true, rosterVisible: true, createdBy: by, createdAt: now(),
+    };
+    s.teams.push(t);
+    return t;
   };
-  const child = (cid: string, first: string, last: string, parentId: string | null, invitedEmail?: string) => {
-    const person = { id: cid, userId: null, firstName: first, lastName: last };
-    s.people.push(person);
-    s.guardians.push({
-      id: `g-${cid}`,
-      personId: cid,
-      userId: parentId,
-      invitedEmail: invitedEmail ?? null,
-      isPrimary: true,
-      isSelf: false,
-      status: parentId ? "active" : "invited",
+  team("t-strikers", "Kingston Strikers", null, "Sunday league", "#2D0A3E", "#B8964A", "u-priya", "KSTR7A2Q");
+  team("t-first", "Limestone City First Team", "c-lcfc", "Division 1", "#0F5C3A", "#F2C14E", "u-dan", "LCFT9K3M");
+  team("t-reserves", "Limestone City Reserves", "c-lcfc", "Division 2", "#0F5C3A", "#F2C14E", "u-dan", "LCRS4P8X");
+
+  const member = (teamId: string, userId: string, jersey: string | null, position: string | null, roles: TeamRole[] = [], allPerms = false): void => {
+    s.roster.push({
+      id: `r-${teamId}-${userId}`, teamId, userId, invitedEmail: null, invitedName: null,
+      isPlayer: jersey !== null, roles, jersey, position,
+      permissions: allPerms ? [...TEAM_PERMISSIONS] : permissionsForRoles(roles), status: "active",
     });
-    return person;
   };
-
-  const priya = profile("u-priya", "Priya", "Raman", "priya.coach@example.com");
-  profile("u-anita", "Anita", "Nair", "anita.nair@example.com");
-  profile("u-sam", "Sam", "Patel", "sam.patel@example.com");
-  const marc = profile("u-marc", "Marc", "Tremblay", "marc.coach@example.com");
-  // other families on the teams (no demo sign-in)
-  const others: [string, string, string][] = [
-    ["u-f1", "Grace", "Williams"], ["u-f2", "Harpreet", "Singh"], ["u-f3", "Julie", "Martin"],
-    ["u-f4", "Kwame", "Brown"], ["u-f5", "Fiona", "Roy"], ["u-f6", "Rami", "Haddad"],
-    ["u-f7", "Mei", "Lin"], ["u-f8", "Dan", "Kowalski"],
-  ];
-  others.forEach(([pid, f, l]) => profile(pid, f, l, `${f.toLowerCase()}.${l.toLowerCase()}@example.com`));
-
-  const strikers: Team = {
-    id: "t-strikers", name: "Kingston U12 Strikers", sport: "Soccer", ageGroup: "U12", location: "Kingston, ON",
-    color: "#2D0A3E", colorSecondary: "#B8964A", orgName: null, joinCode: "KUS12A7Q", isPublic: true, rosterVisible: true,
-    createdBy: "u-priya", createdAt: now(),
-  };
-  const comets: Team = {
-    id: "t-comets", name: "Ottawa U10 Comets", sport: "Soccer", ageGroup: "U10", location: "Ottawa, ON",
-    color: "#0B1F4B", colorSecondary: "#E4B23A", orgName: null, joinCode: "OTC10M3X", isPublic: true, rosterVisible: true,
-    createdBy: "u-marc", createdAt: now(),
-  };
-  s.teams.push(strikers, comets);
-
-  const staffRow = (teamId: string, personId: string, role: StaffRole): RosterMember => ({
-    id: `r-${teamId}-${personId}`, teamId, personId, kind: "staff", jersey: null, position: null, staffRole: role,
-    permissions: [...STAFF_PERMISSIONS], status: "active", invitedEmail: null,
+  // Strikers: Priya started it, plays #4 and captains.
+  member("t-strikers", "u-priya", "4", "Defence", ["captain"], true);
+  member("t-strikers", "u-rahul", "10", "Midfield");
+  member("t-strikers", "u-sam", "1", "Goalkeeper");
+  member("t-strikers", "u-jordan", "7", "Forward");
+  member("t-strikers", "u-chris", "22", "Midfield");
+  member("t-strikers", "u-tom", "9", "Forward");
+  member("t-strikers", "u-ade", "15", "Defence");
+  s.roster.push({
+    id: "r-t-strikers-ben", teamId: "t-strikers", userId: null, invitedEmail: "ben.hart@example.com",
+    invitedName: { firstName: "Ben", lastName: "Hart" }, isPlayer: true, roles: [], jersey: "18", position: "Defence",
+    permissions: [], status: "invited",
   });
-  const playerRow = (teamId: string, personId: string, jersey: string, position: string, status: RosterMember["status"] = "active"): RosterMember => ({
-    id: `r-${teamId}-${personId}`, teamId, personId, kind: "player", jersey, position, staffRole: null, permissions: [],
-    status, invitedEmail: null,
-  });
-  s.roster.push(staffRow("t-strikers", priya.id, "head_coach"), staffRow("t-comets", marc.id, "head_coach"));
-
-  const kids: [string, string, string, string | null, string, string, string][] = [
-    ["k-arjun", "Arjun", "Nair", "u-anita", "t-strikers", "11", "Midfield"],
-    ["k-maya", "Maya", "Patel", "u-sam", "t-strikers", "7", "Forward"],
-    ["k-noah", "Noah", "Williams", "u-f1", "t-strikers", "9", "Forward"],
-    ["k-ava", "Ava", "Singh", "u-f2", "t-strikers", "3", "Defence"],
-    ["k-zoe", "Zoe", "Martin", "u-f3", "t-strikers", "10", "Midfield"],
-    ["k-ethan", "Ethan", "Brown", "u-f4", "t-strikers", "8", "Midfield"],
-    ["k-isla", "Isla", "Roy", "u-f5", "t-strikers", "6", "Defence"],
-    ["k-omar", "Omar", "Haddad", "u-f6", "t-strikers", "2", "Defence"],
-    ["k-ben", "Ben", "Kowalski", "u-f8", "t-strikers", "1", "Goalkeeper"],
-    ["k-diya", "Diya", "Nair", "u-anita", "t-comets", "5", "Forward"],
-    ["k-lucas", "Lucas", "Lin", "u-f7", "t-comets", "4", "Defence"],
-  ];
-  for (const [cid, f, l, parent, team, jersey, pos] of kids) {
-    if (!s.people.some((p) => p.id === cid)) child(cid, f, l, parent);
-    s.roster.push(playerRow(team, cid, jersey, pos));
-  }
-  // one pending invite
-  child("k-leo", "Leo", "Chen", null, "leo.chen.parent@example.com");
-  s.roster.push({ ...playerRow("t-strikers", "k-leo", "4", "Forward", "invited"), invitedEmail: "leo.chen.parent@example.com" });
+  // First Team: Dan owns the club, and plays #9, captains and manages here.
+  member("t-first", "u-dan", "9", "Forward", ["captain", "manager"], true);
+  member("t-first", "u-kofi", "5", "Defence", ["vice_captain"]);
+  member("t-first", "u-dev", "11", "Midfield");
+  member("t-first", "u-owen", "8", "Midfield");
+  // Reserves: Marcus plays #2 and captains. Rahul plays here too.
+  member("t-reserves", "u-marcus", "2", "Defence", ["captain"]);
+  member("t-reserves", "u-rahul", "14", "Midfield");
+  member("t-reserves", "u-leo", "3", "Defence");
+  member("t-reserves", "u-femi", "19", "Forward");
+  member("t-reserves", "u-aisha", "12", "Midfield", ["treasurer"]);
 
   // dates relative to today, in Toronto
   const today = utcToZoned(now(), tz).date;
@@ -771,7 +845,7 @@ function seed(): Store {
     const e: TeamEvent = {
       id: eid, teamId, type, title: null, startAt: zonedToUtc(date, start, tz), endAt: zonedToUtc(date, end, tz), tz,
       locationText: null, opponent: null, homeAway: null, notes: null, status: "active", statusReason: null,
-      createdBy: teamId === "t-strikers" ? "u-priya" : "u-marc", ...extra,
+      createdBy: s.teams.find((t) => t.id === teamId)!.createdBy, ...extra,
     };
     s.events.push(e);
     return e;
@@ -780,13 +854,13 @@ function seed(): Store {
   const sat = next(6);
   const game1 = ev("e-s-g1", "t-strikers", "game", sat, "10:00", "11:30", {
     opponent: "Frontenac FC", homeAway: "home", locationText: "Invista Centre, Field 2",
-    notes: "Arrive 30 minutes early for warm-up. White kits.",
+    notes: "Meet 9:30 for warm-up. Purple kit.",
   });
   for (let w = 0; w < 3; w++) {
     ev(`e-s-p-tue-${w}`, "t-strikers", "practice", next(2, w), "18:00", "19:15", { locationText: "Caraco Park" });
     ev(`e-s-p-thu-${w}`, "t-strikers", "practice", next(4, w), "18:00", "19:15", { locationText: "Caraco Park" });
   }
-  ev("e-s-g2", "t-strikers", "game", next(6, 1), "13:00", "14:30", {
+  ev("e-s-g2", "t-strikers", "game", next(6, 1), "10:00", "11:30", {
     opponent: "Ottawa Rangers", homeAway: "away", locationText: "Mooney's Bay Park, Ottawa",
     status: "cancelled", statusReason: "Field closed for frost",
   });
@@ -794,34 +868,35 @@ function seed(): Store {
     opponent: "Belleville United", homeAway: "home", locationText: "Invista Centre, Field 1",
   });
   ev("e-s-past", "t-strikers", "game", addDays(sat, -7), "10:00", "11:30", {
-    opponent: "Brockville Blaze", homeAway: "away", locationText: "Brockville Memorial Centre",
+    opponent: "Brockville Blaze", homeAway: "home", locationText: "Caraco Park",
   });
-  ev("e-s-photo", "t-strikers", "event", next(5, 1), "17:30", "18:30", {
-    title: "Team photo day", locationText: "Invista Centre lobby", notes: "Full kit, hair tied back.",
+  ev("e-s-social", "t-strikers", "event", next(6, 3), "19:00", "22:00", {
+    title: "End-of-season night", locationText: "The clubhouse", notes: "Partners welcome.",
   });
 
-  const sun = next(0);
-  ev("e-c-g1", "t-comets", "game", sun, "13:00", "14:00", {
-    opponent: "Nepean Hotspurs", homeAway: "away", locationText: "Nepean Sportsplex, Field 4",
+  ev("e-r-g1", "t-reserves", "game", next(0), "13:00", "14:45", {
+    opponent: "Napanee Rovers", homeAway: "away", locationText: "Napanee Fairgrounds", notes: "45 min drive. Sort out lifts in chat.",
   });
-  ev("e-c-p1", "t-comets", "practice", next(3), "17:30", "18:30", { locationText: "Lansdowne Park" });
-  ev("e-c-p2", "t-comets", "practice", next(3, 1), "17:30", "18:30", { locationText: "Lansdowne Park" });
+  ev("e-r-p1", "t-reserves", "practice", next(3), "19:30", "21:00", { locationText: "Club fieldhouse" });
+  ev("e-r-g2", "t-reserves", "game", next(6, 1), "10:30", "12:15", { opponent: "Amherstview", homeAway: "home", locationText: "Club grounds, Pitch 1" });
 
-  const answers: [string, RsvpResponse, string, string | null][] = [
-    ["k-maya", "going", "u-sam", null],
-    ["k-noah", "going", "u-f1", null],
-    ["k-ava", "maybe", "u-f2", "Depends on her ankle, will confirm Friday"],
-    ["k-zoe", "going", "u-f3", null],
-    ["k-ethan", "not_going", "u-f4", "Away at a family wedding"],
-    ["k-isla", "going", "u-f5", null],
-    ["k-ben", "going", "u-f8", "Might be 10 min late"],
+  ev("e-f-g1", "t-first", "game", sat, "14:00", "15:45", { opponent: "Kingston Royals", homeAway: "home", locationText: "Club grounds, Pitch 1" });
+  ev("e-f-p1", "t-first", "practice", next(2), "19:00", "20:30", { locationText: "Club fieldhouse" });
+
+  const answers: [string, RsvpResponse, string | null][] = [
+    ["u-priya", "going", null],
+    ["u-sam", "going", null],
+    ["u-jordan", "going", null],
+    ["u-chris", "maybe", "Depends on work, will confirm Friday"],
+    ["u-tom", "not_going", "Away at a wedding"],
+    ["u-ade", "going", "Might be 10 min late"],
   ];
-  for (const [p, r, by, note] of answers)
-    s.rsvps.push({ id: `rs-${game1.id}-${p}`, eventId: game1.id, personId: p, response: r, note, respondedBy: by, updatedAt: now() });
-  s.rsvps.push({ id: "rs-p-maya", eventId: "e-s-p-tue-0", personId: "k-maya", response: "maybe", note: null, respondedBy: "u-sam", updatedAt: now() });
+  for (const [u, r, note] of answers)
+    s.rsvps.push({ id: `rs-${game1.id}-${u}`, eventId: game1.id, userId: u, response: r, note, respondedBy: u, updatedAt: now() });
+  s.rsvps.push({ id: "rs-f-kofi", eventId: "e-f-g1", userId: "u-kofi", response: "going", note: null, respondedBy: "u-kofi", updatedAt: now() });
 
   return s;
 }
 
 // Initialised last so seed() can use every helper above. Survives dev hot-reloads via globalThis.
-const db: Store = (g.__teamAppStore ??= seed());
+const db: Store = (g.__teamAppStoreV2 ??= seed());
