@@ -1,0 +1,178 @@
+/* Generated from tokens.json by gen_css.py. Do not edit by hand. */
+
+:root {
+  --ff-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ff-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --ff-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fs-xs: 0.75rem;
+  --lh-xs: 1rem;
+  --fw-xs: 500;
+  --fs-sm: 0.875rem;
+  --lh-sm: 1.25rem;
+  --fw-sm: 400;
+  --fs-base: 1rem;
+  --lh-base: 1.5rem;
+  --fw-base: 400;
+  --fs-lg: 1.125rem;
+  --lh-lg: 1.625rem;
+  --fw-lg: 600;
+  --fs-xl: 1.375rem;
+  --lh-xl: 1.75rem;
+  --fw-xl: 700;
+  --fs-2xl: 1.75rem;
+  --lh-2xl: 2rem;
+  --fw-2xl: 700;
+  --fs-display: 2.5rem;
+  --lh-display: 2.625rem;
+  --fw-display: 700;
+  --fs-score: 3.5rem;
+  --lh-score: 3.5rem;
+  --fw-score: 700;
+  --space-0: 0rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+  --space-9: 3rem;
+  --space-10: 4rem;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+  --sh-card: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --sh-pop: 0 12px 32px rgba(16,24,40,.18);
+  --sh-dark-card: 0 0 0 1px rgba(255,255,255,.04);
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-ease: cubic-bezier(.2,.8,.2,1);
+  --layout-gutter: 16px;
+  --layout-max-content: 1120px;
+  --layout-header: 56px;
+  --layout-tabbar: 64px;
+  --layout-sidebar: 248px;
+  --layout-tap-min: 44px;
+  --z-header: 20;
+  --z-tabbar: 20;
+  --z-sheet: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+  color-scheme: light;
+  --bg: #FFFFFF;
+  --surface: #F5F6F8;
+  --sunken: #ECEEF2;
+  --border: #E1E4E9;
+  --border-input: #858D99;
+  --text: #12151A;
+  --text-muted: #5A6270;
+  --accent: #2346D8;
+  --on-accent: #FFFFFF;
+  --focus: #2346D8;
+  --danger: #C42B2B;
+  --on-danger: #FFFFFF;
+  --danger-soft: #FCECEC;
+  --success: #18794E;
+  --on-success: #FFFFFF;
+  --success-soft: #E6F4EC;
+  --warning: #9A5700;
+  --on-warning: #FFFFFF;
+  --warning-soft: #FFF3DF;
+  --live: #C8261A;
+  --on-live: #FFFFFF;
+  --overlay: #0B0D11;
+  --team: var(--accent);
+  --on-team: var(--on-accent);
+  --team-ink: var(--accent);
+  --team-soft: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  --team-2: var(--team);
+  --on-team-2: var(--on-team);
+}
+
+/* Dark: follows the device unless the user picked a theme (data-theme on <html>). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0E1116;
+    --surface: #161A21;
+    --sunken: #0A0C10;
+    --border: #272D37;
+    --border-input: #6E7785;
+    --text: #F2F4F7;
+    --text-muted: #A2AAB7;
+    --accent: #8AA4FF;
+    --on-accent: #0E1116;
+    --focus: #8AA4FF;
+    --danger: #FF7A7A;
+    --on-danger: #1A0707;
+    --danger-soft: #2E1517;
+    --success: #45CC8E;
+    --on-success: #06170F;
+    --success-soft: #112A1F;
+    --warning: #F4B54A;
+    --on-warning: #1D1405;
+    --warning-soft: #2C2211;
+    --live: #FF5A4F;
+    --on-live: #1A0707;
+    --overlay: #000000;
+    --team: var(--accent);
+    --on-team: var(--on-accent);
+    --team-ink: var(--accent);
+    --team-soft: color-mix(in srgb, var(--accent) 10%, var(--bg));
+    --team-2: var(--team);
+    --on-team-2: var(--on-team);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E1116;
+  --surface: #161A21;
+  --sunken: #0A0C10;
+  --border: #272D37;
+  --border-input: #6E7785;
+  --text: #F2F4F7;
+  --text-muted: #A2AAB7;
+  --accent: #8AA4FF;
+  --on-accent: #0E1116;
+  --focus: #8AA4FF;
+  --danger: #FF7A7A;
+  --on-danger: #1A0707;
+  --danger-soft: #2E1517;
+  --success: #45CC8E;
+  --on-success: #06170F;
+  --success-soft: #112A1F;
+  --warning: #F4B54A;
+  --on-warning: #1D1405;
+  --warning-soft: #2C2211;
+  --live: #FF5A4F;
+  --on-live: #1A0707;
+  --overlay: #000000;
+  --team: var(--accent);
+  --on-team: var(--on-accent);
+  --team-ink: var(--accent);
+  --team-soft: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  --team-2: var(--team);
+  --on-team-2: var(--on-team);
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ff-sans);
+  -webkit-text-size-adjust: 100%;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

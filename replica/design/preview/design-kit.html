@@ -1,0 +1,981 @@
+<title>Team App Design Kit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+/* Generated tokens (tokens.json -> gen_css.py). Layout: one phone-width column of real components, team colour switcher pinned on top. */
+/* Generated from tokens.json by gen_css.py. Do not edit by hand. */
+
+:root {
+  --ff-sans: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ff-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  --ff-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fs-xs: 0.75rem;
+  --lh-xs: 1rem;
+  --fw-xs: 500;
+  --fs-sm: 0.875rem;
+  --lh-sm: 1.25rem;
+  --fw-sm: 400;
+  --fs-base: 1rem;
+  --lh-base: 1.5rem;
+  --fw-base: 400;
+  --fs-lg: 1.125rem;
+  --lh-lg: 1.625rem;
+  --fw-lg: 600;
+  --fs-xl: 1.375rem;
+  --lh-xl: 1.75rem;
+  --fw-xl: 700;
+  --fs-2xl: 1.75rem;
+  --lh-2xl: 2rem;
+  --fw-2xl: 700;
+  --fs-display: 2.5rem;
+  --lh-display: 2.625rem;
+  --fw-display: 700;
+  --fs-score: 3.5rem;
+  --lh-score: 3.5rem;
+  --fw-score: 700;
+  --space-0: 0rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+  --space-9: 3rem;
+  --space-10: 4rem;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+  --sh-card: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --sh-pop: 0 12px 32px rgba(16,24,40,.18);
+  --sh-dark-card: 0 0 0 1px rgba(255,255,255,.04);
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-ease: cubic-bezier(.2,.8,.2,1);
+  --layout-gutter: 16px;
+  --layout-max-content: 1120px;
+  --layout-header: 56px;
+  --layout-tabbar: 64px;
+  --layout-sidebar: 248px;
+  --layout-tap-min: 44px;
+  --z-header: 20;
+  --z-tabbar: 20;
+  --z-sheet: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+  color-scheme: light;
+  --bg: #FFFFFF;
+  --surface: #F5F6F8;
+  --sunken: #ECEEF2;
+  --border: #E1E4E9;
+  --border-input: #858D99;
+  --text: #12151A;
+  --text-muted: #5A6270;
+  --accent: #2346D8;
+  --on-accent: #FFFFFF;
+  --focus: #2346D8;
+  --danger: #C42B2B;
+  --on-danger: #FFFFFF;
+  --danger-soft: #FCECEC;
+  --success: #18794E;
+  --on-success: #FFFFFF;
+  --success-soft: #E6F4EC;
+  --warning: #9A5700;
+  --on-warning: #FFFFFF;
+  --warning-soft: #FFF3DF;
+  --live: #C8261A;
+  --on-live: #FFFFFF;
+  --overlay: #0B0D11;
+  --team: var(--accent);
+  --on-team: var(--on-accent);
+  --team-ink: var(--accent);
+  --team-soft: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  --team-2: var(--team);
+  --on-team-2: var(--on-team);
+}
+
+/* Dark: follows the device unless the user picked a theme (data-theme on <html>). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0E1116;
+    --surface: #161A21;
+    --sunken: #0A0C10;
+    --border: #272D37;
+    --border-input: #6E7785;
+    --text: #F2F4F7;
+    --text-muted: #A2AAB7;
+    --accent: #8AA4FF;
+    --on-accent: #0E1116;
+    --focus: #8AA4FF;
+    --danger: #FF7A7A;
+    --on-danger: #1A0707;
+    --danger-soft: #2E1517;
+    --success: #45CC8E;
+    --on-success: #06170F;
+    --success-soft: #112A1F;
+    --warning: #F4B54A;
+    --on-warning: #1D1405;
+    --warning-soft: #2C2211;
+    --live: #FF5A4F;
+    --on-live: #1A0707;
+    --overlay: #000000;
+    --team: var(--accent);
+    --on-team: var(--on-accent);
+    --team-ink: var(--accent);
+    --team-soft: color-mix(in srgb, var(--accent) 10%, var(--bg));
+    --team-2: var(--team);
+    --on-team-2: var(--on-team);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0E1116;
+  --surface: #161A21;
+  --sunken: #0A0C10;
+  --border: #272D37;
+  --border-input: #6E7785;
+  --text: #F2F4F7;
+  --text-muted: #A2AAB7;
+  --accent: #8AA4FF;
+  --on-accent: #0E1116;
+  --focus: #8AA4FF;
+  --danger: #FF7A7A;
+  --on-danger: #1A0707;
+  --danger-soft: #2E1517;
+  --success: #45CC8E;
+  --on-success: #06170F;
+  --success-soft: #112A1F;
+  --warning: #F4B54A;
+  --on-warning: #1D1405;
+  --warning-soft: #2C2211;
+  --live: #FF5A4F;
+  --on-live: #1A0707;
+  --overlay: #000000;
+  --team: var(--accent);
+  --on-team: var(--on-accent);
+  --team-ink: var(--accent);
+  --team-soft: color-mix(in srgb, var(--accent) 10%, var(--bg));
+  --team-2: var(--team);
+  --on-team-2: var(--on-team);
+}
+
+html {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ff-sans);
+  -webkit-text-size-adjust: 100%;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--ff-sans); font-size: var(--fs-base); line-height: var(--lh-base); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+* { box-sizing: border-box; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+.controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 25; background: var(--surface); border-bottom: 1px solid var(--border);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 12px; }
+.controls-inner { max-width: 1120px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.controls-label { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.swatch { width: 32px; height: 32px; border-radius: 999px; border: 1px solid var(--border-input); cursor: pointer; padding: 0; position: relative; }
+.swatch[aria-checked="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
+.hex { display: flex; align-items: center; gap: 6px; }
+.hex input[type=color] { width: 36px; height: 36px; border: 1px solid var(--border-input); border-radius: var(--r-sm); background: var(--bg); padding: 2px; }
+.hex code { font-family: var(--ff-mono); font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.seg-small { display: inline-flex; border: 1px solid var(--border-input); border-radius: 999px; overflow: hidden; }
+.seg-small button { border: 0; background: transparent; color: var(--text); font: 600 var(--fs-xs)/1 var(--ff-sans); padding: 10px 12px; min-height: 36px; cursor: pointer; }
+.seg-small button[aria-pressed="true"] { background: var(--text); color: var(--bg); }
+.adjust-note { flex-basis: 100%; font-size: var(--fs-xs); color: var(--text-muted); min-height: 16px; }
+
+main { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 24px 64px; }
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 40px; align-items: start; }
+@media (max-width: 900px) { .wrap { grid-template-columns: minmax(0, 1fr); } }
+
+.intro h1 { font-family: var(--ff-display); font-size: var(--fs-display); line-height: var(--lh-display); text-transform: uppercase; letter-spacing: .01em; }
+.intro p { color: var(--text-muted); max-width: 60ch; margin: 8px 0 0; }
+
+/* phone frame */
+.phone { position: sticky; top: 96px; border: 1px solid var(--border); border-radius: 28px; overflow: hidden; background: var(--bg); box-shadow: var(--sh-pop); }
+@media (max-width: 900px) { .phone { position: static; } }
+.phone-scroll { max-height: 760px; overflow-y: auto; }
+@media (max-width: 900px) { .phone-scroll { max-height: none; } }
+
+.team-header { background: var(--team); color: var(--on-team); padding: 20px 16px 16px; display: flex; gap: 12px; align-items: center; border-bottom: 4px solid var(--team-2); }
+.crest { width: 44px; height: 44px; border-radius: 999px; border: 2px solid var(--on-team); display: grid; place-items: center; font-family: var(--ff-display); font-weight: 700; font-size: 18px; flex: none; }
+.team-header h2 { font-family: var(--ff-display); font-size: var(--fs-2xl); line-height: var(--lh-2xl); text-transform: uppercase; letter-spacing: .02em; }
+.team-header p { margin: 0; font-size: var(--fs-sm); opacity: .9; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding: 0 8px; overflow-x: auto; }
+.tabs button { background: none; border: 0; color: var(--text-muted); font: 600 var(--fs-sm)/1 var(--ff-sans); padding: 14px 10px; min-height: 44px; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--team-ink); border-bottom-color: var(--team-ink); }
+.phone-body { padding: 16px; display: grid; gap: 12px; }
+.week-head { font-size: var(--fs-xs); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
+
+.tabbar { display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid var(--border); background: var(--bg); position: sticky; bottom: 0; }
+.tabbar a { display: grid; justify-items: center; gap: 2px; padding: 8px 0 10px; color: var(--text-muted); text-decoration: none; font-size: 11px; font-weight: 500; min-height: 56px; position: relative; }
+.tabbar a[aria-current="page"] { color: var(--team-ink); }
+.tabbar a[aria-current="page"]::before { content: ""; position: absolute; top: 0; left: 30%; right: 30%; height: 2px; background: var(--team-ink); }
+.tabbar svg { width: 22px; height: 22px; }
+.dot-badge { position: absolute; top: 6px; left: calc(50% + 6px); background: var(--danger); color: var(--on-danger); font-size: 10px; font-weight: 700; border-radius: 999px; min-width: 16px; height: 16px; display: grid; place-items: center; padding: 0 4px; }
+
+/* sections */
+.sections { display: grid; gap: 40px; min-width: 0; }
+.sec h2 { font-size: var(--fs-lg); line-height: var(--lh-lg); }
+.sec > p { margin: 4px 0 16px; color: var(--text-muted); font-size: var(--fs-sm); max-width: 62ch; }
+.row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.stack { display: grid; gap: 12px; }
+
+/* buttons */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: var(--r-md); font: 600 var(--fs-sm)/1 var(--ff-sans); border: 1px solid transparent; cursor: pointer; transition: transform var(--motion-fast) var(--motion-ease), background var(--motion-fast); }
+.btn:active { transform: scale(.98); }
+.btn svg { width: 18px; height: 18px; }
+.btn-primary { background: var(--team); color: var(--on-team); }
+.btn-primary:hover { background: color-mix(in srgb, var(--team) 92%, var(--text)); }
+.btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn-ghost { background: transparent; color: var(--team-ink); }
+.btn-danger { background: var(--danger); color: var(--on-danger); }
+.btn-sm { min-height: 36px; padding: 0 12px; }
+.btn-lg { min-height: 52px; padding: 0 22px; font-size: var(--fs-base); }
+.btn[disabled] { opacity: .4; cursor: not-allowed; }
+.spin { width: 16px; height: 16px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 999px; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* inputs */
+.field { display: grid; gap: 6px; align-content: start; }
+.field label { font-size: var(--fs-sm); font-weight: 600; }
+.field input, .field select { min-height: 44px; border: 1px solid var(--border-input); border-radius: var(--r-md); padding: 0 12px; font: var(--fs-base) var(--ff-sans); background: var(--bg); color: var(--text); width: 100%; }
+.field input:focus { outline: 2px solid var(--focus); outline-offset: 0; border-color: var(--focus); }
+.field .hint { font-size: var(--fs-xs); color: var(--text-muted); }
+.field.error input { border-color: var(--danger); }
+.field .err { font-size: var(--fs-xs); color: var(--danger); font-weight: 500; display: flex; gap: 4px; align-items: center; }
+.field .err svg { width: 14px; height: 14px; }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+
+/* segmented */
+.seg { display: inline-flex; background: var(--sunken); border-radius: var(--r-md); padding: 4px; gap: 4px; }
+.seg button { border: 0; background: transparent; color: var(--text-muted); font: 600 var(--fs-sm)/1 var(--ff-sans); padding: 0 14px; min-height: 36px; border-radius: 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--team); color: var(--on-team); }
+
+/* event card */
+.ecard { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--bg); color: inherit; text-decoration: none; box-shadow: var(--sh-card); }
+.ecard.today { background: var(--team-soft); border-color: transparent; }
+.ecard.past { opacity: .75; }
+.date { text-align: center; }
+.date .dow { font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.date .day { font-family: var(--ff-display); font-size: var(--fs-2xl); line-height: 1; font-weight: 700; }
+.ecard h3 { font-size: var(--fs-base); line-height: 22px; font-weight: 600; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ecard.cancelled h3 span.t { text-decoration: line-through; color: var(--text-muted); }
+.meta { font-size: var(--fs-sm); color: var(--text-muted); display: flex; gap: 4px 12px; flex-wrap: wrap; margin-top: 2px; }
+.meta span { display: inline-flex; gap: 4px; align-items: center; }
+.meta svg { width: 14px; height: 14px; }
+.ecard-foot { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+.tag { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; padding: 3px 8px; display: inline-flex; align-items: center; gap: 5px; }
+.tag-cancelled { background: var(--danger-soft); color: var(--danger); }
+.tag-postponed { background: var(--warning-soft); color: var(--warning); }
+.tag-live { background: var(--live); color: var(--on-live); }
+.tag-live::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; animation: pulse 1.4s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.tag-final { background: var(--sunken); color: var(--text); }
+.tag-home { background: var(--sunken); color: var(--text-muted); }
+.chip { font-size: var(--fs-xs); font-weight: 600; border-radius: 999px; padding: 4px 10px; display: inline-flex; gap: 4px; align-items: center; }
+.chip svg { width: 14px; height: 14px; }
+.chip-going { background: var(--success-soft); color: var(--success); }
+.chip-maybe { background: var(--warning-soft); color: var(--warning); }
+.chip-no { background: var(--danger-soft); color: var(--danger); }
+.chip-none { background: var(--sunken); color: var(--text-muted); }
+.score-inline { font-family: var(--ff-display); font-weight: 700; font-size: 20px; font-variant-numeric: tabular-nums; }
+
+/* rsvp */
+.rsvp { display: grid; gap: 10px; }
+.rsvp-who { font-size: var(--fs-sm); font-weight: 600; }
+.rsvp-opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.rsvp-opts button { min-height: 48px; border: 1px solid var(--border-input); background: var(--bg); color: var(--text); border-radius: var(--r-md); font: 600 var(--fs-sm)/1.1 var(--ff-sans); display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; padding: 0 6px; }
+.rsvp-opts button svg { width: 18px; height: 18px; flex: none; }
+.rsvp-opts button[aria-pressed="true"][data-v="going"] { background: var(--success); border-color: var(--success); color: var(--on-success); }
+.rsvp-opts button[aria-pressed="true"][data-v="maybe"] { background: var(--warning); border-color: var(--warning); color: var(--on-warning); }
+.rsvp-opts button[aria-pressed="true"][data-v="no"] { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
+.rsvp-note { font-size: var(--fs-sm); color: var(--team-ink); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; font-weight: 600; min-height: 32px; }
+
+.att { display: flex; gap: 8px; flex-wrap: wrap; }
+.att .chip { font-variant-numeric: tabular-nums; }
+
+/* people */
+.person { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.person:last-child { border-bottom: 0; }
+.avatar { width: 40px; height: 40px; border-radius: 999px; background: var(--team-2); color: var(--on-team-2); display: grid; place-items: center; font-weight: 700; font-size: var(--fs-sm); flex: none; }
+.person .name { font-weight: 600; }
+.person .sub { font-size: var(--fs-sm); color: var(--text-muted); }
+.person .grow { flex: 1; min-width: 0; }
+.jersey { font-family: var(--ff-display); font-weight: 700; font-size: 18px; width: 36px; text-align: center; color: var(--team-ink); font-variant-numeric: tabular-nums; }
+.pending { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); background: var(--sunken); border-radius: 999px; padding: 3px 8px; }
+
+/* chat */
+.chat { display: grid; gap: 6px; }
+.msg { max-width: 80%; display: grid; gap: 2px; }
+.msg .who { font-size: var(--fs-xs); color: var(--text-muted); font-weight: 600; padding-left: 12px; }
+.bubble { padding: 9px 12px; border-radius: 16px; font-size: var(--fs-sm); line-height: 20px; }
+.theirs .bubble { background: var(--surface); color: var(--text); border-bottom-left-radius: 4px; }
+.mine { justify-self: end; }
+.mine .bubble { background: var(--team); color: var(--on-team); border-bottom-right-radius: 4px; }
+.mine .status { justify-self: end; font-size: 11px; color: var(--text-muted); }
+.system { justify-self: center; font-size: var(--fs-xs); color: var(--text-muted); text-align: center; padding: 6px 0; }
+.reacts { display: flex; gap: 4px; padding-left: 8px; }
+.react { font-size: 12px; border: 1px solid var(--border); background: var(--bg); color: var(--text); border-radius: 999px; padding: 2px 8px; cursor: pointer; font-variant-numeric: tabular-nums; min-height: 26px; }
+.react[aria-pressed="true"] { background: var(--team-soft); border-color: var(--team-ink); color: var(--team-ink); }
+.pinned { display: flex; gap: 8px; align-items: center; font-size: var(--fs-sm); background: var(--surface); border-radius: var(--r-md); padding: 8px 12px; }
+.pinned svg { width: 16px; height: 16px; color: var(--team-ink); flex: none; }
+.pinned b { font-weight: 600; }
+.poll { background: var(--surface); border-radius: 16px; padding: 12px; display: grid; gap: 8px; border-bottom-left-radius: 4px; }
+.poll q { font-weight: 600; font-size: var(--fs-sm); quotes: none; }
+.poll-opt { position: relative; border: 1px solid var(--border); border-radius: var(--r-sm); padding: 8px 10px; font-size: var(--fs-sm); background: var(--bg); color: var(--text); display: flex; justify-content: space-between; overflow: hidden; cursor: pointer; text-align: left; min-height: 40px; align-items: center; }
+.poll-opt .bar { position: absolute; inset: 0 auto 0 0; background: var(--team-soft); z-index: 0; transition: width var(--motion-slow) var(--motion-ease); }
+.poll-opt span { position: relative; z-index: 1; }
+.poll-opt[aria-pressed="true"] { border-color: var(--team-ink); }
+.poll small { font-size: var(--fs-xs); color: var(--text-muted); }
+.composer { display: flex; gap: 8px; align-items: center; border: 1px solid var(--border-input); border-radius: 999px; padding: 4px 4px 4px 14px; }
+.composer input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: var(--fs-sm) var(--ff-sans); min-height: 36px; }
+.composer input:focus { outline: none; }
+.composer:focus-within { outline: 2px solid var(--focus); outline-offset: 1px; }
+.icon-btn { width: 40px; height: 40px; border-radius: 999px; border: 0; display: grid; place-items: center; cursor: pointer; }
+.icon-btn svg { width: 18px; height: 18px; }
+.icon-btn.send { background: var(--team); color: var(--on-team); }
+
+/* scoreboard */
+.score { border: 1px solid var(--border); border-radius: var(--r-lg); padding: 16px; display: grid; gap: 14px; }
+.score-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; text-align: center; }
+.score-side { display: grid; justify-items: center; gap: 6px; font-weight: 600; font-size: var(--fs-sm); }
+.score-num { font-family: var(--ff-display); font-size: var(--fs-score); line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; }
+.score-mid { font-family: var(--ff-display); font-size: 32px; color: var(--text-muted); }
+.score-ctrl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.score-ctrl .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.opp-crest { width: 44px; height: 44px; border-radius: 999px; background: var(--sunken); color: var(--text-muted); display: grid; place-items: center; font-family: var(--ff-display); font-weight: 700; }
+
+/* feedback */
+.toast { display: inline-flex; gap: 10px; align-items: center; background: var(--text); color: var(--bg); border-radius: var(--r-md); padding: 12px 14px; font-size: var(--fs-sm); font-weight: 500; box-shadow: var(--sh-pop); }
+.toast svg { width: 18px; height: 18px; }
+.toast button { background: none; border: 0; color: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0 0 0 6px; min-height: 32px; }
+.empty { border: 1px dashed var(--border-input); border-radius: var(--r-lg); padding: 28px 16px; display: grid; justify-items: center; gap: 8px; text-align: center; }
+.empty .ico { width: 52px; height: 52px; border-radius: 999px; background: var(--sunken); display: grid; place-items: center; color: var(--text-muted); }
+.empty .ico svg { width: 24px; height: 24px; }
+.empty h3 { font-size: var(--fs-base); }
+.empty p { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.banner { display: flex; gap: 10px; align-items: flex-start; border-radius: var(--r-md); padding: 12px 14px; font-size: var(--fs-sm); }
+.banner svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.banner-info { background: var(--team-soft); color: var(--text); }
+.banner-warn { background: var(--warning-soft); color: var(--text); }
+.banner-warn svg { color: var(--warning); }
+.banner-info svg { color: var(--team-ink); }
+.skel { display: grid; gap: 8px; border: 1px solid var(--border); border-radius: var(--r-lg); padding: 14px; }
+.skel i { display: block; height: 12px; border-radius: 6px; background: linear-gradient(90deg, var(--sunken), var(--surface), var(--sunken)); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+
+.palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.pal { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; font-size: var(--fs-xs); }
+.pal div:first-child { height: 44px; }
+.pal div:last-child { padding: 6px 8px; display: grid; }
+.pal code { font-family: var(--ff-mono); color: var(--text-muted); }
+.type-sample { display: grid; gap: 10px; }
+.type-sample div { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 12px; align-items: baseline; }
+.type-sample small { font-family: var(--ff-mono); color: var(--text-muted); font-size: 11px; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+
+<div class="controls" role="region" aria-label="Preview controls">
+  <div class="controls-inner">
+    <span class="controls-label" id="tc-label">Team colour</span>
+    <div class="swatches" role="radiogroup" aria-labelledby="tc-label" id="swatches"></div>
+    <div class="hex">
+      <label class="vh" for="custom">Custom team colour</label>
+      <input type="color" id="custom" value="#2D0A3E">
+      <code id="hexout">#2D0A3E</code>
+    </div>
+    <div class="seg-small" role="group" aria-label="Colour mode">
+      <button type="button" data-mode="light" id="m-light">Light</button>
+      <button type="button" data-mode="dark" id="m-dark">Dark</button>
+    </div>
+    <div class="seg-small" role="group" aria-label="Team colours on or off">
+      <button type="button" id="tc-on" aria-pressed="true">Team colours</button>
+      <button type="button" id="tc-off" aria-pressed="false">Off</button>
+    </div>
+    <div class="adjust-note" id="note" aria-live="polite"></div>
+  </div>
+</div>
+<style id="team-style"></style>
+
+<main>
+  <div class="wrap">
+    <div data-team="demo" id="phone-team">
+      <div class="phone" aria-label="Team screen preview">
+        <div class="phone-scroll">
+          <header class="team-header">
+            <div class="crest" aria-hidden="true">KU</div>
+            <div>
+              <h2>Kingston U12 Strikers</h2>
+              <p>Soccer · U12 · Kingston, ON</p>
+            </div>
+          </header>
+          <div class="tabs" role="tablist" aria-label="Team sections">
+            <button role="tab" aria-selected="true">Schedule</button>
+            <button role="tab" aria-selected="false">Roster</button>
+            <button role="tab" aria-selected="false">Chat</button>
+            <button role="tab" aria-selected="false">Messages</button>
+          </div>
+          <div class="phone-body">
+            <div class="row" style="justify-content: space-between;">
+              <div class="seg" role="group" aria-label="Schedule view">
+                <button type="button" aria-pressed="true">List</button>
+                <button type="button" aria-pressed="false">Month</button>
+              </div>
+              <button class="btn btn-primary btn-sm" type="button"><i data-lucide="plus"></i>New event</button>
+            </div>
+            <div class="week-head">This week</div>
+            <a class="ecard today" href="#game">
+              <div class="date"><div class="dow">Sat</div><div class="day">25</div></div>
+              <div>
+                <h3><span class="t">vs Frontenac FC</span> <span class="tag tag-home">Home</span></h3>
+                <div class="meta"><span><i data-lucide="clock"></i>10:00 – 11:30</span><span><i data-lucide="map-pin"></i>Invista Centre, Field 2</span></div>
+                <div class="ecard-foot"><span class="chip chip-going"><i data-lucide="check"></i>Maya going</span><span class="chip chip-none">Arjun: no reply</span></div>
+              </div>
+            </a>
+            <a class="ecard" href="#practice">
+              <div class="date"><div class="dow">Tue</div><div class="day">28</div></div>
+              <div>
+                <h3><span class="t">Practice</span></h3>
+                <div class="meta"><span><i data-lucide="clock"></i>18:00 – 19:15</span><span><i data-lucide="repeat"></i>Every Tue &amp; Thu</span></div>
+                <div class="ecard-foot"><span class="chip chip-maybe"><i data-lucide="help-circle"></i>Maybe</span></div>
+              </div>
+            </a>
+            <div class="week-head">Next week</div>
+            <a class="ecard cancelled" href="#cancelled">
+              <div class="date"><div class="dow">Sat</div><div class="day">1</div></div>
+              <div>
+                <h3><span class="t">at Ottawa Rangers</span> <span class="tag tag-cancelled">Cancelled</span></h3>
+                <div class="meta"><span>Field closed for frost</span></div>
+              </div>
+            </a>
+            <a class="ecard" href="#live">
+              <div class="date"><div class="dow">Sun</div><div class="day">2</div></div>
+              <div>
+                <h3><span class="t">vs Belleville United</span> <span class="tag tag-live">Live</span></h3>
+                <div class="meta"><span>2nd half</span><span class="score-inline">2 – 1</span></div>
+              </div>
+            </a>
+          </div>
+          <nav class="tabbar" aria-label="Primary">
+            <a href="#home"><i data-lucide="house"></i>Home</a>
+            <a href="#teams" aria-current="page"><i data-lucide="users"></i>Teams</a>
+            <a href="#calendar"><i data-lucide="calendar-days"></i>Calendar</a>
+            <a href="#chat"><i data-lucide="message-circle"></i>Chat<span class="dot-badge" aria-hidden="true">3</span><span class="vh">, 3 unread</span></a>
+            <a href="#account"><i data-lucide="user"></i>Account</a>
+          </nav>
+        </div>
+      </div>
+    </div>
+
+    <div class="sections" data-team="demo">
+      <div class="intro">
+        <h1>Team App Design Kit</h1>
+        <p>Every component in the app, built from the design tokens. Pick a team colour above and watch the team parts recolour, with contrast fixed automatically. RSVP colours and match status never change.</p>
+      </div>
+
+      <section class="sec" aria-labelledby="h-rsvp">
+        <h2 id="h-rsvp">RSVP</h2>
+        <p>The core action. One tap per kid; the note goes to staff only.</p>
+        <div class="stack">
+          <div class="rsvp" data-rsvp>
+            <div class="rsvp-who" id="rsvp-maya">Maya</div>
+            <div class="rsvp-opts" role="group" aria-labelledby="rsvp-maya">
+              <button type="button" data-v="going" aria-pressed="true"><i data-lucide="check"></i>Going</button>
+              <button type="button" data-v="maybe" aria-pressed="false"><i data-lucide="help-circle"></i>Maybe</button>
+              <button type="button" data-v="no" aria-pressed="false"><i data-lucide="x"></i>Can't make it</button>
+            </div>
+          </div>
+          <div class="rsvp" data-rsvp>
+            <div class="rsvp-who" id="rsvp-arjun">Arjun</div>
+            <div class="rsvp-opts" role="group" aria-labelledby="rsvp-arjun">
+              <button type="button" data-v="going" aria-pressed="false"><i data-lucide="check"></i>Going</button>
+              <button type="button" data-v="maybe" aria-pressed="false"><i data-lucide="help-circle"></i>Maybe</button>
+              <button type="button" data-v="no" aria-pressed="false"><i data-lucide="x"></i>Can't make it</button>
+            </div>
+            <button type="button" class="rsvp-note">+ Add a note for the coach</button>
+          </div>
+          <div class="att" aria-label="Team answers">
+            <span class="chip chip-going">12 going</span><span class="chip chip-maybe">2 maybe</span><span class="chip chip-no">3 can't</span><span class="chip chip-none">4 no reply</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-btn">
+        <h2 id="h-btn">Buttons</h2>
+        <p>Primary takes the team colour inside a team. Danger never does.</p>
+        <div class="row">
+          <button class="btn btn-primary" type="button">Save game</button>
+          <button class="btn btn-secondary" type="button">Cancel</button>
+          <button class="btn btn-ghost" type="button">See all</button>
+          <button class="btn btn-danger" type="button">Delete event</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-primary btn-sm" type="button">Small</button>
+          <button class="btn btn-primary btn-lg" type="button">Large</button>
+          <button class="btn btn-primary" type="button" aria-busy="true"><span class="spin" aria-hidden="true"></span>Saving</button>
+          <button class="btn btn-primary" type="button" disabled>Disabled</button>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-forms">
+        <h2 id="h-forms">Forms</h2>
+        <p>Labels above fields, 44px targets, errors that say how to fix it.</p>
+        <div class="fields">
+          <div class="field">
+            <label for="f-opp">Opponent</label>
+            <input id="f-opp" value="Frontenac FC">
+          </div>
+          <div class="field">
+            <label for="f-start">Starts</label>
+            <input id="f-start" type="datetime-local" value="2026-10-25T10:00">
+            <span class="hint">Toronto time</span>
+          </div>
+          <div class="field error">
+            <label for="f-email">Parent email</label>
+            <input id="f-email" value="priya@" aria-invalid="true" aria-describedby="f-email-err">
+            <span class="err" id="f-email-err"><i data-lucide="alert-circle"></i>Add the part after @, like gmail.com</span>
+          </div>
+          <div class="field">
+            <label for="f-type">Event type</label>
+            <div class="seg" role="group" aria-label="Event type" id="f-type">
+              <button type="button" aria-pressed="true">Game</button>
+              <button type="button" aria-pressed="false">Practice</button>
+              <button type="button" aria-pressed="false">Event</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-roster">
+        <h2 id="h-roster">Roster</h2>
+        <p>Jersey numbers in the display face; avatars take the team's second colour.</p>
+        <div>
+          <div class="person"><div class="jersey">7</div><div class="avatar" aria-hidden="true">MP</div><div class="grow"><div class="name">Maya Patel</div><div class="sub">Forward</div></div></div>
+          <div class="person"><div class="jersey">11</div><div class="avatar" aria-hidden="true">AN</div><div class="grow"><div class="name">Arjun Nair</div><div class="sub">Midfield</div></div></div>
+          <div class="person"><div class="jersey">4</div><div class="avatar" aria-hidden="true">LC</div><div class="grow"><div class="name">Leo Chen</div><div class="sub">leo.chen.parent@example.com</div></div><span class="pending">Invite sent</span></div>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-chat">
+        <h2 id="h-chat">Team chat</h2>
+        <p>Your messages in the team colour; reactions, pins, polls and read counts.</p>
+        <div class="chat">
+          <div class="pinned"><i data-lucide="pin"></i><span><b>Pinned:</b> Bring white and dark kits on Saturday</span></div>
+          <div class="system">Coach Priya moved Saturday's game to 10:00</div>
+          <div class="msg theirs"><div class="who">Coach Priya</div><div class="bubble">Arrive 30 min early for warm-up please. Field 2 this week.</div>
+            <div class="reacts"><button class="react" type="button" aria-pressed="true">👍 <span>9</span></button><button class="react" type="button" aria-pressed="false">🙌 <span>3</span></button></div></div>
+          <div class="msg theirs"><div class="poll"><q>Team dinner after the game?</q>
+            <button class="poll-opt" type="button" aria-pressed="false" data-votes="11"><span class="bar"></span><span>Pizza at Woodenheads</span><span>11</span></button>
+            <button class="poll-opt" type="button" aria-pressed="false" data-votes="4"><span class="bar"></span><span>Skip this week</span><span>4</span></button>
+            <small>15 votes</small></div></div>
+          <div class="msg mine"><div class="bubble">We'll be there, Maya has her boots back from repair 🙌</div><div class="status">Seen by 14</div></div>
+          <div class="composer"><label class="vh" for="msg">Message</label><input id="msg" placeholder="Message the team"><button class="icon-btn send" type="button" aria-label="Send"><i data-lucide="send"></i></button></div>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-score">
+        <h2 id="h-score">Live scoring</h2>
+        <p>Big targets for the sideline. Followers see the score update live.</p>
+        <div class="score">
+          <div class="score-row">
+            <div class="score-side"><div class="crest" style="background:var(--team);color:var(--on-team);border-color:var(--team-2)" aria-hidden="true">KU</div>Strikers</div>
+            <div><span class="score-num" id="s-us">2</span> <span class="score-mid">–</span> <span class="score-num" id="s-them">1</span></div>
+            <div class="score-side"><div class="opp-crest" aria-hidden="true">BU</div>Belleville</div>
+          </div>
+          <div class="row" style="justify-content:center"><span class="tag tag-live">Live · 2nd half</span></div>
+          <div class="score-ctrl">
+            <div class="pair"><button class="btn btn-secondary" type="button" data-s="us" data-d="-1" aria-label="Remove goal for Strikers">−1</button><button class="btn btn-primary" type="button" data-s="us" data-d="1" aria-label="Add goal for Strikers">+1</button></div>
+            <div class="pair"><button class="btn btn-secondary" type="button" data-s="them" data-d="-1" aria-label="Remove goal for Belleville">−1</button><button class="btn btn-secondary" type="button" data-s="them" data-d="1" aria-label="Add goal for Belleville">+1</button></div>
+          </div>
+          <p class="vh" aria-live="polite" id="score-live">Score 2 to 1</p>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-status">
+        <h2 id="h-status">Status and feedback</h2>
+        <p>Status colours are fixed so a red team never looks cancelled.</p>
+        <div class="stack">
+          <div class="row"><span class="tag tag-cancelled">Cancelled</span><span class="tag tag-postponed">Postponed</span><span class="tag tag-live">Live</span><span class="tag tag-final">Final</span></div>
+          <div><span class="toast" role="status"><i data-lucide="check-circle-2"></i>Answer saved<button type="button">Undo</button></span></div>
+          <div class="banner banner-info"><i data-lucide="bell"></i><span>Add this app to your home screen to get game alerts on iPhone.</span></div>
+          <div class="banner banner-warn"><i data-lucide="wifi-off"></i><span>You're offline. Answers will send when you reconnect.</span></div>
+          <div class="empty"><div class="ico"><i data-lucide="calendar-plus"></i></div><h3>No games yet</h3><p>Add your first game or practice and the team gets a heads-up.</p><button class="btn btn-primary btn-sm" type="button">New event</button></div>
+          <div class="skel" aria-label="Loading" role="status"><i style="width:40%"></i><i style="width:80%"></i><i style="width:60%"></i></div>
+        </div>
+      </section>
+
+      <section class="sec" aria-labelledby="h-found">
+        <h2 id="h-found">Foundations</h2>
+        <p>Colour roles, current team colours and the type scale. All text pairs pass WCAG AA in both modes.</p>
+        <div class="palette" id="palette"></div>
+        <div class="type-sample" style="margin-top:20px">
+          <div><small>score 56</small><span style="font-family:var(--ff-display);font-size:var(--fs-score);line-height:1;font-weight:700">3 – 2</span></div>
+          <div><small>display 40</small><span style="font-family:var(--ff-display);font-size:var(--fs-display);line-height:1.05;font-weight:700;text-transform:uppercase">Matchday</span></div>
+          <div><small>2xl 28</small><span style="font-family:var(--ff-display);font-size:var(--fs-2xl);font-weight:700;text-transform:uppercase">Kingston U12</span></div>
+          <div><small>xl 22</small><span style="font-size:var(--fs-xl);font-weight:700">Saturday's game</span></div>
+          <div><small>lg 18</small><span style="font-size:var(--fs-lg);font-weight:600">Who's coming</span></div>
+          <div><small>base 16</small><span>Arrive 30 minutes early for warm-up.</span></div>
+          <div><small>sm 14</small><span style="font-size:var(--fs-sm)">Invista Centre, Field 2</span></div>
+          <div><small>xs 12</small><span style="font-size:var(--fs-xs);font-weight:500;text-transform:uppercase;letter-spacing:.06em">This week</span></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+/**
+ * Team colour theming.
+ *
+ * A coach can pick any colour for their team (bright yellow, white, black...).
+ * This turns that raw pick into colours that always pass WCAG AA in both
+ * light and dark mode, and returns them as CSS custom properties to set on the
+ * team's screens:
+ *
+ *   --team         solid fill: team header band, primary buttons, selected chips
+ *   --on-team      text/icons on --team (black-ish or white, whichever reads better)
+ *   --team-ink     the team colour as text/icons/links on the page background
+ *   --team-soft    tinted background: selected rows, today in the calendar, unread chat
+ *   --team-2 / --on-team-2   the same for the optional secondary colour
+ *
+ * Rules:
+ *   - on-team vs team         >= 4.5 (button labels are normal text)
+ *   - team-ink vs bg, surface >= 4.5 (links, active tab labels)
+ *   - team-ink vs team-soft   >= 4.5
+ *   - team vs bg              >= 1.3 so a white team on a white page, or a black
+ *                                    team in dark mode, still shows as a band
+ * The hue and saturation are kept; only lightness moves, as little as needed.
+ * Status colours (going / not going / cancelled / live) never use team colours.
+ */
+
+                                    
+
+                            
+               
+                 
+                  
+                   
+ 
+
+                                
+                   
+                      
+                       
+                        
+                      
+                         
+ 
+
+// Must match tokens.json.
+const BASE = {
+  // text/white: the two label colours tried on a team fill. fg: the page's body text colour.
+  light: { bg: "#FFFFFF", surface: "#F5F6F8", fg: "#12151A", text: "#12151A", white: "#FFFFFF" },
+  dark: { bg: "#0E1116", surface: "#161A21", fg: "#F2F4F7", text: "#12151A", white: "#FFFFFF" },
+}         ;
+
+const AA = 4.5;
+const BAND = 1.3;
+
+// ---------- colour maths ----------
+
+                                    
+                                    
+
+function parseHex(hex        )      {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) throw new Error(`not a hex colour: ${hex}`);
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16))       ;
+}
+
+function toHex([r, g, b]     )         {
+  return "#" + [r, g, b].map((c) => Math.round(Math.min(255, Math.max(0, c))).toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+function luminance(hex        )         {
+  const [r, g, b] = parseHex(hex).map((c) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a        , b        )         {
+  const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p);
+  return (x + 0.05) / (y + 0.05);
+}
+
+function rgbToHsl([r, g, b]     )      {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h / 6, s, l];
+}
+
+function hslToRgb([h, s, l]     )      {
+  if (s === 0) return [l * 255, l * 255, l * 255];
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const f = (t        ) => {
+    if (t < 0) t += 1;
+    if (t > 1) t -= 1;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+    return p;
+  };
+  return [f(h + 1 / 3) * 255, f(h) * 255, f(h - 1 / 3) * 255];
+}
+
+function withLightness(hex        , l        )         {
+  const [h, s] = rgbToHsl(parseHex(hex));
+  return toHex(hslToRgb([h, s, Math.min(1, Math.max(0, l))]));
+}
+
+function lightnessOf(hex        )         {
+  return rgbToHsl(parseHex(hex))[2];
+}
+
+function mix(a        , b        , amountOfA        )         {
+  const A = parseHex(a), B = parseHex(b);
+  return toHex(A.map((c, i) => c * amountOfA + B[i] * (1 - amountOfA))       );
+}
+
+/**
+ * Move lightness in one direction (darker or lighter) in small steps until
+ * `ok` passes. Returns the first passing colour, i.e. the smallest change.
+ */
+function nudge(hex        , direction                      , ok                        )         {
+  if (ok(hex)) return hex;
+  const start = lightnessOf(hex);
+  for (let i = 1; i <= 100; i++) {
+    const l = direction === "darker" ? start - i / 100 : start + i / 100;
+    if (l < 0 || l > 1) break;
+    const c = withLightness(hex, l);
+    if (ok(c)) return c;
+  }
+  return direction === "darker" ? "#000000" : "#FFFFFF";
+}
+
+// ---------- the derivation ----------
+
+function solid(raw        , mode      )                                   {
+  const { bg, text, white } = BASE[mode];
+  let team = raw.toUpperCase();
+
+  // Make it visible as a band against the page.
+  if (contrast(team, bg) < BAND) {
+    team = nudge(team, mode === "light" ? "darker" : "lighter", (c) => contrast(c, bg) >= BAND);
+  }
+
+  // Pick the label colour that reads better, then nudge the fill until it passes.
+  const onTeam = contrast(white, team) >= contrast(text, team) ? white : text;
+  const away = onTeam === white ? "darker" : "lighter";
+  team = nudge(team, away, (c) => contrast(onTeam, c) >= AA && contrast(c, bg) >= BAND);
+  return { team, onTeam };
+}
+
+function deriveTeamTheme(raw        , mode      )            {
+  const { bg, surface } = BASE[mode];
+  const { team, onTeam } = solid(raw, mode);
+
+  // Ink: readable on both page backgrounds.
+  const inkOk = (c        ) => contrast(c, bg) >= AA && contrast(c, surface) >= AA;
+  const teamInk = nudge(raw.toUpperCase(), mode === "light" ? "darker" : "lighter", inkOk);
+
+  // Soft tint: as strong as possible while ink stays readable on it.
+  // Same hue at a fixed light/dark lightness, so navy gives a pale blue, not a grey.
+  let teamSoft = bg;
+  const lightnesses = mode === "light" ? [0.94, 0.96, 0.975] : [0.17, 0.14, 0.11];
+  for (const l of lightnesses) {
+    const c = mix(withLightness(raw, l), bg, 0.85);
+    if (contrast(teamInk, c) >= AA && contrast(BASE[mode].fg, c) >= AA) {
+      teamSoft = c;
+      break;
+    }
+  }
+
+  return { team, onTeam, teamInk, teamSoft };
+}
+
+function teamThemeVars(primary        , secondary               , mode      )                {
+  const t = deriveTeamTheme(primary, mode);
+  const vars                = {
+    "--team": t.team,
+    "--on-team": t.onTeam,
+    "--team-ink": t.teamInk,
+    "--team-soft": t.teamSoft,
+  };
+  if (secondary) {
+    const s = solid(secondary, mode);
+    vars["--team-2"] = s.team;
+    vars["--on-team-2"] = s.onTeam;
+  }
+  return vars;
+}
+
+/**
+ * CSS for one team, scoped to its pages: <div data-team="<id>">.
+ * Server-render this into the team layout so there's no flash of the default colour.
+ * Respects the viewer's "use team colours" setting by simply not emitting it.
+ */
+function teamThemeCss(teamId        , primary        , secondary               )         {
+  const block = (mode      ) =>
+    Object.entries(teamThemeVars(primary, secondary, mode)).map(([k, v]) => `${k}:${v};`).join("");
+  const sel = `[data-team="${teamId.replace(/[^a-zA-Z0-9-]/g, "")}"]`;
+  return [
+    `${sel}{${block("light")}}`,
+    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) ${sel}{${block("dark")}}}`,
+    `:root[data-theme="dark"] ${sel}{${block("dark")}}`,
+  ].join("\n");
+}
+
+
+(function () {
+  const PRESETS = [
+    ["Deep purple", "#2D0A3E", "#B8964A"],
+    ["Navy", "#0B1F4B", "#E4B23A"],
+    ["Royal blue", "#1D4ED8", "#FFFFFF"],
+    ["Red", "#C8102E", "#FFFFFF"],
+    ["Forest", "#1B5E20", "#F2C14E"],
+    ["Orange", "#FF7A00", "#111111"],
+    ["Lemon yellow", "#FFE600", "#111111"],
+    ["Volt lime", "#B8F000", "#0B1F4B"],
+    ["Sky", "#5EB8FF", "#0B1F4B"],
+    ["Black", "#000000", "#E4B23A"],
+    ["White", "#FFFFFF", "#C8102E"],
+  ];
+  let primary = PRESETS[0][1], secondary = PRESETS[0][2], on = true;
+  const root = document.documentElement;
+  const styleEl = document.getElementById("team-style");
+  const sw = document.getElementById("swatches");
+  const note = document.getElementById("note");
+  const custom = document.getElementById("custom");
+  const hexout = document.getElementById("hexout");
+
+  PRESETS.forEach(([name, p, s], i) => {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "swatch"; b.setAttribute("role", "radio");
+    b.setAttribute("aria-label", name); b.style.background = p;
+    b.setAttribute("aria-checked", i === 0 ? "true" : "false");
+    b.addEventListener("click", () => { primary = p; secondary = s; custom.value = p.toLowerCase(); select(b); apply(); });
+    sw.appendChild(b);
+  });
+  function select(btn) { sw.querySelectorAll(".swatch").forEach((x) => x.setAttribute("aria-checked", x === btn ? "true" : "false")); }
+
+  custom.addEventListener("input", () => { primary = custom.value.toUpperCase(); select(null); apply(); });
+
+  function currentMode() {
+    const t = root.getAttribute("data-theme");
+    if (t === "light" || t === "dark") return t;
+    return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  document.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", () => {
+    root.setAttribute("data-theme", b.dataset.mode); apply();
+  }));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", apply);
+  new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+
+  const tcOn = document.getElementById("tc-on"), tcOff = document.getElementById("tc-off");
+  tcOn.addEventListener("click", () => { on = true; apply(); });
+  tcOff.addEventListener("click", () => { on = false; apply(); });
+
+  let applying = false;
+  function apply() {
+    if (applying) return; applying = true;
+    const mode = currentMode();
+    document.getElementById("m-light").setAttribute("aria-pressed", mode === "light");
+    document.getElementById("m-dark").setAttribute("aria-pressed", mode === "dark");
+    tcOn.setAttribute("aria-pressed", on); tcOff.setAttribute("aria-pressed", !on);
+    hexout.textContent = primary;
+    styleEl.textContent = on ? teamThemeCss("demo", primary, secondary) : "";
+    if (on) {
+      const t = deriveTeamTheme(primary, mode);
+      const changed = t.team !== primary.toUpperCase() || t.teamInk !== primary.toUpperCase();
+      note.textContent = changed
+        ? `In ${mode} mode we adjusted the shade (fill ${t.team}, text ${t.teamInk}) so everything stays readable.`
+        : `${primary} works as-is in ${mode} mode.`;
+    } else {
+      note.textContent = "Team colours off: the app accent is used everywhere.";
+    }
+    renderPalette();
+    applying = false;
+  }
+
+  function renderPalette() {
+    const el = document.getElementById("palette");
+    const scope = document.querySelector('.sections[data-team="demo"]');
+    const cs = getComputedStyle(scope);
+    const names = ["bg", "surface", "text", "text-muted", "accent", "success", "warning", "danger", "live", "team", "team-ink", "team-soft", "team-2"];
+    el.innerHTML = names.map((n) => {
+      const v = cs.getPropertyValue("--" + n).trim();
+      return `<div class="pal"><div style="background:var(--${n})"></div><div><b>${n}</b><code>${v.startsWith("#") ? v : ""}</code></div></div>`;
+    }).join("");
+  }
+
+  // RSVP toggles
+  document.querySelectorAll("[data-rsvp]").forEach((g) => {
+    g.querySelectorAll(".rsvp-opts button").forEach((b) => b.addEventListener("click", () => {
+      g.querySelectorAll(".rsvp-opts button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    }));
+  });
+  // simple toggles
+  document.querySelectorAll(".seg").forEach((g) => g.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    g.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  })));
+  document.querySelectorAll(".react").forEach((b) => b.addEventListener("click", () => {
+    const on = b.getAttribute("aria-pressed") === "true"; const n = b.querySelector("span");
+    n.textContent = +n.textContent + (on ? -1 : 1); b.setAttribute("aria-pressed", on ? "false" : "true");
+  }));
+  // poll
+  const opts = document.querySelectorAll(".poll-opt");
+  opts.forEach((b) => b.addEventListener("click", () => {
+    opts.forEach((x) => { const was = x.getAttribute("aria-pressed") === "true"; if (was) x.dataset.votes = +x.dataset.votes - 1; x.setAttribute("aria-pressed", "false"); });
+    b.dataset.votes = +b.dataset.votes + 1; b.setAttribute("aria-pressed", "true"); drawPoll();
+  }));
+  function drawPoll() {
+    const total = [...opts].reduce((a, x) => a + +x.dataset.votes, 0);
+    opts.forEach((x) => { x.querySelector(".bar").style.width = (100 * x.dataset.votes / total) + "%"; x.lastElementChild.textContent = x.dataset.votes; });
+    document.querySelector(".poll small").textContent = total + " votes";
+  }
+  drawPoll();
+  // scoring
+  const s = { us: 2, them: 1 };
+  document.querySelectorAll("[data-s]").forEach((b) => b.addEventListener("click", () => {
+    s[b.dataset.s] = Math.max(0, s[b.dataset.s] + +b.dataset.d);
+    document.getElementById("s-us").textContent = s.us; document.getElementById("s-them").textContent = s.them;
+    document.getElementById("score-live").textContent = `Score ${s.us} to ${s.them}`;
+  }));
+  document.querySelectorAll('a[href^="#"]').forEach((a) => a.addEventListener("click", (e) => e.preventDefault()));
+
+  apply();
+  try { window.lucide && lucide.createIcons(); } catch (e) {}
+})();
+</script>

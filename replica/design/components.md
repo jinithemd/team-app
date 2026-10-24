@@ -1,0 +1,279 @@
+# Components
+
+The design system for the team management app. Original look, built from roles in `tokens.json`; nothing measured from or copied out of SportsEngine (no screenshots were taken; recon was text sources only). Brand values are placeholders until replica-brand.
+
+- **Icons:** Lucide (ISC licence), 20px in UI, 24px in the tab bar, 1.75 stroke.
+- **Fonts:** Inter for everything you read; Barlow Condensed (bold, uppercase) for scores, big dates, team names in headers. Both SIL OFL, loaded with `next/font`.
+- **Copy:** every label written fresh. Short, plain, parent-friendly ("Going", "Can't make it", "Maybe").
+- **Base:** shadcn/ui on Radix primitives for dialog, sheet, popover, tabs, toggle group, dropdown, so focus trapping and keyboard support come for free. Restyle with tokens only.
+- **Touch:** every tappable thing is at least 44×44px, including icon buttons.
+
+## Where team colours go
+
+Inside a team (`<div data-team={id}>` with vars from `team-theme.ts`), and only these parts:
+
+| part | token |
+| --- | --- |
+| Team header band and crest ring | `--team` / `--on-team` |
+| Primary buttons on team screens | `--team` / `--on-team` |
+| Active tab underline, active bottom-tab icon and label | `--team-ink` |
+| Links, "See all" | `--team-ink` |
+| Selected chip, segmented-control thumb | `--team` / `--on-team` |
+| Today in the calendar, unread chat row, my own chat bubbles | `--team-soft` (my bubbles: `--team` / `--on-team`) |
+| Focus ring on team screens | stays `--focus` (consistent and always tested) |
+| Team colour dot on cards outside the team (Home, family calendar) | `--team` of that team, with its name next to it, never colour alone |
+| Secondary colour | thin stripe under the header, jersey number badges |
+
+Never team-coloured: RSVP states, event status (cancelled / postponed / live), errors, success toasts, destructive buttons. Those always use the fixed status roles, so a red team never looks cancelled.
+
+The viewer can switch team colours off (`profiles.use_team_colors`); then the vars aren't emitted and everything falls back to `--accent`.
+
+---
+
+## Foundations
+
+```
+AppShell
+  layout    < lg: TopBar (56) + content + TabBar (64 + safe-area); >= lg: Sidebar (248) + content (max 1120)
+  states    signed out (no tabs), signed in, inside a team (TopBar becomes TeamHeader)
+  a11y      skip link to <main>; landmarks header/nav/main; tab bar is <nav aria-label="Primary">
+  used on   all
+
+TabBar
+  items     Home, Teams, Calendar, Chat, Account (Lucide: house, users, calendar-days, message-circle, user)
+  states    default, active (team-ink icon + label + 2px top bar), badge (unread count, danger dot)
+  tokens    bg bg, border-top border, label xs/500, inactive text-muted
+  a11y      aria-current="page" on active; badge has visually-hidden "3 unread"
+  used on   all signed-in
+
+TeamHeader
+  content   crest (40, ring on-team), team name (2xl display uppercase), sport · age group, secondary stripe
+  states    default, collapsed on scroll (name moves into TopBar), no crest (initials on team-2)
+  tokens    bg team, text on-team, stripe team-2 4px
+  a11y      team name is the page <h1>
+  used on   S06–S17, S20
+```
+
+## Inputs and actions
+
+```
+Button
+  variants  primary (team or accent), secondary (surface + border), ghost, danger, link
+  sizes     sm 36px, md 44px, lg 52px (full-width on mobile forms)
+  states    default, hover (8% darker via color-mix), pressed (scale .98), focus-visible (2px focus ring, offset 2),
+            disabled (40% opacity, no pointer), loading (spinner replaces icon, label kept, aria-busy)
+  tokens    radius md, font sm/600 (lg: base/600)
+  a11y      real <button>; icon-only buttons need aria-label; loading keeps the accessible name
+  used on   all
+
+IconButton
+  sizes     44×44 touch target, 20px icon
+  states    as Button
+  used on   TopBar, chat composer, roster rows
+
+TextInput / Textarea / Select / SearchInput
+  anatomy   label (sm/600, above), field (44px, radius md, border-input 1px), hint (xs muted), error (xs danger + icon)
+  states    default, focus (2px focus ring, border focus), filled, error (border danger, aria-invalid, aria-describedby → message),
+            disabled (sunken bg), read-only
+  a11y      <label for>; errors announced with role="alert" on submit; correct input types (email, tel) for mobile keyboards
+  used on   S01, S04, S05, S09, S13, S17
+
+DateTimePicker
+  anatomy   date field + time field + time zone line ("Toronto time" — shown only when it differs from the viewer's zone)
+  states    default, TBD toggle on (fields disabled), error (end before start)
+  a11y      native <input type="date"/"time"> on mobile; Radix popover calendar on desktop with arrow-key grid
+  used on   S09
+
+VenuePicker
+  anatomy   combobox of saved venues + "Add a new place" (address autocomplete later)
+  states    empty, results, new venue form
+  used on   S09
+
+ColorPicker (team colours)
+  anatomy   12 preset swatches + hex field + live preview card (header band, button, link) in light and dark
+  states    default, selected (check icon + 2px ring), invalid hex (error), auto-adjusted ("We darkened this a little so text stays readable")
+  a11y      radiogroup of swatches with names ("Royal blue"); preview text has real contrast
+  used on   S05, team settings
+
+Toggle / Checkbox / RadioGroup
+  states    off, on, focus, disabled
+  a11y      Radix Switch (role="switch"), real checkbox/radio semantics
+  used on   S09 (notify team), S13, S15, S22
+
+SegmentedControl
+  variants  2–3 options
+  states    selected (team thumb), focus
+  a11y      Radix ToggleGroup type="single" with roving tabindex
+  used on   S07 (List | Month), S09 (Game | Practice | Event), S12 (Players | Staff)
+
+PermissionChecklist
+  content   6 rows: team settings, roster, schedule games, schedule practices & events, scoring, manage permissions
+  states    default, saving, saved toast; head coach row locked (all on)
+  used on   S13, S15
+```
+
+## Schedule
+
+```
+EventCard
+  variants  game (opponent, home/away tag, score if final), practice, event
+  anatomy   date block (day xs/500 uppercase muted + date 2xl display), title, time + place, my RSVP chip, team dot (outside team)
+  states    upcoming, today (team-soft bg), cancelled (strikethrough title, danger StatusBadge, RSVP hidden),
+            postponed (warning badge), live (live badge with pulsing dot), past (muted, score shown), loading skeleton
+  tokens    bg bg, border border, radius lg, shadow card (light only)
+  a11y      whole card is one link; accessible name reads "Game vs Rivals, Saturday 1 November, 10:00, Going"
+  used on   S02, S07, S18
+
+StatusBadge
+  variants  cancelled (danger), postponed (warning), live (live + dot), final (sunken + text), TBD (sunken + muted)
+  tokens    xs/600 uppercase, radius pill, soft bg + strong text (e.g. danger-soft / danger)
+  a11y      text, not colour alone
+  used on   S07, S08, S20
+
+ScheduleList (default view)
+  anatomy   grouped by week with sticky week headers ("This week", "Next week", "Nov 10–16"), past collapsed under "Earlier"
+  states    empty ("No games or practices yet" + New event for staff), loading skeleton (3 cards), error (retry)
+  note      list is the default: one long scroll is what parents use; month view is the alternative
+  used on   S07, S18
+
+MonthCalendar
+  anatomy   7-column grid, dots per event (team colour on family calendar, max 3 + "+2"), tap a day → day list below
+  states    today (team-soft), selected day (team ring), empty month
+  a11y      grid role with arrow keys; each day labelled "Tuesday 4 November, 2 events"
+  used on   S07, S18
+
+AthleteFilter
+  anatomy   chips per kid ("All", "Maya", "Arjun")
+  states    selected, unselected
+  used on   S18, S11
+```
+
+## RSVP
+
+```
+RsvpControl
+  anatomy   3 buttons in a row: Going (check), Maybe (help-circle), Can't make it (x) + "Add a note for the coach"
+  sizes     md (event page), sm (cards and My RSVPs)
+  states    unanswered (all outline), answered (chosen fills: success / warning / danger with on-* text, others outline),
+            saving (chosen shows spinner, others disabled), saved (brief check, toast "Saved"), error (toast + revert),
+            locked (event cancelled or in the past: read-only)
+  per kid   with two kids on the team, one row per kid with their name
+  a11y      Radix ToggleGroup type="single"; aria-label "Maya's answer"; note field labelled "Note for the coach (only staff see this)"
+  used on   S08, S11, email RSVP landing
+
+AttendanceSummary
+  anatomy   three count pills (12 going · 2 maybe · 3 can't · 4 no reply) + stacked avatars
+  states    nobody answered ("No answers yet"), partial, all answered
+  used on   S08, S10
+
+AttendanceList
+  anatomy   sections Going / Maybe / Can't make it / No reply, PersonRow each, note under the name (staff only, muted, italic)
+  actions   staff: "Nudge 4 who haven't replied"
+  states    loading, empty sections hidden
+  used on   S10
+```
+
+## People
+
+```
+PersonRow
+  variants  player (jersey badge on team-2, position), staff (role), guardian (relationship), invite (email + "Invite sent")
+  states    active, invite pending (muted + "Pending" badge + Resend), removed (not shown)
+  a11y      row is a link to the profile when allowed; actions in a dropdown menu with aria-label "Options for Maya"
+  used on   S10, S12, S14, S21
+
+Avatar
+  sizes     24, 32, 40, 64
+  states    image, initials (on team-2 / on-team-2 inside a team, sunken outside), loading
+  a11y      decorative when the name is next to it (alt="")
+  used on   all people lists, chat
+
+RosterTabs
+  content   Players (count) | Staff (count), add FAB for staff, Print
+  states    empty ("Add your first player" with paste-a-list option), filled
+  used on   S12
+```
+
+## Chat and messages
+
+```
+MessageBubble
+  variants  mine (team / on-team, right), theirs (surface / text, left, author name + avatar on first in a group),
+            system ("Coach changed Saturday's game to 11:00", centred, xs muted), poll, deleted ("Message deleted", italic muted)
+  attachments  image (rounded, tap to open full screen), video (poster + play), file (icon + name + size)
+  states    sending (60% opacity + clock), sent, read (read-by count for staff: "Seen by 14"), failed (danger icon + "Tap to retry"), pinned (pin icon)
+  a11y      list is role="log" aria-live="polite"; each message reads "Coach Priya, 9:41: text"
+  used on   S16
+
+Composer
+  anatomy   + (photo, video, file, GIF, poll), auto-growing textarea (max 6 lines), send button (team)
+  states    empty (send disabled), typing, uploading (progress), announcement-only chat for families ("Only coaches can post here")
+  a11y      Enter sends on desktop, Shift+Enter new line; send button aria-label "Send"
+  used on   S16
+
+ReactionBar
+  content   reaction chips with counts under the bubble; long-press / right-click opens a picker of 6
+  states    none, mine (team-soft bg + team-ink border)
+  a11y      each chip a toggle button "👍 3, you reacted"
+  used on   S16
+
+PinnedBar
+  anatomy   strip under the header with the latest pin, tap to jump, "2 pinned"
+  used on   S16
+
+PollCard
+  anatomy   question, options as buttons, results as bars after voting (team-soft fill), total votes
+  states    not voted, voted (my option checked), closed
+  used on   S16
+
+MessageListItem (subject messages)
+  anatomy   subject (600), first line (muted), sender, time, unread dot (team)
+  states    unread, read
+  used on   S17
+```
+
+## Scoring
+
+```
+Scoreboard
+  anatomy   team crest + name | score (score type, tabular numbers) — score | opponent; period; status badge
+  states    not started (– : –), live (live badge, scores update with a short scale), final (FINAL badge)
+  staff     big +1 / −1 buttons under each score (52px), period stepper, "End game"
+  a11y      live region announces "Score: 2–1" politely; buttons "Add goal for Riverkrest"
+  used on   S08, S20
+```
+
+## Feedback and overlays
+
+```
+Toast
+  variants  success, error, info
+  states    enter, auto-dismiss 4s (errors stay until closed), with action ("Undo")
+  a11y      role="status" (errors: role="alert")
+  used on   all
+
+Modal / Sheet
+  variants  centred modal ≥ md, bottom sheet < md
+  states    open, closing
+  a11y      Radix Dialog: focus trap, Esc closes, focus returns to trigger, aria-labelledby title
+  used on   S19, confirmations, pickers
+
+EmptyState
+  anatomy   Lucide icon in a sunken circle, one-line title, one-line hint, one action
+  copy      "No games yet", "Nobody's on the roster yet", "No messages — say hi to the team"
+  used on   S02, S03, S07, S11, S12, S16, S17, S18
+
+Skeleton
+  shapes    card, row, text lines; shimmer off under reduced motion
+  used on   every list while loading
+
+Banner
+  variants  info (install the app for notifications), warning (you're offline), danger (couldn't load)
+  used on   S02, S22
+```
+
+## Checks before building screens
+
+1. `python3 contrast.py tokens.json` — 62 pairs, 0 failing AA.
+2. `node --experimental-strip-types team-theme.test.ts` — 16 tricky team colours, light and dark, all pass.
+3. The primitives page (`/design` route) shows every component in every state in light and dark, with a team colour switcher; screenshot it at 390px and 1280px.

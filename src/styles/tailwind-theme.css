@@ -1,0 +1,77 @@
+/* Generated from tokens.json by gen_css.py. Import from app/globals.css: */
+/*   @import "tailwindcss"; @import "../design/tailwind-theme.css"; */
+@import "./tokens.css";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+@theme inline {
+  --color-*: initial;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-border: var(--border);
+  --color-border-input: var(--border-input);
+  --color-fg: var(--text);
+  --color-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-focus: var(--focus);
+  --color-danger: var(--danger);
+  --color-on-danger: var(--on-danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-on-success: var(--on-success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-on-warning: var(--on-warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-live: var(--live);
+  --color-on-live: var(--on-live);
+  --color-overlay: var(--overlay);
+  --color-team: var(--team);
+  --color-on-team: var(--on-team);
+  --color-team-ink: var(--team-ink);
+  --color-team-soft: var(--team-soft);
+  --color-team-2: var(--team-2);
+  --color-on-team-2: var(--on-team-2);
+  --font-sans: var(--ff-sans);
+  --font-display: var(--ff-display);
+  --font-mono: var(--ff-mono);
+  --text-xs: var(--fs-xs);
+  --text-xs--line-height: var(--lh-xs);
+  --text-xs--font-weight: var(--fw-xs);
+  --text-sm: var(--fs-sm);
+  --text-sm--line-height: var(--lh-sm);
+  --text-sm--font-weight: var(--fw-sm);
+  --text-base: var(--fs-base);
+  --text-base--line-height: var(--lh-base);
+  --text-base--font-weight: var(--fw-base);
+  --text-lg: var(--fs-lg);
+  --text-lg--line-height: var(--lh-lg);
+  --text-lg--font-weight: var(--fw-lg);
+  --text-xl: var(--fs-xl);
+  --text-xl--line-height: var(--lh-xl);
+  --text-xl--font-weight: var(--fw-xl);
+  --text-2xl: var(--fs-2xl);
+  --text-2xl--line-height: var(--lh-2xl);
+  --text-2xl--font-weight: var(--fw-2xl);
+  --text-display: var(--fs-display);
+  --text-display--line-height: var(--lh-display);
+  --text-display--font-weight: var(--fw-display);
+  --text-score: var(--fs-score);
+  --text-score--line-height: var(--lh-score);
+  --text-score--font-weight: var(--fw-score);
+  --spacing: 0.25rem;
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-pill: var(--r-pill);
+  --shadow-card: var(--sh-card);
+  --shadow-pop: var(--sh-pop);
+  --breakpoint-sm: 40rem;
+  --breakpoint-md: 48rem;
+  --breakpoint-lg: 64rem;
+  --breakpoint-xl: 80rem;
+}

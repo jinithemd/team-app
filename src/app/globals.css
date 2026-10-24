@@ -1,0 +1,59 @@
+@import "tailwindcss";
+@import "../styles/tailwind-theme.css";
+
+@layer base {
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-size: var(--fs-base);
+    line-height: var(--lh-base);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+  }
+  button, [role="button"], a {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button:not(:disabled), [role="button"] {
+    cursor: pointer;
+  }
+  input, select, textarea {
+    font: inherit;
+    color: inherit;
+  }
+}
+
+@layer utilities {
+  .tabular { font-variant-numeric: tabular-nums; }
+  .eyebrow {
+    font-size: var(--fs-xs);
+    line-height: var(--lh-xs);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .display-caps {
+    font-family: var(--ff-display);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .gutter {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+}
+
+@keyframes pulse-dot { 50% { opacity: 0.3; } }
+.live-dot { animation: pulse-dot 1.4s ease-in-out infinite; }
+@keyframes shimmer { to { background-position: -200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, var(--sunken), var(--surface), var(--sunken));
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 0.7s linear infinite; }

@@ -1,0 +1,116 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { CalendarDays, House, MessageCircle, User, Users } from "lucide-react";
+import { APP_NAME } from "@/lib/brand";
+
+const ITEMS = [
+  { href: "/", label: "Home", icon: House, match: (p: string) => p === "/" || p.startsWith("/rsvps") },
+  { href: "/teams", label: "Teams", icon: Users, match: (p: string) => p.startsWith("/teams") || p.startsWith("/t/") },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays, match: (p: string) => p.startsWith("/calendar") },
+  { href: "/chat", label: "Chat", icon: MessageCircle, match: (p: string) => p.startsWith("/chat") },
+  { href: "/account", label: "Account", icon: User, match: (p: string) => p.startsWith("/account") },
+];
+
+/** Bottom tab bar under lg, left sidebar at lg and up. */
+export function PrimaryNav({ pendingCount }: { pendingCount: number }) {
+  const path = usePathname();
+  return (
+    <>
+      <nav
+        aria-label="Primary"
+        className="pb-safe gutter fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg lg:hidden"
+      >
+        <ul className="mx-auto grid max-w-xl grid-cols-5">
+          {ITEMS.map(({ href, label, icon: Icon, match }) => {
+            const active = match(path);
+            return (
+              <li key={href}>
+                <Link
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative grid min-h-14 justify-items-center gap-0.5 pt-2 pb-2.5 text-[11px] font-medium focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+                    active ? "text-team-ink" : "text-muted"
+                  }`}
+                >
+                  {active && <span aria-hidden className="absolute inset-x-[30%] top-0 h-0.5 rounded-pill bg-team-ink" />}
+                  <Icon aria-hidden className="size-[22px]" />
+                  {label}
+                  {href === "/" && pendingCount > 0 && (
+                    <>
+                      <span aria-hidden className="absolute top-1 left-[calc(50%+6px)] grid h-4 min-w-4 place-items-center rounded-pill bg-danger px-1 text-[10px] font-bold text-on-danger tabular">
+                        {pendingCount}
+                      </span>
+                      <span className="sr-only">, {pendingCount} waiting for your answer</span>
+                    </>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+
+      <nav aria-label="Primary" className="sticky top-0 hidden h-dvh w-62 shrink-0 flex-col gap-1 border-r border-border bg-surface px-3 py-5 lg:flex">
+        <Link href="/" className="mb-4 px-3 font-display text-2xl font-bold uppercase tracking-wide">
+          {APP_NAME}
+        </Link>
+        {ITEMS.map(({ href, label, icon: Icon, match }) => {
+          const active = match(path);
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={`flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-focus ${
+                active ? "bg-team-soft text-team-ink" : "text-muted hover:bg-sunken hover:text-fg"
+              }`}
+            >
+              <Icon aria-hidden className="size-5" />
+              <span className="flex-1">{label}</span>
+              {href === "/" && pendingCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-pill bg-danger px-1.5 text-[11px] font-bold text-on-danger tabular">
+                  {pendingCount}
+                  <span className="sr-only"> waiting for your answer</span>
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+    </>
+  );
+}
+
+export function TeamTabs({ teamId }: { teamId: string }) {
+  const path = usePathname();
+  const tabs = [
+    { href: `/t/${teamId}/schedule`, label: "Schedule", match: (p: string) => p.includes("/schedule") || p.includes("/e/") },
+    { href: `/t/${teamId}/roster`, label: "Roster", match: (p: string) => p.includes("/roster") },
+    { href: `/t/${teamId}/chat`, label: "Chat", match: (p: string) => p.endsWith("/chat") },
+    { href: `/t/${teamId}/messages`, label: "Messages", match: (p: string) => p.includes("/messages") },
+  ];
+  return (
+    <nav aria-label="Team sections" className="gutter border-b border-border bg-bg">
+      <ul className="mx-auto flex max-w-3xl gap-1 overflow-x-auto">
+        {tabs.map((t) => {
+          const active = t.match(path);
+          return (
+            <li key={t.href}>
+              <Link
+                href={t.href}
+                aria-current={active ? "page" : undefined}
+                className={`inline-flex min-h-12 items-center border-b-2 px-2.5 text-sm font-semibold whitespace-nowrap focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus ${
+                  active ? "border-team-ink text-team-ink" : "border-transparent text-muted hover:text-fg"
+                }`}
+              >
+                {t.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
