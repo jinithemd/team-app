@@ -266,3 +266,48 @@ export async function clearAvailabilityAction(periodId: string, _: FormState): P
   revalidatePath("/", "layout");
   redirect("/availability?cleared=1");
 }
+
+export async function saveAttendanceAction(eventId: string, teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const ids = f.getAll("uid").map(String);
+  const res = await data.saveAttendance(
+    eventId,
+    ids.map((u) => ({ userId: u, status: str(f, `s.${u}`), minutesLate: str(f, `m.${u}`) })),
+  );
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}`, "layout");
+  return { ok: true, message: `Saved ${res.data.saved} ${res.data.saved === 1 ? "mark" : "marks"}.` };
+}
+
+export async function checkInAction(eventId: string, lat: number, lng: number, accuracy: number) {
+  const res = await data.checkIn(eventId, lat, lng, accuracy);
+  if (res.ok) revalidatePath("/", "layout");
+  return res;
+}
+
+export async function addPointsAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.addManualPoints(teamId, { userId: str(f, "userId"), points: str(f, "points"), note: str(f, "note") });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}/points`);
+  return { ok: true, message: "Points added." };
+}
+
+export async function removePointsAction(teamId: string, pointsId: string, _: FormState): Promise<FormState> {
+  const res = await data.removeManualPoints(teamId, pointsId);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(`/t/${teamId}/points`);
+  return { ok: true };
+}
+
+export async function closeSeasonAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.closeSeason(teamId, {
+    nextName: str(f, "nextName"),
+    startsOn: str(f, "startsOn"),
+    copyRoster: str(f, "copyRoster") === "on",
+    keepRoles: str(f, "keepRoles") === "on",
+    copyTrainings: str(f, "copyTrainings") === "on",
+    carryDues: str(f, "carryDues") === "on",
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}`, "layout");
+  redirect(`/t/${teamId}/seasons?started=1`);
+}

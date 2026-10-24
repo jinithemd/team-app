@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronRight, Clock, MapPin, Pencil, StickyNote, Users } from "lucide-react";
-import { getAvailability, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
+import { ArrowLeft, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Users } from "lucide-react";
+import { attendanceSummary, getAvailability, getCheckIn, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
+import { CheckInCard } from "@/components/check-in";
 import { EVENT_TYPE_LABEL, isFixture } from "@/lib/data/types";
 import { RsvpControl } from "@/components/rsvp-control";
 import { Counts, ScoreBadge, StatusBadge, TypeTag } from "@/components/event-bits";
@@ -25,7 +26,9 @@ export default async function EventPage({
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
-  const [team, e, avail, user, perms] = await Promise.all([getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId)]);
+  const [team, e, avail, user, perms, checkIn, att] = await Promise.all([
+    getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId),
+  ]);
   if (!team || !e || e.teamId !== teamId) notFound();
 
   const title = eventTitle(e);
@@ -127,7 +130,27 @@ export default async function EventPage({
         </Banner>
       )}
 
-      {e.mine && user && (
+      {checkIn && <CheckInCard eventId={e.id} tz={e.tz} {...checkIn} />}
+
+      {perms.attendance && !cancelled && Date.parse(e.startAt) - Date.now() < 3600_000 && (
+        <Link
+          href={`/t/${teamId}/e/${eventId}/attendance`}
+          className="flex items-center gap-3 rounded-lg border border-border p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <ClipboardCheck aria-hidden className="size-6 shrink-0 text-team-ink" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">{att && att.present + att.late + att.absent + att.excused > 0 ? "Attendance" : "Take attendance"}</span>
+            <span className="block text-sm text-muted">
+              {att && att.present + att.late + att.absent + att.excused > 0
+                ? `${att.present} present · ${att.late} late · ${att.absent} absent${att.geo ? ` · ${att.geo} checked in` : ""}`
+                : "Mark who turned up. Points update when you save."}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-muted" />
+        </Link>
+      )}
+
+      {e.mine && user && !(past && att && att.present + att.late > 0) && (
         <section aria-labelledby="mine-h" className="grid gap-4 rounded-lg border border-border p-4">
           <h2 id="mine-h" className="text-lg font-semibold">
             Are you in?

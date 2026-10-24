@@ -15,6 +15,7 @@ OUT = "/home/claude/team-app/replica/clone-screens"
 errors = []
 
 def watch(page, who):
+    track(page)
     page.on("console", lambda m: errors.append(f"{who} console: {m.text}") if m.type == "error" and "fonts.g" not in m.text and "ERR_TUNNEL" not in m.text and "Failed to load resource" not in m.text else None)
     page.on("pageerror", lambda e: errors.append(f"{who} pageerror: {e}"))
 
@@ -26,6 +27,26 @@ def shot(page, name):
     page.screenshot(path=f"{OUT}/{name}.png", full_page=True)
 
 def step(msg): print("✓", msg, flush=True)
+
+_pending = {}
+def track(page):
+    pend = _pending.setdefault(id(page), {})
+    page.on("request", lambda r: pend.__setitem__(id(r), (r.method, r.url[-90:], __import__("time").time())))
+    page.on("requestfinished", lambda r: pend.pop(id(r), None))
+    page.on("requestfailed", lambda r: pend.pop(id(r), None))
+
+def submit(page, button, url_re, timeout=15000):
+    """Click a submit button and wait for the redirect; on failure, say what the page shows."""
+    page.get_by_role("button", name=button).click()
+    try:
+        page.wait_for_url(re.compile(url_re), timeout=timeout)
+    except Exception:
+        print("   STUCK at", page.url)
+        print("   busy:", page.locator("[aria-busy=true]").all_inner_texts(), "alerts:", page.locator("[role=alert]").all_inner_texts())
+        import time as _t
+        for m, u, t0 in _pending.get(id(page), {}).values(): print("   pending", m, u, f"{_t.time()-t0:.1f}s")
+        page.screenshot(path="/tmp/claude-0/-home-claude/dfc9fd4f-d579-5240-ac28-0ea6ad2e19a8/scratchpad/stuck.png", full_page=True)
+        raise
 
 import atexit
 _pages = []
@@ -92,7 +113,7 @@ with sync_playwright() as p:
     expect(c.locator("input[name='1.firstName']")).to_have_value("Lila")
     c.locator("li", has_text="Person 2").locator("label", has_text="Vice captain").click()
     shot(c, "S13-add-players")
-    c.get_by_role("button", name="Send 2 invites").click(); c.wait_for_url(re.compile(r"invited=2"))
+    submit(c, "Send 2 invites", r"invited=2")
     expect(c.get_by_text("Invite sent").first).to_be_visible()
     expect(c.locator("li", has_text="Lila Osei").get_by_text("Vice captain", exact=True)).to_be_visible()
     shot(c, "S12-roster-invited"); step("pasted 2 players, Lila invited as vice captain")
@@ -113,7 +134,7 @@ with sync_playwright() as p:
     c.fill("#date", "2026-11-07"); c.fill("#startTime", "10:00")
     c.fill("#locationText", "Caraco Park, Field 1")
     c.fill("#squadSize", "11")
-    c.get_by_role("button", name="Add match").click(); c.wait_for_url(re.compile(r"/e/[^/]+\?created=1"))
+    submit(c, "Add match", r"/e/[^/]+\?created=1")
     event_url = c.url.split("?")[0]
     expect(c.get_by_text("0 going")).to_be_visible(); step("founder adds a match; 0 going so far")
     expect(c.get_by_text("Meet at 9:30 am")).to_be_visible(); expect(c.get_by_text("0 of 11")).to_be_visible(); step("match shows meet time and players needed")
@@ -128,7 +149,7 @@ with sync_playwright() as p:
     par.goto(f"{BASE}/dev/outbox")
     mail = par.locator("li", has_text="Cataraqui Cobras").filter(has_text="kai.morgan@example.com").first
     mail.get_by_role("link", name="Going", exact=True).click()
-    expect(par.get_by_text("You're in, Kai")).to_be_visible(); shot(par, "email-rsvp-landing"); step("player taps Going in the email, no sign-in")
+    expect(par.get_by_text("You're in, Kai").first).to_be_visible(); shot(par, "email-rsvp-landing"); step("player taps Going in the email, no sign-in")
     c.goto(event_url); expect(c.get_by_text("2 going")).to_be_visible(); step("founder sees 2 going")
 
     # player adds a note; founder sees it
@@ -160,18 +181,18 @@ with sync_playwright() as p:
     c.get_by_role("radio", name="Training").click()
     c.fill("#date", "2026-11-03"); c.fill("#startTime", "19:00")
     c.get_by_label("Repeat every week").check(); c.fill("#repeatWeeks", "4")
-    c.get_by_role("button", name="Add training").click(); c.wait_for_url(re.compile(r"/e/[^/]+\?created=1"))
+    submit(c, "Add training", r"/e/[^/]+\?created=1")
     tr_url = c.url.split("?")[0]
     c.goto(f"{BASE}/t/{team_id}/schedule"); expect(c.get_by_role("link", name=re.compile(r"^Training, ")).nth(3)).to_be_visible(); step("weekly training creates 4 sessions")
     c.goto(tr_url + "/edit"); c.fill("#startTime", "19:30"); c.fill("#endTime", "20:45")
-    c.get_by_label("Change this and the following weeks").check(); c.get_by_role("button", name="Save changes").click(); c.wait_for_url(re.compile(r"saved=1"))
+    c.get_by_label("Change this and the following weeks").check(); submit(c, "Save changes", r"saved=1")
     c.goto(f"{BASE}/t/{team_id}/schedule"); expect(c.get_by_text("7:30 pm – 8:45 pm")).to_have_count(4); step("editing 'this and following' moves all 4")
     c.goto(tr_url + "/edit"); c.get_by_role("button", name="Delete this event").click(); c.get_by_role("button", name="Delete", exact=True).click()
     c.wait_for_url(re.compile(r"/schedule\?deleted=1")); expect(c.get_by_text("7:30 pm – 8:45 pm")).to_have_count(3); step("delete removes just one")
 
     # venue with a map pin, team settings with a crest
     c.goto(f"{BASE}/t/{team_id}/venues"); c.fill("#name", "Riverside Park, Pitch 1"); c.fill("#lat", "44.2312"); c.fill("#lng", "-76.4860")
-    c.get_by_role("button", name="Add venue").click(); c.wait_for_url(re.compile(r"/venues\?saved=1"))
+    submit(c, "Add venue", r"/venues\?saved=1")
     expect(c.get_by_text("Pinned · check-in within 150 m")).to_be_visible(); step("venue saved with a map pin")
     c.goto(f"{BASE}/t/{team_id}/settings"); shot(c, "team-settings")
     c.set_input_files("input[aria-label='Crest file']", files=[{"name": "crest.png", "mimeType": "image/png", "buffer": PNG}])
@@ -212,7 +233,7 @@ with sync_playwright() as p:
     d.get_by_role("radio", name="Away").click()
     d.fill("#startsOn", TOMORROW); d.fill("#endsOn", TOMORROW); d.fill("#note", "Cousin's wedding")
     d.get_by_label("Kingston Strikers").uncheck()
-    d.get_by_role("button", name="Save").click(); d.wait_for_url(re.compile(r"/availability\?saved="))
+    submit(d, "Save", r"/availability\?saved=")
     expect(d.get_by_text(re.compile(r"You're down as can't make it for 1 event"))).to_be_visible(); step("away for 1 event")
     d.goto(f"{BASE}/t/t-reserves/e/e-r-g1"); expect(d.get_by_text("You're marked away that day")).to_be_visible(); step("event says you're marked away")
     m = b.new_context(**phone).new_page(); watch(m, "marcus")
@@ -229,6 +250,42 @@ with sync_playwright() as p:
     d.goto(f"{BASE}/t/t-strikers/e/e-s-g1"); shot(d, "S08-event-dark")
     d.goto(f"{BASE}/"); shot(d, "S02-home-dark"); step("dark mode via account setting")
 
+
+    # geo check-in: Rahul at the "Small-sided session" (starts within the hour)
+    rc = b.new_context(**phone, geolocation={"latitude": 44.2312, "longitude": -76.4860, "accuracy": 15}, permissions=["geolocation"]); r = rc.new_page(); watch(r, "rahul-geo")
+    r.goto(f"{BASE}/login"); r.get_by_role("button", name=re.compile("Rahul Menon")).click(); r.wait_for_url(f"{BASE}/")
+    r.goto(f"{BASE}/t/t-strikers/e/e-s-now"); expect(r.get_by_role("heading", name=re.compile("Check in at Invista Centre"))).to_be_visible()
+    r.get_by_role("button", name="I'm here").click()
+    expect(r.get_by_text(re.compile(r"You're [\d,]+ m from Invista Centre, Field 2"))).to_be_visible(); step("check-in refused 3 km away, with the distance")
+    rc.set_geolocation({"latitude": 44.25395, "longitude": -76.57315, "accuracy": 12})
+    r.get_by_role("button", name="I'm here").click()
+    expect(r.get_by_role("heading", name="You're checked in")).to_be_visible(); shot(r, "check-in-done"); step("check-in at the pitch marks Rahul present")
+    r.reload(); expect(r.get_by_role("heading", name="You're checked in")).to_be_visible(); step("check-in remembered")
+
+    # captain takes attendance: sees the check-in, marks someone late
+    pc = b.new_context(**phone); pr = pc.new_page(); watch(pr, "priya")
+    pr.goto(f"{BASE}/login"); pr.get_by_role("button", name=re.compile("Priya Raman")).click(); pr.wait_for_url(f"{BASE}/")
+    pr.goto(f"{BASE}/t/t-strikers/e/e-s-now"); pr.get_by_role("link", name=re.compile(r"^(Take attendance|Attendance)")).click(); pr.wait_for_url(re.compile("/attendance"))
+    expect(pr.get_by_text("1 checked in at the venue, marked for you.")).to_be_visible()
+    expect(pr.locator("li", has_text="Rahul Menon").get_by_role("radio", name="Present")).to_have_attribute("aria-checked", "true"); step("check-in shows on the captain's sheet")
+    pr.get_by_role("button", name="Mark everyone who said going as present").click()
+    pr.locator("li", has_text="Jordan Blake").get_by_role("radio", name="Late").click()
+    pr.get_by_label("Minutes late for Jordan Blake").fill("20")
+    expect(pr.locator("li", has_text="Jordan Blake").get_by_text("· 0 pts")).to_be_visible(); step("late 20 min previews 1 - 1 = 0 points")
+    shot(pr, "S-take-attendance")
+    pr.get_by_role("button", name="Save attendance").click(); expect(pr.get_by_text(re.compile(r"Saved \d+ marks"))).to_be_visible(); step("attendance saved")
+
+    # leaderboard, manual points, seasons
+    pr.goto(f"{BASE}/t/t-strikers/points"); expect(pr.get_by_role("list", name="Leaderboard")).to_be_visible(); shot(pr, "S-leaderboard")
+    pr.select_option("#userId", label="Ade Bello"); pr.fill("#points", "3"); pr.fill("#note", "Brought the oranges")
+    pr.get_by_role("button", name="Add points").click(); expect(pr.get_by_text("Points added.")).to_be_visible()
+    expect(pr.get_by_text("Brought the oranges")).to_be_visible(); step("captain adds points with a reason")
+    pr.goto(f"{BASE}/t/t-strikers/seasons"); shot(pr, "S-seasons")
+    pr.get_by_role("button", name="Close season").click(); submit(pr, "Yes, close it", "started=1")
+    expect(pr.get_by_text("Summer 2026")).to_be_visible(); step("season closed, next one started")
+    pr.goto(f"{BASE}/t/t-strikers/points"); expect(pr.get_by_text("No points yet this season")).to_be_visible(); step("new season starts at zero")
+    pr.get_by_role("link", name="Summer 2026").click(); expect(pr.get_by_role("list", name="Leaderboard")).to_be_visible(); step("old season's leaderboard kept")
+
     # Dan: club owner who plays, captains and manages the First Team
     dan = b.new_context(**phone).new_page(); watch(dan, "dan")
     dan.goto(f"{BASE}/login"); dan.get_by_role("button", name=re.compile("Dan Kowalski")).click(); dan.wait_for_url(f"{BASE}/")
@@ -243,16 +300,16 @@ with sync_playwright() as p:
     dan.locator("label", has_text="Manager").click()
     expect(dan.get_by_label("Add and change matches")).to_be_checked(); step("picking Manager fills in what managers can do")
     shot(dan, "S15-edit-roles")
-    dan.get_by_role("button", name="Save").click(); dan.wait_for_url(re.compile(r"saved=member"))
+    submit(dan, "Save", r"saved=member")
     expect(dan.get_by_text("Roles saved.")).to_be_visible()
     dan.get_by_role("link", name=re.compile("Owen Park")).click(); dan.wait_for_url(re.compile(r"/p/u-owen"))
     dan.get_by_role("link", name="Roles and permissions").click(); dan.wait_for_url(re.compile(r"/roster/r-"))
-    dan.locator("label", has_text="Coach").click(); dan.get_by_role("button", name="Save").click(); dan.wait_for_url(re.compile(r"saved=member"))
+    dan.locator("label", has_text="Coach").click(); submit(dan, "Save", r"saved=member")
     dan.goto(f"{BASE}/t/t-first/roster/add")
     dan.fill("input[name='0.firstName']", "Sara"); dan.fill("input[name='0.lastName']", "Ito"); dan.fill("input[name='0.email']", "sara.ito@example.com")
     dan.get_by_label("Plays on the team").uncheck()
     dan.locator("li", has_text="Person 1").locator("label", has_text="Coach").click()
-    dan.get_by_role("button", name="Send 1 invite").click(); dan.wait_for_url(re.compile(r"invited=1"))
+    submit(dan, "Send 1 invite", r"invited=1")
     expect(dan.get_by_text("1 captain · 1 vice captain · 2 managers · 2 coaches")).to_be_visible()
     expect(dan.get_by_role("region", name="Running the team, not playing").get_by_text("Sara Ito")).to_be_visible()
     shot(dan, "S12-roster-staff"); step("First Team now has 2 managers and 2 coaches, one coach not playing")

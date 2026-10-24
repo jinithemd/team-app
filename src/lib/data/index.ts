@@ -2,4 +2,5 @@
 // replica-backend swaps these lines for the Supabase modules with the same exports.
 export * from "./fake";
 export * from "./availability";
+export * from "./attendance";
 export type * from "./types";

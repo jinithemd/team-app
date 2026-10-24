@@ -37,7 +37,7 @@ export default async function TeamLayout({ children, params }: { children: React
           </div>
         </div>
       </header>
-      <TeamTabs teamId={team.id} show={{ settings: perms.settings }} />
+      <TeamTabs teamId={team.id} show={{ settings: perms.settings, points: team.settings.pointsEnabled && (team.settings.pointsPublic || perms.staff) }} />
       <main id="main" className="gutter mx-auto max-w-3xl py-5">
         {children}
       </main>

@@ -1,4 +1,11 @@
 import type { Metadata, Viewport } from "next";
+// Self-hosted (SIL Open Font License): no request to Google, and pages never wait on a font CDN.
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-600.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/barlow-condensed/latin-600.css";
+import "@fontsource/barlow-condensed/latin-700.css";
 import "./globals.css";
 import { getSessionUser } from "@/lib/data";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
@@ -23,15 +30,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = user?.theme && user.theme !== "system" ? user.theme : undefined;
   return (
     <html lang="en-CA" data-theme={theme} suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* Inter + Barlow Condensed, both SIL Open Font License. Falls back to system fonts offline. */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600;700&display=swap"
-        />
-      </head>
       <body>{children}</body>
     </html>
   );
