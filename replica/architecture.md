@@ -128,3 +128,12 @@ Jobs: `send-outbox` (every minute), `event-reminders` (every 15 min; skips playe
 4. **Should-haves:** dues, seasons, carpools, results and player of the match, points and leaderboard, subject messages, calendar feeds, exports.
 5. **Could-haves:** analytics dashboard, follow a team, membership cards and sponsor rewards, GPS pickup confirmation for carpools (reuse the check-in approach: one fix at pickup).
 6. **Fixes from replica-entrepreneur.**
+
+### Sponsors
+
+- A **sponsor** backs one team or a whole club (`sponsors`, exactly one of `team_id` / `club_id`). Tiers, highest first: **Diamond, Platinum, Gold, Silver, Bronze**. The tier sets the badge and the order on every sponsor strip.
+- Added by whoever runs the team (`edit_settings`) or the club (owner/admin), with name, tier, logo, website, a line about them, dates, and the contact's email. The contact gets an invite and signs in with an ordinary account.
+- **Sponsors are not team members.** RLS keeps rosters, chat, answers, attendance, dues, carpools, injuries and contact details closed. They see the team only through `sponsor_feed()` and `sponsor_news()`: matches, tournaments and social events (date, opponent, venue name, status, score, player of the match once voting closes) and the announcements the team ticks "share with sponsors". Captains can hide or show any single event (`events.sponsor_visible`).
+- When a deal's `ends_on` passes, the sponsor view closes on its own.
+- Everyone sees the sponsor strip (`sponsors_public`, no emails) on the team schedule and the club page.
+- Tests: captain without `edit_settings` can't add one; a sponsor reads 0 roster/chat/dues/attendance/event rows directly; the feed has the 2 matches and no trainings; only shared news; can't change its own tier; a hidden match drops out; an outsider gets nothing; an ended deal closes the view.

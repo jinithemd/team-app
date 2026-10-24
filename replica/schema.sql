@@ -1046,3 +1046,110 @@ create policy feeds_own on calendar_feeds for select using (user_id = auth.uid()
 
 -- realtime:
 -- alter publication supabase_realtime add table chat_messages, chat_reactions, chat_reads, poll_votes, scores, match_events, rsvps, events, ride_offers, ride_requests;
+
+-- ---------------------------------------------------------------------------
+-- sponsors: a business backing a team or a whole club. They get a tier badge and a
+-- sponsor view of the main events (fixtures, results, news the team chooses to share).
+-- They are NOT team members: rosters, chat, attendance, dues, injuries and contact
+-- details stay closed to them by the policies above. Everything they see comes through
+-- the two security-definer functions below, which return only sponsor-safe columns.
+-- ---------------------------------------------------------------------------
+
+create table sponsors (
+  id uuid primary key default gen_random_uuid(),
+  club_id uuid references clubs(id) on delete cascade,     -- a club sponsor backs every club team
+  team_id uuid references teams(id) on delete cascade,
+  name text not null check (length(name) between 1 and 80),
+  tier text not null check (tier in ('diamond','platinum','gold','silver','bronze')),
+  logo_url text,
+  website text check (website is null or website ~* '^https?://'),
+  blurb text check (length(blurb) <= 200),
+  contact_user_id uuid references profiles(id) on delete set null,   -- who signs in for the sponsor
+  invited_email citext,
+  invite_token_hash text unique,
+  status text not null default 'invited' check (status in ('invited','active','ended')),
+  starts_on date,
+  ends_on date,
+  created_by uuid references profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint one_scope check ((club_id is null) <> (team_id is null)),
+  constraint contact_or_invite check (contact_user_id is not null or invited_email is not null),
+  constraint dates_in_order check (ends_on is null or starts_on is null or ends_on >= starts_on)
+);
+create index on sponsors (team_id);
+create index on sponsors (club_id);
+create index on sponsors (contact_user_id);
+create trigger sponsors_updated before update on sponsors for each row execute function set_updated_at();
+
+-- Captains choose per event; empty means "the usual": matches, tournaments and socials yes, trainings no.
+alter table events add column sponsor_visible boolean;
+-- Announcements can go to sponsors too.
+alter table messages add column to_sponsors boolean not null default false;
+
+create or replace function tier_rank(t text) returns int
+language sql immutable as $$
+  select case t when 'diamond' then 1 when 'platinum' then 2 when 'gold' then 3 when 'silver' then 4 else 5 end
+$$;
+
+-- Am I the active contact for a sponsor of this team (directly, or through its club)?
+create or replace function is_sponsor_of_team(t uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from sponsors s left join teams tm on tm.id = t
+    where s.contact_user_id = auth.uid() and s.status = 'active'
+      and (s.ends_on is null or s.ends_on >= current_date)
+      and (s.team_id = t or (s.club_id is not null and s.club_id = tm.club_id))
+  )
+$$;
+
+create or replace function can_manage_sponsors(p_team uuid, p_club uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case when p_team is not null then has_team_perm(p_team, 'edit_settings') else is_club_admin(p_club) end
+$$;
+
+alter table sponsors enable row level security;
+-- The sponsor contact sees their own row; whoever runs the team or club sees and edits all of them.
+create policy sponsors_read on sponsors for select using (contact_user_id = auth.uid() or can_manage_sponsors(team_id, club_id));
+create policy sponsors_write on sponsors for all
+  using (can_manage_sponsors(team_id, club_id)) with check (can_manage_sponsors(team_id, club_id));
+
+-- What anyone may see about a team's sponsors (the strip on team and club pages): no emails.
+create or replace view sponsors_public with (security_invoker = false) as
+  select s.id, s.club_id, s.team_id, s.name, s.tier, s.logo_url, s.website, s.blurb
+  from sponsors s
+  where s.status = 'active' and (s.ends_on is null or s.ends_on >= current_date)
+  order by tier_rank(s.tier), s.name;
+grant select on sponsors_public to anon, authenticated;
+
+-- The sponsor view: main events only, with sponsor-safe columns. No notes, no answers,
+-- no squad list. Results show the score and the player of the match once voting closes.
+create or replace function sponsor_feed(p_team uuid)
+returns table (event_id uuid, type text, title text, opponent text, home_away text, competition text,
+               start_at timestamptz, end_at timestamptz, tz text, venue_name text, status text,
+               team_score int, opponent_score int, score_status text, player_of_match text)
+language sql stable security definer set search_path = public as $$
+  select e.id, e.type, e.title, e.opponent, e.home_away, e.competition, e.start_at, e.end_at, e.tz,
+         v.name, e.status, sc.team_score, sc.opponent_score, sc.status,
+         case when not e.potm_open then (
+           select p.first_name || ' ' || p.last_name from potm_votes pv join profiles p on p.id = pv.nominee_id
+           where pv.event_id = e.id group by p.id, p.first_name, p.last_name order by count(*) desc limit 1) end
+  from events e
+  left join venues v on v.id = e.venue_id
+  left join scores sc on sc.event_id = e.id
+  where e.team_id = p_team
+    and (is_sponsor_of_team(p_team) or is_team_member(p_team))
+    and coalesce(e.sponsor_visible, e.type in ('match','tournament','social'))
+    and e.start_at > now() - interval '120 days'
+  order by e.start_at
+$$;
+
+create or replace function sponsor_news(p_team uuid)
+returns table (message_id uuid, subject text, body text, created_at timestamptz)
+language sql stable security definer set search_path = public as $$
+  select m.id, m.subject, m.body, m.created_at from messages m
+  where m.team_id = p_team and m.to_sponsors and (is_sponsor_of_team(p_team) or is_team_member(p_team))
+  order by m.created_at desc limit 20
+$$;
+revoke all on function sponsor_feed(uuid), sponsor_news(uuid) from public;
+grant execute on function sponsor_feed(uuid), sponsor_news(uuid) to authenticated;

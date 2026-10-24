@@ -181,3 +181,49 @@ set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
 update roster_members set roles='{captain,manager}', permissions=permissions||'{payments}' where user_id='00000000-0000-0000-0000-0000000000c0' and team_id='20000000-0000-0000-0000-000000000001';
 \echo captain can still invite a plain player (1 row):
 insert into roster_members(team_id,invited_email) values ('20000000-0000-0000-0000-000000000001','new@x') returning 1;
+
+\echo == Sponsors
+reset role;
+update teams set is_public=false where id='20000000-0000-0000-0000-000000000001';
+insert into auth.users values ('00000000-0000-0000-0000-0000000000a5'),('00000000-0000-0000-0000-0000000000a6');
+insert into profiles(id,first_name,last_name,email) values ('00000000-0000-0000-0000-0000000000a5','Sid','Sponsor','sid@cafe.x'),('00000000-0000-0000-0000-0000000000a6','Out','Sider','out@x');
+insert into messages(id,team_id,author_id,subject,body,to_all,to_sponsors) values
+ ('90000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c0','Cup draw','Home to Belleville',true,true),
+ ('90000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c0','Subs due','Pay by Friday',true,false);
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+\echo [expect fail] captain without edit_settings adds a sponsor:
+insert into sponsors(team_id,name,tier,invited_email) values ('20000000-0000-0000-0000-000000000001','Corner Cafe','gold','sid@cafe.x');
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a0';
+insert into sponsors(id,team_id,name,tier,contact_user_id,status) values ('a0000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Corner Cafe','gold','00000000-0000-0000-0000-0000000000a5','active');
+insert into sponsors(id,club_id,name,tier,invited_email) values ('a0000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000001','Limestone Motors','diamond','cars@motors.x');
+\echo [ok] club owner adds a gold team sponsor and a diamond club sponsor (invited)
+\echo [expect fail] a sponsor tied to both a team and a club:
+insert into sponsors(team_id,club_id,name,tier,invited_email) values ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Both','gold','b@x');
+\echo [expect fail] made-up tier:
+insert into sponsors(team_id,name,tier,invited_email) values ('20000000-0000-0000-0000-000000000001','Tin Co','tin','t@x');
+
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a5';
+\echo sponsor reads roster, chat, dues, attendance, events directly (0 0 0 0 0):
+select (select count(*) from roster_members), (select count(*) from chat_messages), (select count(*) from dues), (select count(*) from attendance), (select count(*) from events);
+\echo sponsor feed: matches only, no trainings (2 match):
+select count(*), string_agg(distinct type, ',') from sponsor_feed('20000000-0000-0000-0000-000000000001');
+\echo sponsor news: only what was shared (Cup draw):
+select subject from sponsor_news('20000000-0000-0000-0000-000000000001');
+\echo public sponsor list, top tier first, no emails (Corner Cafe only: the diamond is still invited):
+select name, tier from sponsors_public;
+\echo sponsor tries to upgrade itself to diamond (0 rows):
+update sponsors set tier='diamond' where id='a0000000-0000-0000-0000-000000000001' returning 1;
+
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+reset role; update events set sponsor_visible=false where id='30000000-0000-0000-0000-000000000002'; set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a5';
+\echo captain hides one match from sponsors (1):
+select count(*) from sponsor_feed('20000000-0000-0000-0000-000000000001');
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a6';
+\echo outsider gets nothing (0, 0):
+select (select count(*) from sponsor_feed('20000000-0000-0000-0000-000000000001')), (select count(*) from sponsor_news('20000000-0000-0000-0000-000000000001'));
+reset role; update sponsors set ends_on = current_date - 1, starts_on = current_date - 30 where id='a0000000-0000-0000-0000-000000000001'; set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a5';
+\echo deal ended yesterday: sponsor view closes (0):
+select count(*) from sponsor_feed('20000000-0000-0000-0000-000000000001');
