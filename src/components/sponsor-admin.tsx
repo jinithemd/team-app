@@ -47,9 +47,9 @@ export function SponsorRows({ sponsors, editBase, canManage }: { sponsors: Manag
               </div>
             </div>
             {canManage && s.contact && (
-              <p className="text-sm break-all text-muted">
+              <p className="text-sm break-words text-muted">
                 {s.contact.name ? `${s.contact.name} · ` : ""}
-                {s.contact.email}
+                <span className="break-all">{s.contact.email}</span>
                 {(s.startsOn || s.endsOn) && ` · ${day(s.startsOn) ?? "…"} to ${day(s.endsOn) ?? "open-ended"}`}
               </p>
             )}
