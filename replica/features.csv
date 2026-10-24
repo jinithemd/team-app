@@ -5,7 +5,7 @@ Create a team (name sport age group location colour),teams,must,yes,yes,S05; S05
 Invite players by email,roster,must,yes,yes,"paste a list; sample build asks for parent email, rework to player's own email"
 Invite staff with role,roster,must,yes,yes,S13; S13 ?kind=staff with role + permissions
 Roster with Players and Staff tabs (jersey position),roster,must,yes,yes,S12; S12
-Create match / training / tournament / social,schedule,must,yes,partial,"sample build has game/practice/event, rename types"
+Create match / training / tournament / social,schedule,must,yes,yes,"sample build has game/practice/event, rename types"
 Notify team on create or change,notifications,must,yes,partial,push plus email; email to sample inbox; real send + push in replica-backend
 Team schedule list view,schedule,must,yes,yes,S07; users disliked a calendar-only view; S07 grouped by week; list is default
 Cancel or postpone an event with status shown,schedule,must,yes,yes,S08 StatusBadge; S08 staff tools + reason; badge on cards
@@ -14,27 +14,27 @@ RSVP Going / Not Going / Maybe,rsvp,must,yes,yes,S08 S11; S08 S11 optimistic
 Private RSVP note to staff,rsvp,must,yes,yes,hidden from teammates (tested)
 Team availability view per event,rsvp,must,yes,yes,S10; S10 grouped + counts
 My pending RSVPs across all my teams,rsvp,must,yes,yes,S11; S11
-Team chat with text and photos,chat,must,yes,no,S16 real-time; needs Supabase Realtime; stub screen
+Team chat with text and photos,chat,must,yes,yes,S16 real-time; needs Supabase Realtime; stub screen
 Push notifications (web push / PWA),notifications,must,yes,no,replica-backend
 Home with upcoming events across teams,home,must,yes,yes,S02; S02
 Mobile-first responsive layout,platform,must,yes,yes,"clone is web first; 390 and 1440 checked, no sideways scroll"
 RSVP from email without logging in,rsvp,should,yes,yes,signed link; signed 21-day links; saves after page load so link scanners don't answer
 My calendar across all my teams,schedule,should,yes,yes,"S18 list + per-team filter; sample build still filters per kid, rework"
-Calendar subscribe (iCal / Google / Outlook),schedule,should,yes,no,S19
-Recurring practices,schedule,should,unknown,no,not confirmed in SportsEngine sources
+Calendar subscribe (iCal / Google / Outlook),schedule,should,yes,yes,S19
+Recurring practices,schedule,should,unknown,yes,not confirmed in SportsEngine sources
 Staff permissions checklist,roster,should,yes,yes,S15 six permissions; set on invite; editing later (S15) not built
-Email-style messages with subject to selected members,messages,should,yes,no,S17
-Chat reactions with counts,chat,should,yes,no,
-Chat video file and GIF attachments,chat,should,yes,no,
-Chat read receipts,chat,should,yes,no,
-Pin a chat message,chat,should,yes,no,
-Chat polls,chat,should,yes,no,HQ blog
-Per-team notification preferences,notifications,should,yes,no,S22
-Live scoring with real-time score for followers,scoring,should,yes,no,S20
-Follow a team as a fan (search by name or code),teams,could,yes,no,S04
+Email-style messages with subject to selected members,messages,should,yes,yes,S17
+Chat reactions with counts,chat,should,yes,yes,
+Chat video file and GIF attachments,chat,should,yes,partial,photos and GIFs; no video
+Chat read receipts,chat,should,yes,partial,unread counts per room; no per-message receipts
+Pin a chat message,chat,should,yes,yes,
+Chat polls,chat,should,yes,yes,HQ blog
+Per-team notification preferences,notifications,should,yes,yes,S22
+Live scoring with real-time score for followers,scoring,should,yes,partial,refreshes every 15 s on sample data; Realtime in replica-backend
+Follow a team as a fan (search by name or code),teams,could,yes,partial,"find a team by name and ask to join, or join by code; no fan-follow yet"
 Print roster,roster,could,yes,no,
 Team colour theming of team screens (primary + secondary),teams,should,partial,yes,"original only uses team colour as a swatch; clone themes header buttons and highlights with auto contrast fix; header, buttons, tabs, today tint; auto contrast"
-Team logo / crest upload,teams,should,no,no,shown in team header and team chips
+Team logo / crest upload,teams,should,no,yes,shown in team header and team chips
 Viewer can turn team colours off,platform,could,no,yes,profiles.use_team_colors; Account
 Dark mode,platform,could,yes,yes,Account: match phone / light / dark
 SMS notifications,notifications,could,yes,no,costs per message
@@ -42,7 +42,7 @@ Biometric / passkey login,onboarding,could,yes,no,passkeys on web
 Moderate posts before they're visible,chat,could,yes,no,staff with edit rights
 Nudge non-responders,rsvp,could,no,yes,gap: not seen in original; staff tool on S08
 Bulk add roster from CSV or paste,roster,could,no,yes,"gap: original adds one at a time in-app; paste names, emails, numbers"
-Venue library,schedule,could,yes,no,
+Venue library,schedule,could,yes,yes,
 Registration and program sign-up,hq,could,yes,skip,HQ product; out of this slice
 Bills and auto-payments,hq,could,yes,skip,HQ product; out of this slice
 Memberships and credentials,hq,could,yes,skip,HQ product
@@ -52,35 +52,35 @@ News articles,hq,could,yes,skip,HQ-gated in original
 Livestreaming,video,could,yes,skip,separate SportsEngine Play product
 League / governing-body affiliation,network,could,yes,skip,their network and partner deals
 Third-party advertising and tracking,ads,could,yes,skip,deliberately not cloned
-"Club account with club name, logo and colours",clubs,must,no,partial,the app takes the club's look for its members; powered-by line
-Club teams grouped under the club; club admins run every team,clubs,must,partial,partial,original needs SportsEngine HQ for this
-Club join page with all its teams,clubs,should,partial,no,/c/<slug> for posters and WhatsApp
-Club look on the home-screen icon,clubs,should,no,no,per-club web app manifest; no per-club store listing
+"Club account with club name, logo and colours",clubs,must,no,yes,the app takes the club's look for its members; powered-by line
+Club teams grouped under the club; club admins run every team,clubs,must,partial,yes,original needs SportsEngine HQ for this
+Club join page with all its teams,clubs,should,partial,yes,/c/<slug> for posters and WhatsApp
+Club look on the home-screen icon,clubs,should,no,yes,per-club web app manifest; no per-club store listing
 Club switcher for families in more than one club,clubs,should,no,no,
-Club admins and owner roles,clubs,should,partial,partial,
+Club admins and owner roles,clubs,should,partial,yes,
 Players own their accounts and answer for themselves,roster,must,yes,yes,sample build is parent-centric; rework
 "Roles: captain, vice captain, coach, manager, treasurer",roster,must,partial,yes,a playing captain is a player with permissions
-"Mark yourself away, injured or on vacation",availability,must,no,no,teammates see unavailable; reason is staff-only; reminders skip you
-"Take attendance: present, late (minutes), absent, excused",attendance,must,partial,no,what happened vs what was said
-Attendance history and rate per player,attendance,should,partial,no,player profile and team stats
-Geo check-in: player taps I'm here at the venue,attendance,should,no,no,off by default per team; one location fix; within venue radius; present or late from the time; stores distance not coordinates
-Venue map pin and check-in radius,schedule,should,partial,no,default 150 m
+"Mark yourself away, injured or on vacation",availability,must,no,yes,teammates see unavailable; reason is staff-only; reminders skip you
+"Take attendance: present, late (minutes), absent, excused",attendance,must,partial,yes,what happened vs what was said
+Attendance history and rate per player,attendance,should,partial,yes,player profile and team stats
+Geo check-in: player taps I'm here at the venue,attendance,should,no,yes,off by default per team; one location fix; within venue radius; present or late from the time; stores distance not coordinates
+Venue map pin and check-in radius,schedule,should,partial,yes,default 150 m
 Check-in reminder push before kick-off,notifications,could,no,no,only to Going players not yet checked in
-"Event manager for one event (away trip, tournament)",roster,should,no,no,"attendance, scoring, carpools for that event only"
-Staff-only chat,chat,should,no,no,captains and coaches
-Reply to a message in chat,chat,should,no,no,
-"Seasons: start, close, archive, copy roster",seasons,should,partial,no,one open season per team
-"Carpools: offer seats, ask for a ride, assign riders",carpools,should,no,no,seat limit enforced in the database
+"Event manager for one event (away trip, tournament)",roster,should,no,yes,"attendance, scoring, carpools for that event only"
+Staff-only chat,chat,should,no,yes,captains and coaches
+Reply to a message in chat,chat,should,no,yes,
+"Seasons: start, close, archive, copy roster",seasons,should,partial,yes,one open season per team
+"Carpools: offer seats, ask for a ride, assign riders",carpools,should,no,yes,seat limit enforced in the database
 Mark rider picked up,carpools,could,no,no,typed meeting point; no GPS
-"Match result with goals, assists and cards",results,should,yes,no,after live scoring
-Player of the match voting,results,should,no,no,only players who played; no self-votes
-Points for attendance with configurable rules,points,should,no,no,"off by default; training 1, match 2, away +10, late -1"
-Season leaderboard,points,should,no,no,public to team or staff-only
-"Dues: fees per season, who has paid, who owes",dues,should,partial,no,manual: e-Transfer and cash
-Player reports a payment; treasurer verifies,dues,should,no,no,
-Dues reminders,dues,could,no,no,"weekly, opt-in per fee"
-"Export players, attendance and dues to CSV",exports,should,partial,no,
-Club and team stats dashboard,analytics,could,partial,no,"attendance trends, dues collected, carpool use"
+"Match result with goals, assists and cards",results,should,yes,yes,after live scoring
+Player of the match voting,results,should,no,yes,only players who played; no self-votes
+Points for attendance with configurable rules,points,should,no,yes,"off by default; training 1, match 2, away +10, late -1"
+Season leaderboard,points,should,no,yes,public to team or staff-only
+"Dues: fees per season, who has paid, who owes",dues,should,partial,yes,manual: e-Transfer and cash
+Player reports a payment; treasurer verifies,dues,should,no,yes,
+Dues reminders,dues,could,no,yes,"weekly, opt-in per fee"
+"Export players, attendance and dues to CSV",exports,should,partial,yes,
+Club and team stats dashboard,analytics,could,partial,yes,"attendance trends, dues collected, carpool use"
 Digital membership card,membership,could,no,no,later
 Sponsor offers and rewards,membership,could,no,no,later; revenue for clubs
 GPS pickup confirmation,carpools,could,no,no,reuse geo check-in: one fix at pickup

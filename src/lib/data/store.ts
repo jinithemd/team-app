@@ -68,6 +68,7 @@ export interface Store {
   matchEvents: MatchEvent[];
   potmVotes: PotmVote[];
   eventManagers: EventManager[];
+  calFeedVersions: Record<ID, number>;
   rideOffers: RideOffer[];
   rideRequests: RideRequest[];
   fees: Fee[];
@@ -90,8 +91,8 @@ export const norm = (e: string) => e.trim().toLowerCase();
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-const g = globalThis as unknown as { __teamAppStoreV4?: Store };
-export const db: Store = (g.__teamAppStoreV4 ??= seed());
+const g = globalThis as unknown as { __teamAppStoreV5?: Store };
+export const db: Store = (g.__teamAppStoreV5 ??= seed());
 
 // ---------------------------------------------------------------------------
 // access rules

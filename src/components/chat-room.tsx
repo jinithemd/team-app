@@ -82,7 +82,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
   }
 
   return (
-    <div className="grid gap-3">
+    <div className="grid min-w-0 gap-3 [&>*]:min-w-0">
       {chat.hasStaffRoom && (
         <nav aria-label="Chat rooms" className="inline-flex gap-1 justify-self-start rounded-md bg-sunken p-1">
           {(
@@ -108,10 +108,10 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
       {chat.pinned.length > 0 && (
         <section aria-label="Pinned" className="grid gap-1 rounded-md bg-team-soft px-3 py-2">
           {chat.pinned.map((p) => (
-            <a key={p.id} href={`#m-${p.id}`} className="flex items-start gap-2 text-sm">
+            <a key={p.id} href={`#m-${p.id}`} className="flex min-w-0 items-start gap-2 text-sm">
               <Pin aria-hidden className="mt-0.5 size-4 shrink-0 text-team-ink" />
-              <span className="min-w-0">
-                <strong>{p.who}:</strong> <span className="line-clamp-2">{p.text}</span>
+              <span className="line-clamp-2 min-w-0 flex-1 break-words">
+                <strong>{p.who}:</strong> {p.text}
               </span>
             </a>
           ))}
@@ -327,7 +327,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
                   }
                 }}
                 placeholder="Message the team"
-                className="max-h-32 min-h-11 flex-1 resize-none rounded-md border border-border-input bg-bg px-3 py-2.5 text-base focus:outline-2 focus:outline-focus"
+                className="max-h-32 min-h-11 w-0 min-w-0 flex-1 resize-none rounded-md border border-border-input bg-bg px-3 py-2.5 text-base focus:outline-2 focus:outline-focus"
               />
             )}
             <button type="submit" aria-label={poll ? "Post poll" : "Send"} disabled={pending} className={`grid size-11 shrink-0 place-items-center rounded-md bg-team text-on-team disabled:opacity-50 ${poll ? "ml-auto" : ""}`}>

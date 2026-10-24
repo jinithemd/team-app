@@ -19,13 +19,13 @@ export async function myCalendarFeed() {
   return { https, webcal: https.replace(/^https?:/, "webcal:"), google: `https://calendar.google.com/calendar/r?cid=${encodeURIComponent(https.replace(/^https?:/, "webcal:"))}` };
 }
 
-const versions = new Map<ID, number>();
+// Kept in the shared store (real build: calendar_feeds table), so every route sees a reset.
 function feedVersion(uid: ID) {
-  return versions.get(uid) ?? 0;
+  return db.calFeedVersions[uid] ?? 0;
 }
 export async function resetCalendarFeed() {
   const user = await requireUser();
-  versions.set(user.id, feedVersion(user.id) + 1);
+  db.calFeedVersions[user.id] = feedVersion(user.id) + 1;
   return myCalendarFeed();
 }
 

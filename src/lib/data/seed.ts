@@ -49,7 +49,7 @@ function hash(s: string) {
 export function seed(): Store {
   const s: Store = {
     profiles: [], clubs: [], clubAdmins: [], joinRequests: [], teams: [], roster: [], venues: [], seasons: [],
-    events: [], rsvps: [], availability: [], attendance: [], points: [], scores: [], matchEvents: [], potmVotes: [], eventManagers: [],
+    events: [], rsvps: [], availability: [], attendance: [], points: [], scores: [], matchEvents: [], potmVotes: [], eventManagers: [], calFeedVersions: {},
     rideOffers: [], rideRequests: [], fees: [], dues: [], payments: [], conversations: [], chat: [], reactions: [],
     pollVotes: [], reads: [], messages: [], prefs: [], outbox: [],
   };
@@ -95,6 +95,7 @@ export function seed(): Store {
   team("t-reserves", "Limestone City Reserves", "c-lcfc", "Division 2", "#0F5C3A", "#F2C14E", "u-dan", "LCRS4P8X", { pointsEnabled: true, geoCheckinEnabled: true });
   team("t-women", "Limestone City Women", "c-lcfc", "Women's league", "#0F5C3A", "#F2C14E", "u-dan", "LCWM2H6R", {});
   team("t-o35", "Limestone City Over-35s", "c-lcfc", "Masters", "#0F5C3A", "#F2C14E", "u-dan", "LCOV5T1D", {});
+  team("t-futsal", "Limestone City Winter Futsal", "c-lcfc", "Winter indoor", "#0F5C3A", "#F2C14E", "u-dan", "LCFU8W4K", {});
 
   const member = (teamId: string, userId: string, jersey: string | null, position: string | null, roles: TeamRole[] = [], allPerms = false) => {
     s.roster.push({
@@ -363,6 +364,8 @@ export function seed(): Store {
   member("t-women", "u-hana", "10", "Forward");
   member("t-o35", "u-paul", "6", "Defence", ["captain", "manager"]);
   member("t-o35", "u-owen", "12", "Midfield");
+  member("t-futsal", "u-dev", "7", "Pivot", ["captain"]);
+  member("t-futsal", "u-femi", "9", "Winger");
   s.joinRequests.push(
     { id: "jr-tariq", teamId: "t-first", userId: "u-tariq", message: "Played centre-back for Queen's last year. Free most Saturdays.", status: "pending", createdAt: new Date(Date.now() - 26 * 3600_000).toISOString() },
     { id: "jr-sana", teamId: "t-women", userId: "u-sana", message: "New to Kingston, keen to play!", status: "pending", createdAt: new Date(Date.now() - 5 * 3600_000).toISOString() },
