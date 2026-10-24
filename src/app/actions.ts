@@ -311,3 +311,41 @@ export async function closeSeasonAction(teamId: string, _: FormState, f: FormDat
   revalidatePath(`/t/${teamId}`, "layout");
   redirect(`/t/${teamId}/seasons?started=1`);
 }
+
+export async function updateScoreAction(eventId: string, input: { us: number; them: number; period: string | null; status: "not_started" | "live" | "final"; version: number }) {
+  const res = await data.updateScore(eventId, input);
+  revalidatePath("/", "layout");
+  return res;
+}
+
+export async function addMatchEventAction(eventId: string, input: { kind: string; side: string; userId?: string; assistId?: string; minute?: string; version: number }) {
+  const res = await data.addMatchEvent(eventId, input);
+  revalidatePath("/", "layout");
+  return res.ok ? { ok: true as const, score: res.data.score } : res;
+}
+
+export async function removeMatchEventAction(eventId: string, matchEventId: string) {
+  const res = await data.removeMatchEvent(eventId, matchEventId);
+  revalidatePath("/", "layout");
+  return res;
+}
+
+export async function votePotmAction(eventId: string, nomineeId: string) {
+  const res = await data.votePotm(eventId, nomineeId);
+  revalidatePath("/", "layout");
+  return res;
+}
+
+export async function closePotmAction(eventId: string, _: FormState): Promise<FormState> {
+  const res = await data.closePotm(eventId);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Voting closed." };
+}
+
+export async function setEventManagerAction(teamId: string, eventId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.setEventManager(eventId, str(f, "userId"), f.getAll("perm").map(String));
+  if (!res.ok) return { error: res.error };
+  revalidatePath(`/t/${teamId}`, "layout");
+  return { ok: true, message: f.getAll("perm").length ? "Saved. They'll see the tools on this event." : "Removed." };
+}

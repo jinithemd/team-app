@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Users } from "lucide-react";
-import { attendanceSummary, getAvailability, getCheckIn, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
+import { ArrowLeft, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Trophy, UserCog, Users } from "lucide-react";
+import { attendanceSummary, eventPerms, getAvailability, getCheckIn, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
 import { CheckInCard } from "@/components/check-in";
 import { EVENT_TYPE_LABEL, isFixture } from "@/lib/data/types";
 import { RsvpControl } from "@/components/rsvp-control";
@@ -26,8 +26,8 @@ export default async function EventPage({
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
-  const [team, e, avail, user, perms, checkIn, att] = await Promise.all([
-    getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId),
+  const [team, e, avail, user, perms, checkIn, att, ep] = await Promise.all([
+    getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId), eventPerms(eventId),
   ]);
   if (!team || !e || e.teamId !== teamId) notFound();
 
@@ -132,7 +132,29 @@ export default async function EventPage({
 
       {checkIn && <CheckInCard eventId={e.id} tz={e.tz} {...checkIn} />}
 
-      {perms.attendance && !cancelled && Date.parse(e.startAt) - Date.now() < 3600_000 && (
+      {ep.manager && !team.isStaff && (
+        <Banner>You&apos;re running this one. The tools you were given are below.</Banner>
+      )}
+
+      {isFixture(e.type) && !cancelled && (ep.scoring || e.score) && (
+        <Link
+          href={`/t/${teamId}/e/${eventId}/match`}
+          className="flex items-center gap-3 rounded-lg border border-border p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <Trophy aria-hidden className="size-6 shrink-0 text-team-ink" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">
+              {e.score?.status === "live" ? "Live score" : e.score?.status === "final" ? "Result and player of the match" : "Keep score"}
+            </span>
+            <span className="block text-sm text-muted">
+              {e.score ? `${e.score.us}–${e.score.them}${e.score.status === "live" ? ", updating" : ""}` : "Start the clock at kick-off. Everyone sees the score as it changes."}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-muted" />
+        </Link>
+      )}
+
+      {ep.attendance && !cancelled && Date.parse(e.startAt) - Date.now() < 3600_000 && (
         <Link
           href={`/t/${teamId}/e/${eventId}/attendance`}
           className="flex items-center gap-3 rounded-lg border border-border p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
@@ -179,6 +201,13 @@ export default async function EventPage({
           </div>
           <Counts counts={avail.counts} />
         </section>
+      )}
+
+      {team.isStaff && !past && !cancelled && (
+        <Link href={`/t/${teamId}/e/${eventId}/managers`} className="inline-flex min-h-10 items-center gap-2 justify-self-start text-sm font-semibold text-team-ink">
+          <UserCog aria-hidden className="size-[18px]" />
+          Hand this event to someone
+        </Link>
       )}
 
       {team.isStaff && (

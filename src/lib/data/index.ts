@@ -3,4 +3,6 @@
 export * from "./fake";
 export * from "./availability";
 export * from "./attendance";
+export * from "./matchday";
+export * from "./events-managers";
 export type * from "./types";

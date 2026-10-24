@@ -8,6 +8,7 @@ import {
   db,
   distanceM,
   eventById,
+  hasEventPerm,
   hasTeamPerm,
   isActivePlayer,
   isTeamMember,
@@ -49,7 +50,7 @@ function rewritePoints(e: TeamEvent, userId: ID, a: Attendance | null) {
 export async function getAttendanceSheet(eventId: ID) {
   const user = await requireUser();
   const e = eventById(eventId);
-  if (!e || !hasTeamPerm(user.id, e.teamId, "attendance")) return null;
+  if (!e || !hasEventPerm(user.id, e.id, "attendance")) return null;
   const team = teamById(e.teamId)!;
   const season = seasonOf(e);
   const rows = activePlayers(e.teamId)
@@ -86,7 +87,7 @@ export async function saveAttendance(
   const user = await requireUser();
   const e = eventById(eventId);
   if (!e) return { ok: false, error: "That event no longer exists." };
-  if (!hasTeamPerm(user.id, e.teamId, "attendance")) return { ok: false, error: "You don't have permission to take attendance." };
+  if (!hasEventPerm(user.id, e.id, "attendance")) return { ok: false, error: "You don't have permission to take attendance." };
   if (seasonOf(e)?.closedAt) return { ok: false, error: "This season is closed, so attendance is locked." };
   if (e.status === "cancelled") return { ok: false, error: "This event was cancelled." };
   if (Date.parse(e.startAt) - Date.now() > CHECKIN_OPENS_MIN * 60000) return { ok: false, error: "Attendance opens an hour before the start." };

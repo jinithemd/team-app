@@ -10,6 +10,8 @@ import type {
   ClubAdmin,
   ClubRole,
   Conversation,
+  EventManager,
+  EventPermission,
   Due,
   Fee,
   Hats,
@@ -65,6 +67,7 @@ export interface Store {
   scores: Score[];
   matchEvents: MatchEvent[];
   potmVotes: PotmVote[];
+  eventManagers: EventManager[];
   rideOffers: RideOffer[];
   rideRequests: RideRequest[];
   fees: Fee[];
@@ -87,8 +90,8 @@ export const norm = (e: string) => e.trim().toLowerCase();
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-const g = globalThis as unknown as { __teamAppStoreV3?: Store };
-export const db: Store = (g.__teamAppStoreV3 ??= seed());
+const g = globalThis as unknown as { __teamAppStoreV4?: Store };
+export const db: Store = (g.__teamAppStoreV4 ??= seed());
 
 // ---------------------------------------------------------------------------
 // access rules
@@ -124,6 +127,17 @@ export function hasTeamPerm(uid: ID, teamId: ID, perm: TeamPermission) {
   if (perm === "payments" && clubRoleFor(uid, team.clubId) === "treasurer") return true;
   const row = myRow(uid, teamId);
   return !!row && row.status === "active" && row.permissions.includes(perm);
+}
+/** Team permission, or this person manages this one event (mirrors has_event_perm in SQL). */
+export function hasEventPerm(uid: ID, eventId: ID, perm: EventPermission) {
+  const e = eventById(eventId);
+  if (!e) return false;
+  if (perm !== "carpools" && hasTeamPerm(uid, e.teamId, perm)) return true;
+  if (perm === "carpools" && isTeamStaff(uid, e.teamId)) return true;
+  return db.eventManagers.some((m) => m.eventId === eventId && m.userId === uid && m.permissions.includes(perm));
+}
+export function isEventManager(uid: ID, eventId: ID) {
+  return db.eventManagers.some((m) => m.eventId === eventId && m.userId === uid);
 }
 export function isTeamStaff(uid: ID, teamId: ID) {
   const team = teamById(teamId);

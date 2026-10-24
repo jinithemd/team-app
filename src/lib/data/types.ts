@@ -277,6 +277,20 @@ export interface MatchEvent {
   createdAt: string;
 }
 
+/** Someone who runs one event (an away trip, a tournament) without being staff for the season. */
+export const EVENT_PERMISSIONS = ["attendance", "scoring", "carpools"] as const;
+export type EventPermission = (typeof EVENT_PERMISSIONS)[number];
+export const EVENT_PERMISSION_LABEL: Record<EventPermission, string> = {
+  attendance: "Take attendance",
+  scoring: "Keep score",
+  carpools: "Sort out carpools",
+};
+export interface EventManager {
+  eventId: ID;
+  userId: ID;
+  permissions: EventPermission[];
+}
+
 export interface PotmVote {
   eventId: ID;
   voterId: ID;

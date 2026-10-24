@@ -49,7 +49,7 @@ function hash(s: string) {
 export function seed(): Store {
   const s: Store = {
     profiles: [], clubs: [], clubAdmins: [], joinRequests: [], teams: [], roster: [], venues: [], seasons: [],
-    events: [], rsvps: [], availability: [], attendance: [], points: [], scores: [], matchEvents: [], potmVotes: [],
+    events: [], rsvps: [], availability: [], attendance: [], points: [], scores: [], matchEvents: [], potmVotes: [], eventManagers: [],
     rideOffers: [], rideRequests: [], fees: [], dues: [], payments: [], conversations: [], chat: [], reactions: [],
     pollVotes: [], reads: [], messages: [], prefs: [], outbox: [],
   };
