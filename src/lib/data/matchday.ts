@@ -77,6 +77,11 @@ export async function getMatch(eventId: ID) {
     score: s,
     feed,
     squad,
+    // Everyone else on the roster, for a scorer whose goalscorer turned up without answering.
+    others: roster
+      .filter((r) => !squad.some((p) => p.userId === r.userId))
+      .map((r) => ({ userId: r.userId!, person: personOf(r.userId!), jersey: r.jersey }))
+      .sort((a, b) => +(a.jersey ?? 999) - +(b.jersey ?? 999)),
     canScore: hasEventPerm(user.id, e.id, "scoring"),
     potm: {
       open: e.potmOpen,

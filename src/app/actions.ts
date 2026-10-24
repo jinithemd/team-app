@@ -349,3 +349,53 @@ export async function setEventManagerAction(teamId: string, eventId: string, _: 
   revalidatePath(`/t/${teamId}`, "layout");
   return { ok: true, message: f.getAll("perm").length ? "Saved. They'll see the tools on this event." : "Removed." };
 }
+
+export async function offerRideAction(teamId: string, eventId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.offerRide(eventId, { seats: Number(str(f, "seats")), leavesAt: str(f, "leavesAt"), from: str(f, "from"), note: str(f, "note") });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}`, "layout");
+  return { ok: true, message: "Thanks. Teammates can take a seat now." };
+}
+
+export async function carpoolAction(
+  teamId: string,
+  eventId: string,
+  op: { kind: "take"; offerId: string | null; from?: string } | { kind: "leave" } | { kind: "cancelOffer" } | { kind: "assign"; requestId: string; offerId: string | null },
+) {
+  const res =
+    op.kind === "take"
+      ? await data.takeSeat(eventId, op.offerId, op.from)
+      : op.kind === "leave"
+        ? await data.leaveCarpool(eventId)
+        : op.kind === "cancelOffer"
+          ? await data.cancelOffer(eventId)
+          : await data.assignRider(eventId, op.requestId, op.offerId);
+  revalidatePath(`/t/${teamId}`, "layout");
+  return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+}
+
+export async function addFeeAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.addFee(teamId, { name: str(f, "name"), amount: str(f, "amount"), dueOn: str(f, "dueOn") });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}`, "layout");
+  return { ok: true, message: `Added for ${res.data.players} players.` };
+}
+
+export async function reportPaymentAction(teamId: string, dueId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.reportPayment(dueId, { amount: str(f, "amount"), method: str(f, "method"), ref: str(f, "ref"), paidOn: str(f, "paidOn") });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Thanks. The treasurer will tick it off." };
+}
+
+export async function confirmPaymentAction(teamId: string, paymentId: string, accept: boolean) {
+  const res = await data.confirmPayment(paymentId, accept);
+  revalidatePath(`/t/${teamId}`, "layout");
+  return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+}
+
+export async function remindUnpaidAction(teamId: string, _: FormState): Promise<FormState> {
+  const res = await data.remindUnpaid(teamId);
+  if (!res.ok) return { error: res.error };
+  return { ok: true, message: res.data.sent ? `Reminder sent to ${res.data.sent} ${res.data.sent === 1 ? "player" : "players"}.` : "Nobody owes anything." };
+}

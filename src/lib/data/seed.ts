@@ -240,6 +240,8 @@ export function seed(): Store {
   // Last match: goals, and the player of the match vote still open.
   const lastMatch = s.events.find((e) => e.id === "e-s-past-1")!;
   lastMatch.potmOpen = true;
+  // The result went in this morning, so the vote is still open (it closes 36 hours after).
+  s.scores.find((x) => x.eventId === lastMatch.id)!.updatedAt = new Date(Date.now() - 20 * 3600_000).toISOString();
   s.matchEvents.push(
     { id: "me-1", eventId: lastMatch.id, minute: 23, kind: "goal", side: "us", userId: "u-rahul", assistId: "u-priya", note: null, createdAt: lastMatch.endAt },
     { id: "me-2", eventId: lastMatch.id, minute: 51, kind: "goal", side: "them", userId: null, assistId: null, note: "Penalty", createdAt: lastMatch.endAt },
@@ -300,6 +302,9 @@ export function seed(): Store {
   );
 
   // ---- dues ----------------------------------------------------------------
+  s.teams.find((t) => t.id === "t-reserves")!.settings.payTo = "treasurer@limestonecityfc.ca";
+  s.teams.find((t) => t.id === "t-first")!.settings.payTo = "treasurer@limestonecityfc.ca";
+  s.teams.find((t) => t.id === "t-strikers")!.settings.payTo = "ade.bello@example.com";
   const fee = (fid: string, teamId: string, name: string, cents: number, dueOn: string) => {
     s.fees.push({ id: fid, teamId, seasonId: `s-${teamId}-sum26`, name, amountCents: cents, dueOn, createdAt: nowIso });
     for (const r of s.roster.filter((x) => x.teamId === teamId && x.isPlayer && x.status === "active"))

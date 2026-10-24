@@ -5,4 +5,6 @@ export * from "./availability";
 export * from "./attendance";
 export * from "./matchday";
 export * from "./events-managers";
+export * from "./carpool";
+export * from "./dues";
 export type * from "./types";

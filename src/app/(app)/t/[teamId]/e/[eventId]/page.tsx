@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Trophy, UserCog, Users } from "lucide-react";
-import { attendanceSummary, eventPerms, getAvailability, getCheckIn, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
+import { ArrowLeft, Car, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Trophy, UserCog, Users } from "lucide-react";
+import { attendanceSummary, carpoolSummary, eventPerms, getAvailability, getCheckIn, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
 import { CheckInCard } from "@/components/check-in";
 import { EVENT_TYPE_LABEL, isFixture } from "@/lib/data/types";
 import { RsvpControl } from "@/components/rsvp-control";
@@ -26,8 +26,8 @@ export default async function EventPage({
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
-  const [team, e, avail, user, perms, checkIn, att, ep] = await Promise.all([
-    getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId), eventPerms(eventId),
+  const [team, e, avail, user, perms, checkIn, att, ep, pool] = await Promise.all([
+    getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId), eventPerms(eventId), carpoolSummary(eventId),
   ]);
   if (!team || !e || e.teamId !== teamId) notFound();
 
@@ -186,6 +186,28 @@ export default async function EventPage({
             locked={lockReason}
           />
         </section>
+      )}
+
+      {pool && !cancelled && !past && (pool.cars > 0 || e.homeAway === "away" || e.type === "tournament") && (
+        <Link
+          href={`/t/${teamId}/e/${eventId}/carpool`}
+          className="flex items-center gap-3 rounded-lg border border-border p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <Car aria-hidden className="size-6 shrink-0 text-team-ink" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Carpool</span>
+            <span className="block text-sm text-muted">
+              {pool.driving
+                ? "You're driving"
+                : pool.riding
+                  ? "You've got a seat"
+                  : pool.cars
+                    ? `${pool.cars} ${pool.cars === 1 ? "car" : "cars"} · ${pool.free} ${pool.free === 1 ? "seat" : "seats"} free${pool.waiting ? ` · ${pool.waiting} need a lift` : ""}`
+                    : "Nobody's offered a lift yet. Driving? Offer your seats."}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-muted" />
+        </Link>
       )}
 
       {avail && !cancelled && (

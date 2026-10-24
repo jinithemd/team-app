@@ -203,6 +203,8 @@ export interface TeamSettings {
   pointsRules: PointsRules;
   geoCheckinEnabled: boolean;
   membersCanPost: boolean;
+  /** Where players send e-Transfers, shown on the dues screen. */
+  payTo?: string | null;
 }
 
 export interface Season {

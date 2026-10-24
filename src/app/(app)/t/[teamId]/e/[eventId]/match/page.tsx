@@ -32,6 +32,7 @@ export default async function MatchPage({ params }: { params: Promise<{ teamId: 
         score={m.score}
         feed={m.feed.map((f) => ({ id: f.id, minute: f.minute, kind: f.kind, side: f.side, player: f.player ? `${f.player.firstName} ${f.player.lastName}` : null, assist: f.assist ? `${f.assist.firstName} ${f.assist.lastName}` : null }))}
         squad={m.squad.map((p) => ({ userId: p.userId, name: `${p.person.firstName} ${p.person.lastName}`, jersey: p.jersey }))}
+        others={m.others.map((p) => ({ userId: p.userId, name: `${p.person.firstName} ${p.person.lastName}`, jersey: p.jersey }))}
         canScore={m.canScore}
         me={m.me}
         potm={{

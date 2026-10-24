@@ -20,6 +20,7 @@ export function MatchDay(props: {
   score: { us: number; them: number; status: Status; period: string | null; version: number };
   feed: Feed[];
   squad: P[];
+  others: P[];
   canScore: boolean;
   me: string;
   potm: {
@@ -119,7 +120,7 @@ export function MatchDay(props: {
               </Button>
             )}
           </div>
-          <AddEvent eventId={eventId} squad={props.squad} version={score.version} opponent={props.opponent} onDone={(r) => (r.ok ? (setMsg({ tone: "ok", text: "Added" }), router.refresh()) : setMsg({ tone: "error", text: r.error ?? "That didn't save." }))} />
+          <AddEvent eventId={eventId} squad={props.squad} others={props.others} version={score.version} opponent={props.opponent} onDone={(r) => (r.ok ? (setMsg({ tone: "ok", text: "Added" }), router.refresh()) : setMsg({ tone: "error", text: r.error ?? "That didn't save." }))} />
         </section>
       )}
 
@@ -161,7 +162,7 @@ export function MatchDay(props: {
   );
 }
 
-function AddEvent({ eventId, squad, version, opponent, onDone }: { eventId: string; squad: P[]; version: number; opponent: string; onDone: (r: { ok: boolean; error?: string }) => void }) {
+function AddEvent({ eventId, squad, others, version, opponent, onDone }: { eventId: string; squad: P[]; others: P[]; version: number; opponent: string; onDone: (r: { ok: boolean; error?: string }) => void }) {
   const [kind, setKind] = useState("goal");
   const [side, setSide] = useState("us");
   const [pending, start] = useTransition();
@@ -209,12 +210,24 @@ function AddEvent({ eventId, squad, version, opponent, onDone }: { eventId: stri
             Player
             <select name="userId" className={inputClass} defaultValue="">
               <option value="">Not sure</option>
-              {squad.map((p) => (
-                <option key={p.userId} value={p.userId}>
-                  {p.jersey ? `#${p.jersey} ` : ""}
-                  {p.name}
-                </option>
-              ))}
+              <optgroup label="Playing today">
+                {squad.map((p) => (
+                  <option key={p.userId} value={p.userId}>
+                    {p.jersey ? `#${p.jersey} ` : ""}
+                    {p.name}
+                  </option>
+                ))}
+              </optgroup>
+              {others.length > 0 && (
+                <optgroup label="Rest of the roster">
+                  {others.map((p) => (
+                    <option key={p.userId} value={p.userId}>
+                      {p.jersey ? `#${p.jersey} ` : ""}
+                      {p.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </label>
         )}

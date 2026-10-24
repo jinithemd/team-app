@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getSessionUser, getTeam, myPerms } from "@/lib/data";
+import { getSessionUser, getTeam, getTeamDues, myPerms } from "@/lib/data";
 import { TeamTabs } from "@/components/nav";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
@@ -8,7 +8,8 @@ export default async function TeamLayout({ children, params }: { children: React
   const { teamId } = await params;
   const [team, user] = await Promise.all([getTeam(teamId), getSessionUser()]);
   if (!team) notFound();
-  const perms = await myPerms(teamId);
+  const [perms, dues] = await Promise.all([myPerms(teamId), getTeamDues(teamId)]);
+  const hasDues = !!dues && (dues.mine.length > 0 || dues.fees.length > 0);
   const subtitle = [team.club?.name, team.level, team.location].filter(Boolean).join(" · ");
   return (
     // Team colour vars for this id are already emitted by the app layout.
@@ -37,7 +38,7 @@ export default async function TeamLayout({ children, params }: { children: React
           </div>
         </div>
       </header>
-      <TeamTabs teamId={team.id} show={{ settings: perms.settings, points: team.settings.pointsEnabled && (team.settings.pointsPublic || perms.staff) }} />
+      <TeamTabs teamId={team.id} show={{ settings: perms.settings, points: team.settings.pointsEnabled && (team.settings.pointsPublic || perms.staff), dues: hasDues || perms.payments }} />
       <main id="main" className="gutter mx-auto max-w-3xl py-5">
         {children}
       </main>
