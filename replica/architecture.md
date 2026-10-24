@@ -24,9 +24,24 @@ Web first (mobile-first PWA). A native Expo app can come later and reuse the sam
 
 Not reused from Areno's FastAPI + MongoDB stack on purpose: this app is mostly permissions over related rows (guardian → kid → roster → event → RSVP), which Postgres + RLS handles in one place, and Supabase gives realtime chat, auth and storage without extra services.
 
+## Club accounts (one app, each club's own look)
+
+There is one app. A club owner creates a club account and adds the club's name, logo and colours, and from then on the app becomes that club's app for its members:
+
+- **Top bar and sign-in:** the club logo and name replace the platform name. A small "Powered by Areno" sits in Account and on the sign-in page (the platform name is a placeholder until the brand is chosen).
+- **Colours:** the club colour becomes the app accent everywhere outside a team, through the same readable-colour code as team colours (`team-theme.ts`). Inside a team, the team's own colours still apply, and a new club team starts with the club's colours.
+- **Teams:** all of the club's teams appear together; club admins run every team in the club without being added to each roster.
+- **Join link:** each club gets `/c/<slug>`, a branded page listing its teams, for posters, WhatsApp groups and the club website.
+- **More than one club:** a family with kids in two clubs sees a club switcher; the app takes the look of whichever club they're viewing. Independent teams (no club) keep the standard look.
+- **Home-screen icon:** "Add to home screen" from a club's link uses the club logo and name (a per-club web app manifest), so it looks like the club's app on the phone. No separate App Store listing per club.
+
+Tables added: `clubs` (name, slug, colours, logo, welcome text), `club_admins` (owner / admin), and `teams.club_id`. Club branding is readable by anyone, so the join page shows before sign-in; only club admins can change it; only the owner can add or remove admins. Tested: a club admin can schedule for any club team and see its roster, a parent can see the branding but can't change it or make themselves an admin, and the owner can add a second admin.
+
+Routes added: action `createClub`, `updateClubBranding`, `addClubAdmin`, `removeClubAdmin`, `moveTeamToClub`; GET `/c/[slug]` (public join page); GET `/c/[slug]/manifest.webmanifest` (club name and icon for the home screen).
+
 ## Schema
 
-Tables: 24 (+1 view). Access rules: Postgres row level security on every table, via security-definer helper functions (`is_team_member`, `is_team_staff`, `has_team_perm`, `is_guardian`, `can_view_team`). Full SQL in `schema.sql`, written as the first migration.
+Tables: 26 (+1 view). Access rules: Postgres row level security on every table, via security-definer helper functions (`is_team_member`, `is_team_staff`, `has_team_perm`, `is_guardian`, `can_view_team`). Full SQL in `schema.sql`, written as the first migration.
 
 | table | for | key rules |
 | --- | --- | --- |
@@ -34,6 +49,7 @@ Tables: 24 (+1 view). Access rules: Postgres row level security on every table, 
 | people | anyone on a roster, kids included | kids have no account; `user_id` set for adults |
 | people_private | DOB, gender, medical notes | guardians and that person's coaches only |
 | guardians | who acts for whom; the "household" | adult is own guardian (`is_self`); one primary per person; invites by email |
+| clubs, club_admins | club accounts | public branding; admins run all club teams; owner manages admins |
 | teams | S05 | `join_code` for search/follow; `is_public`, `roster_visible` switches; `color`, `color_secondary`, `logo_path` theme the team's screens |
 | roster_members | players and staff (S12, S13, S15) | six staff permissions as a checked `text[]`; one active row per person per kind |
 | follows | fans (F10) | |
@@ -181,4 +197,5 @@ Only official, public APIs with your own keys (Supabase, Resend, Web Push). Noth
    - home: upcoming across teams (S02)
 3. **Should-haves:** family calendar and iCal feeds (S18, S19), recurring practices (event_series, materialise-series), second guardian, staff permissions (S15), subject messages (S17), reactions, read receipts, pins, polls, video/files, notification prefs (S22), live scoring (S20).
    **Could-haves:** follow as a fan, print roster, dark mode, passkeys, chat moderation, SMS, venue library, and the two gaps already designed in: nudge non-responders and paste-a-list bulk roster add.
+3b. **Club accounts:** club setup, club look across the app, club join page, club admin view, home-screen manifest. After the must-haves, since a single team must work first.
 4. **Fixes from replica-entrepreneur:** to be added once it reads SportsEngine's reviews.

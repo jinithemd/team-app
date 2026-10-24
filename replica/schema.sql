@@ -80,6 +80,38 @@ create index on guardians (user_id);
 create index on guardians (invited_email) where status = 'invited';
 
 -- ---------------------------------------------------------------------------
+-- clubs: a club account inside the one app. When a member opens the app, it takes on
+-- their club's name, logo and colours ("Limestone City FC", powered by the platform).
+-- One club has many teams; independent teams (club_id null) keep the standard look.
+-- ---------------------------------------------------------------------------
+
+create table clubs (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (length(name) between 2 and 80),
+  slug text not null unique check (slug ~ '^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$'),  -- join link: /c/<slug>
+  color text not null default '#2563eb' check (color ~ '^#[0-9a-fA-F]{6}$'),
+  color_secondary text check (color_secondary ~ '^#[0-9a-fA-F]{6}$'),
+  logo_path text,
+  welcome_text text check (length(welcome_text) <= 280),
+  sport text,
+  location text,
+  created_by uuid not null references profiles(id) on delete restrict,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index on clubs (created_by);
+
+create table club_admins (
+  club_id uuid not null references clubs(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  role text not null default 'admin' check (role in ('owner','admin')),
+  created_at timestamptz not null default now(),
+  primary key (club_id, user_id)
+);
+create index on club_admins (user_id);
+create unique index one_club_owner on club_admins (club_id) where role = 'owner';
+
+-- ---------------------------------------------------------------------------
 -- teams and rosters
 -- ---------------------------------------------------------------------------
 
@@ -93,6 +125,7 @@ create table teams (
   color_secondary text check (color_secondary ~ '^#[0-9a-fA-F]{6}$'),                 -- optional accent (stripes, badges)
   logo_path text,                                                                      -- crest in the team storage bucket
   org_name text,
+  club_id uuid references clubs(id) on delete set null,   -- null = independent team on the main app
   join_code text not null unique default upper(substr(encode(gen_random_bytes(6),'hex'),1,8)),
   is_public boolean not null default true,      -- followers can see schedule and scores
   roster_visible boolean not null default true, -- families can see the roster
@@ -102,6 +135,7 @@ create table teams (
   updated_at timestamptz not null default now()
 );
 create index on teams (created_by);
+create index on teams (club_id);
 
 -- Players and staff. Staff permissions mirror the original's six (S15).
 create table roster_members (
@@ -382,7 +416,7 @@ create index on outbox (user_id);
 do $$
 declare t text;
 begin
-  foreach t in array array['profiles','people','people_private','guardians','teams','roster_members',
+  foreach t in array array['clubs','profiles','people','people_private','guardians','teams','roster_members',
     'venues','event_series','events','rsvps','scores','conversations','chat_messages','messages','outbox']
   loop
     execute format('create trigger %I_updated before update on %I for each row execute function set_updated_at()', t, t);
@@ -414,6 +448,25 @@ language sql stable security definer set search_path = public as $$
   ) or exists (select 1 from teams where id = t and created_by = auth.uid())
 $$;
 
+-- Club admins run every team in their club.
+create or replace function is_club_admin_of_team(t uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (
+    select 1 from teams tm join club_admins ca on ca.club_id = tm.club_id
+    where tm.id = t and ca.user_id = auth.uid()
+  )
+$$;
+
+create or replace function is_club_admin(c uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from club_admins where club_id = c and user_id = auth.uid())
+$$;
+
+create or replace function is_club_owner(c uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from club_admins where club_id = c and user_id = auth.uid() and role = 'owner')
+$$;
+
 create or replace function is_team_staff(t uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
@@ -421,12 +474,14 @@ language sql stable security definer set search_path = public as $$
     join guardians g on g.person_id = r.person_id and g.is_self
     where r.team_id = t and r.kind = 'staff' and r.status = 'active' and g.user_id = auth.uid() and g.status = 'active'
   ) or exists (select 1 from teams where id = t and created_by = auth.uid())
+  or is_club_admin_of_team(t)
 $$;
 
 -- The team creator has every permission.
 create or replace function has_team_perm(t uuid, perm text) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (select 1 from teams where id = t and created_by = auth.uid())
+  or is_club_admin_of_team(t)
   or exists (
     select 1 from roster_members r
     join guardians g on g.person_id = r.person_id and g.is_self
@@ -469,6 +524,8 @@ $$;
 -- server actions using the service role; RLS still guards every direct client read/write.
 -- ---------------------------------------------------------------------------
 
+alter table clubs enable row level security;
+alter table club_admins enable row level security;
 alter table profiles enable row level security;
 alter table people enable row level security;
 alter table people_private enable row level security;
@@ -493,6 +550,13 @@ alter table notification_prefs enable row level security;
 alter table push_subscriptions enable row level security;
 alter table calendar_feeds enable row level security;
 alter table outbox enable row level security;  -- no policies: service role only
+
+-- clubs: name, logo and colours are public so the club join page shows before sign-in
+create policy clubs_read on clubs for select using (true);
+create policy clubs_insert on clubs for insert with check (created_by = auth.uid());
+create policy clubs_update on clubs for update using (is_club_admin(id)) with check (is_club_admin(id));
+create policy club_admins_read on club_admins for select using (user_id = auth.uid() or is_club_admin(club_id));
+create policy club_admins_write on club_admins for all using (is_club_owner(club_id)) with check (is_club_owner(club_id));
 
 -- profiles: yourself, plus names of people you share a team with
 create policy profiles_self on profiles for all using (id = auth.uid()) with check (id = auth.uid());

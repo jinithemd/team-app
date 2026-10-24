@@ -54,3 +54,9 @@ News articles,hq,could,yes,skip,HQ-gated in original
 Livestreaming,video,could,yes,skip,separate SportsEngine Play product
 League / governing-body affiliation,network,could,yes,skip,their network and partner deals
 Third-party advertising and tracking,ads,could,yes,skip,deliberately not cloned
+"Club account with club name, logo and colours",clubs,must,no,no,the app takes the club's look for its members; powered-by line
+Club teams grouped under the club; club admins run every team,clubs,must,partial,no,original needs SportsEngine HQ for this
+Club join page with all its teams,clubs,should,partial,no,/c/<slug> for posters and WhatsApp
+Club look on the home-screen icon,clubs,should,no,no,per-club web app manifest; no per-club store listing
+Club switcher for families in more than one club,clubs,should,no,no,
+Club admins and owner roles,clubs,should,partial,no,
