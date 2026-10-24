@@ -10,4 +10,5 @@ export * from "./dues";
 export * from "./chat";
 export * from "./feeds";
 export * from "./clubs";
+export * from "./sponsors";
 export type * from "./types";

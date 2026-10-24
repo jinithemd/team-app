@@ -12,6 +12,7 @@ import type {
   Conversation,
   EventManager,
   EventPermission,
+  Sponsor,
   Due,
   Fee,
   Hats,
@@ -69,6 +70,7 @@ export interface Store {
   potmVotes: PotmVote[];
   eventManagers: EventManager[];
   calFeedVersions: Record<ID, number>;
+  sponsors: Sponsor[];
   rideOffers: RideOffer[];
   rideRequests: RideRequest[];
   fees: Fee[];
@@ -91,8 +93,8 @@ export const norm = (e: string) => e.trim().toLowerCase();
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-const g = globalThis as unknown as { __teamAppStoreV5?: Store };
-export const db: Store = (g.__teamAppStoreV5 ??= seed());
+const g = globalThis as unknown as { __teamAppStoreV6?: Store };
+export const db: Store = (g.__teamAppStoreV6 ??= seed());
 
 // ---------------------------------------------------------------------------
 // access rules
@@ -139,6 +141,17 @@ export function hasEventPerm(uid: ID, eventId: ID, perm: EventPermission) {
 }
 export function isEventManager(uid: ID, eventId: ID) {
   return db.eventManagers.some((m) => m.eventId === eventId && m.userId === uid);
+}
+/** Active contact for a sponsor of this team, directly or through its club (is_sponsor_of_team). */
+export function isSponsorOfTeam(uid: ID, teamId: ID) {
+  const team = teamById(teamId);
+  const today = now().slice(0, 10);
+  return db.sponsors.some(
+    (s) => s.contactUserId === uid && s.status === "active" && (!s.endsOn || s.endsOn >= today) && (s.teamId === teamId || (!!s.clubId && s.clubId === team?.clubId)),
+  );
+}
+export function canManageSponsors(uid: ID, scope: { teamId?: ID | null; clubId?: ID | null }) {
+  return scope.teamId ? hasTeamPerm(uid, scope.teamId, "edit_settings") : !!scope.clubId && isClubAdmin(uid, scope.clubId);
 }
 export function isTeamStaff(uid: ID, teamId: ID) {
   const team = teamById(teamId);

@@ -27,6 +27,7 @@ export const DEMO_ACCOUNTS = [
   { id: "u-rahul", blurb: "Player on two teams: Strikers and Limestone City Reserves" },
   { id: "u-marcus", blurb: "Plays for and captains Limestone City Reserves" },
   { id: "u-aisha", blurb: "Club treasurer, and plays for the Reserves" },
+  { id: "u-sid", blurb: "Corner Cafe: Gold sponsor of Kingston Strikers" },
 ];
 
 const settings = (s: Partial<TeamSettings> = {}): TeamSettings => ({
@@ -49,7 +50,7 @@ function hash(s: string) {
 export function seed(): Store {
   const s: Store = {
     profiles: [], clubs: [], clubAdmins: [], joinRequests: [], teams: [], roster: [], venues: [], seasons: [],
-    events: [], rsvps: [], availability: [], attendance: [], points: [], scores: [], matchEvents: [], potmVotes: [], eventManagers: [], calFeedVersions: {},
+    events: [], rsvps: [], availability: [], attendance: [], points: [], scores: [], matchEvents: [], potmVotes: [], eventManagers: [], calFeedVersions: {}, sponsors: [],
     rideOffers: [], rideRequests: [], fees: [], dues: [], payments: [], conversations: [], chat: [], reactions: [],
     pollVotes: [], reads: [], messages: [], prefs: [], outbox: [],
   };
@@ -64,7 +65,7 @@ export function seed(): Store {
     ["u-ade", "Ade", "Bello"], ["u-leo", "Leo", "Grant"], ["u-femi", "Femi", "Ade"], ["u-aisha", "Aisha", "Shah"],
     ["u-kofi", "Kofi", "Mensah"], ["u-dev", "Dev", "Kapoor"], ["u-owen", "Owen", "Park"], ["u-ravi", "Ravi", "Patel"],
     ["u-nia", "Nia", "Brooks"], ["u-mei", "Mei", "Lin"], ["u-grace", "Grace", "Okoye"], ["u-hana", "Hana", "Sato"],
-    ["u-tariq", "Tariq", "Aziz"], ["u-sana", "Sana", "Iqbal"], ["u-paul", "Paul", "Dubois"],
+    ["u-tariq", "Tariq", "Aziz"], ["u-sana", "Sana", "Iqbal"], ["u-paul", "Paul", "Dubois"], ["u-sid", "Sid", "Malhotra"], ["u-lena", "Lena", "Novak"],
   ];
   for (const [pid, f, l] of people)
     s.profiles.push({
@@ -370,6 +371,21 @@ export function seed(): Store {
     { id: "jr-tariq", teamId: "t-first", userId: "u-tariq", message: "Played centre-back for Queen's last year. Free most Saturdays.", status: "pending", createdAt: new Date(Date.now() - 26 * 3600_000).toISOString() },
     { id: "jr-sana", teamId: "t-women", userId: "u-sana", message: "New to Kingston, keen to play!", status: "pending", createdAt: new Date(Date.now() - 5 * 3600_000).toISOString() },
   );
+  // ---- sponsors -------------------------------------------------------------
+  const sp = (id: string, scope: { teamId?: string; clubId?: string }, name: string, tier: Store["sponsors"][number]["tier"], contact: string | null, website: string | null, blurb: string | null, status: "active" | "invited" = "active") =>
+    s.sponsors.push({ id, clubId: scope.clubId ?? null, teamId: scope.teamId ?? null, name, tier, logo: null, website, blurb, contactUserId: contact, invitedEmail: contact ? null : `hello@${name.toLowerCase().replace(/[^a-z]/g, "")}.example.com`, status, startsOn: "2026-05-01", endsOn: "2027-04-30", createdBy: "u-dan", createdAt: nowIso });
+  sp("sp-motors", { clubId: "c-lcfc" }, "Limestone Motors", "diamond", "u-lena", "https://example.com/limestone-motors", "Proud club partner since 2019");
+  sp("sp-physio", { clubId: "c-lcfc" }, "Frontenac Physio", "platinum", null, "https://example.com/frontenac-physio", "Free injury checks for club players");
+  sp("sp-cafe", { teamId: "t-strikers" }, "Corner Cafe", "gold", "u-sid", "https://example.com/corner-cafe", "Post-match coffee on us");
+  sp("sp-kit", { teamId: "t-strikers" }, "Kingston Kit Co", "silver", null, null, "Shirts and training tops");
+  sp("sp-pizza", { teamId: "t-strikers" }, "Princess St Pizza", "bronze", null, null, null);
+  sp("sp-brew", { teamId: "t-reserves" }, "Wolfe Island Brewing", "gold", null, null, null, "invited");
+  s.messages.push({
+    id: "tm-sp-1", teamId: "t-strikers", fromId: "u-priya", subject: "Through to the cup quarter-final",
+    body: "Thanks to everyone who came out. We play Belleville United at home on the 7th. Sponsors: you're welcome at the clubhouse after the game.",
+    recipientIds: s.roster.filter((r) => r.teamId === "t-strikers" && r.status === "active").map((r) => r.userId!), createdAt: new Date(Date.now() - 30 * 3600_000).toISOString(), toSponsors: true,
+  });
+
   s.clubs[0].blurb = "Five teams, one club. Adult football in Kingston since 1994. New players always welcome.";
   return s;
 }

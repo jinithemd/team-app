@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Users } from "lucide-react";
 import { getClubPage } from "@/lib/data";
 import { ButtonLink } from "@/components/ui";
+import { SponsorStrip } from "@/components/sponsor-badge";
 import { ClubHeader, PoweredBy } from "./club-header";
 import { AskToJoin } from "./ask-to-join";
 
@@ -64,6 +65,7 @@ export default async function ClubPage({ params }: { params: Promise<{ slug: str
             </li>
           ))}
         </ul>
+        {c.sponsors.length > 0 && <SponsorStrip sponsors={c.sponsors} title="Club partners" />}
         {!c.club.joinOpen && <p className="text-sm text-muted">{c.club.name} isn&apos;t taking new players right now.</p>}
         {!c.signedIn && (
           <p className="text-center text-sm">

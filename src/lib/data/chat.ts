@@ -223,7 +223,7 @@ export async function messageRecipients(teamId: ID) {
     .sort((a, b) => a.person.firstName.localeCompare(b.person.firstName));
 }
 
-export async function sendTeamMessage(teamId: ID, input: { subject: string; body: string; to: "all" | "players" | "staff" | "chosen"; recipientIds: string[] }): Promise<ActionResult<{ count: number }>> {
+export async function sendTeamMessage(teamId: ID, input: { subject: string; body: string; to: "all" | "players" | "staff" | "chosen"; recipientIds: string[]; toSponsors?: boolean }): Promise<ActionResult<{ count: number }>> {
   const user = await requireUser();
   if (!hasTeamPerm(user.id, teamId, "messages")) return { ok: false, error: "You don't have permission to message the team." };
   const fieldErrors: Record<string, string> = {};
@@ -241,7 +241,14 @@ export async function sendTeamMessage(teamId: ID, input: { subject: string; body
   if (!ids.length) fieldErrors.to = "Pick at least one person.";
   if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
   const team = teamById(teamId)!;
-  db.messages.push({ id: newId(), teamId, fromId: user.id, subject: input.subject.trim().slice(0, 140), body: input.body.trim().slice(0, 5000), recipientIds: ids, createdAt: now() });
+  db.messages.push({ id: newId(), teamId, fromId: user.id, subject: input.subject.trim().slice(0, 140), body: input.body.trim().slice(0, 5000), recipientIds: ids, createdAt: now(), toSponsors: !!input.toSponsors });
+  // Shared with sponsors: their contacts get it by email and on their sponsor page.
+  if (input.toSponsors)
+    for (const sp of db.sponsors.filter((s) => s.contactUserId && s.status === "active" && (s.teamId === teamId || (!!teamById(teamId)!.clubId && s.clubId === teamById(teamId)!.clubId)))) {
+      const c = profileById(sp.contactUserId);
+      if (c && !ids.includes(c.id))
+        queueEmail({ to: c.email, subject: `${teamById(teamId)!.name} · ${input.subject.trim()}`, text: input.body.trim(), links: [{ label: "Open your sponsor page", href: `${APP_URL}/sponsor/${sp.id}` }] });
+    }
   for (const uid of ids) {
     const p = profileById(uid);
     if (p && prefsFor(uid, teamId).email)

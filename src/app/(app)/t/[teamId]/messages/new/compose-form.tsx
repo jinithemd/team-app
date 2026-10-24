@@ -45,6 +45,13 @@ export function ComposeForm({ teamId, people }: { teamId: string; people: { id: 
       <Field id="body" label="Message" error={fe.body}>
         <textarea id="body" name="body" rows={8} maxLength={5000} aria-invalid={fe.body ? true : undefined} className={`${inputClass} py-2.5`} />
       </Field>
+      <label className="flex items-start gap-3">
+        <input type="checkbox" name="toSponsors" className="mt-1 size-4 accent-[var(--team)]" />
+        <span>
+          <span className="block text-sm font-semibold">Share with our sponsors too</span>
+          <span className="block text-xs text-muted">For good news: results, cup runs, events they&apos;re invited to. Sponsors see it on their sponsor page.</span>
+        </span>
+      </label>
       {state?.error && !Object.keys(fe).length && <p role="alert" className="text-sm text-danger">{state.error}</p>}
       <button className={buttonClass("primary", "lg", "w-full sm:w-auto sm:justify-self-start")} disabled={pending}>
         {pending ? "Sending…" : "Send"}

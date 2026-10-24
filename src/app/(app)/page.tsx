@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertCircle, CalendarPlus, ChevronRight, Plus, Users } from "lucide-react";
-import { getSessionUser, listMyAvailability, listMyTeams, listPendingRsvps, listUpcomingForMe } from "@/lib/data";
+import { getSessionUser, listMyAvailability, listMyTeams, listPendingRsvps, listUpcomingForMe, mySponsorships } from "@/lib/data";
+import { SponsorMark, TierBadge } from "@/components/sponsor-badge";
 import { EventCard } from "@/components/event-bits";
 import { ButtonLink, EmptyState, SectionTitle } from "@/components/ui";
 import { hatLabels } from "@/lib/data/types";
@@ -9,7 +10,7 @@ import { hatLabels } from "@/lib/data/types";
 export const metadata: Metadata = { title: "Home" };
 
 export default async function HomePage() {
-  const [user, teams, upcoming, pending, avail] = await Promise.all([getSessionUser(), listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability()]);
+  const [user, teams, upcoming, pending, avail, sponsorships] = await Promise.all([getSessionUser(), listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability(), mySponsorships()]);
   const out = avail.periods[0];
   const fmtDay = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(d + "T12:00:00Z"));
   const staffTeams = teams.filter((t) => t.isStaff);
@@ -25,6 +26,30 @@ export default async function HomePage() {
               : "Welcome"}
         </h1>
       </header>
+
+      {sponsorships.length > 0 && (
+        <section aria-labelledby="sponsor-h" className="grid gap-3">
+          <SectionTitle>
+            <span id="sponsor-h">You sponsor</span>
+          </SectionTitle>
+          <ul className="grid gap-2.5">
+            {sponsorships.map((s) => (
+              <li key={s.id}>
+                <Link href={`/sponsor/${s.id}`} className="flex items-center gap-3 rounded-lg border border-border p-3.5 hover:border-border-input focus-visible:outline-2 focus-visible:outline-focus">
+                  <SponsorMark s={s} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold break-words">{s.scopeName}</span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-1.5 text-sm text-muted">
+                      {s.name} <TierBadge tier={s.tier} />
+                    </span>
+                  </span>
+                  <ChevronRight aria-hidden className="size-5 shrink-0 text-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {teams.length > 0 && (
         <section aria-labelledby="teams-h" className="grid gap-3">
@@ -125,6 +150,8 @@ export default async function HomePage() {
               )
             }
           />
+        ) : sponsorships.length ? (
+          <p className="text-sm text-muted">Fixtures and results for the teams you sponsor are on your sponsor page.</p>
         ) : (
           <EmptyState
             icon={<Users />}

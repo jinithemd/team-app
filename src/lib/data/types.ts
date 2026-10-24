@@ -173,6 +173,8 @@ export interface TeamEvent {
   status: EventStatus;
   statusReason: string | null;
   potmOpen: boolean;
+  /** null = the usual: matches, tournaments and socials show to sponsors, trainings don't. */
+  sponsorVisible?: boolean | null;
   createdBy: ID | null;
 }
 
@@ -391,7 +393,46 @@ export interface TeamMessage {
   body: string;
   recipientIds: ID[];
   createdAt: string;
+  toSponsors?: boolean;
 }
+
+// ---- sponsors ------------------------------------------------------------
+
+export const SPONSOR_TIERS = ["diamond", "platinum", "gold", "silver", "bronze"] as const;
+export type SponsorTier = (typeof SPONSOR_TIERS)[number];
+export const TIER_LABEL: Record<SponsorTier, string> = { diamond: "Diamond", platinum: "Platinum", gold: "Gold", silver: "Silver", bronze: "Bronze" };
+
+export interface Sponsor {
+  id: ID;
+  clubId: ID | null; // a club sponsor backs every club team
+  teamId: ID | null;
+  name: string;
+  tier: SponsorTier;
+  logo: string | null;
+  website: string | null;
+  blurb: string | null;
+  contactUserId: ID | null;
+  invitedEmail: string | null;
+  status: "invited" | "active" | "ended";
+  startsOn: string | null;
+  endsOn: string | null;
+  createdBy: ID | null;
+  createdAt: string;
+}
+
+/** Shown to everyone: no emails, no contact. */
+export interface PublicSponsor {
+  id: ID;
+  name: string;
+  tier: SponsorTier;
+  logo: string | null;
+  website: string | null;
+  blurb: string | null;
+  scope: "team" | "club";
+}
+
+export const showsToSponsors = (e: { type: EventType; sponsorVisible?: boolean | null }) =>
+  e.sponsorVisible ?? (e.type === "match" || e.type === "tournament" || e.type === "social");
 
 export interface NotificationPrefs {
   userId: ID;

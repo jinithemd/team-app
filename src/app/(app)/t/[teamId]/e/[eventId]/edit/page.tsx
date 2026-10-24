@@ -53,6 +53,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ team
           homeAway: e.homeAway ?? "home",
           notes: e.notes ?? "",
           squadSize: e.squadSize ? String(e.squadSize) : "",
+          sponsorVisible: e.sponsorVisible === true ? "show" : e.sponsorVisible === false ? "hide" : "auto",
         }}
       />
       <DeleteEvent eventId={eventId} inSeries={!!e.seriesId} />

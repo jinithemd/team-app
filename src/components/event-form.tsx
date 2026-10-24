@@ -27,6 +27,7 @@ export interface EventFormInitial {
   homeAway: "home" | "away" | "neutral";
   notes: string;
   squadSize: string;
+  sponsorVisible?: "auto" | "show" | "hide";
 }
 
 /**
@@ -223,6 +224,14 @@ export function EventForm({
           </label>
         </fieldset>
       )}
+
+      <Field id="sponsorVisible" label="Sponsors" hint="Sponsors see the date, opponent, venue and score. Never who's coming, notes or chat.">
+        <select id="sponsorVisible" name="sponsorVisible" defaultValue={initial.sponsorVisible ?? "auto"} className={`${inputClass} sm:max-w-sm`}>
+          <option value="auto">Usual: matches, tournaments and socials show to sponsors</option>
+          <option value="show">Show this one to sponsors</option>
+          <option value="hide">Keep this one from sponsors</option>
+        </select>
+      </Field>
 
       <label className="flex min-h-11 items-start gap-3 rounded-md bg-surface p-3">
         <input type="checkbox" name="notify" defaultChecked={!editing} className="mt-0.5 size-5 shrink-0 accent-[var(--team)]" />

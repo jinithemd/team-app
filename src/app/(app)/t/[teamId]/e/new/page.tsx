@@ -49,6 +49,7 @@ export default async function NewEventPage({ params, searchParams }: { params: P
           homeAway: "home",
           notes: "",
           squadSize: "",
+          sponsorVisible: "auto",
         }}
       />
     </div>

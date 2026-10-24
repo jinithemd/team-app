@@ -745,8 +745,10 @@ export interface EventInput {
   notes?: string;
   squadSize?: string;
   repeatWeeks?: string; // trainings: repeat weekly for N weeks
+  sponsorVisible?: "auto" | "show" | "hide";
   notify: boolean;
 }
+const sponsorFlag = (v?: string) => (v === "show" ? true : v === "hide" ? false : null);
 
 function validateEvent(teamId: ID, input: EventInput) {
   const tz = input.tz || DEFAULT_TZ;
@@ -811,6 +813,7 @@ export async function createEvent(teamId: ID, input: EventInput): Promise<Action
       homeAway: input.type === "match" ? input.homeAway ?? "home" : null,
       notes: input.notes?.trim() || null,
       squadSize: v.squad,
+      sponsorVisible: sponsorFlag(input.sponsorVisible),
       status: "active",
       statusReason: null,
       potmOpen: false,
@@ -850,6 +853,7 @@ export async function updateEvent(eventId: ID, input: EventInput & { scope?: "on
       homeAway: input.type === "match" ? input.homeAway ?? "home" : null,
       notes: input.notes?.trim() || null,
       squadSize: v.squad,
+      sponsorVisible: sponsorFlag(input.sponsorVisible),
     });
   }
   if (input.notify) notifyEvent(e, "changed", targets.length);

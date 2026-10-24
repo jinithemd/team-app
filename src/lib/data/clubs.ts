@@ -5,6 +5,7 @@ import {
   APP_URL, EMAIL_RE, HEX_RE, activePlayers, clubRoleFor, currentUserId, db, hasTeamPerm, isClubAdmin, isTeamStaff, myRow, newId, norm, now, personFor, personOf, profileById, queueEmail, requireUser, teamById,
 } from "./store";
 import { clubDues } from "./dues";
+import { clubSponsors } from "./sponsors";
 
 /*
  * Clubs in the app: a public club page with every team (for posters and WhatsApp), asking to
@@ -41,7 +42,7 @@ export async function getClubPage(slug: string) {
       } as const;
     })
     .sort((a, b) => a.name.localeCompare(b.name));
-  return { club, teams, signedIn: !!uid, isAdmin: uid ? isClubAdmin(uid, club.id) : false };
+  return { club, teams, sponsors: clubSponsors(club.id), signedIn: !!uid, isAdmin: uid ? isClubAdmin(uid, club.id) : false };
 }
 
 export async function requestToJoin(teamId: ID, message: string): Promise<ActionResult> {

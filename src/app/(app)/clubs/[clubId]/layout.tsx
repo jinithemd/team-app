@@ -32,6 +32,7 @@ export default async function ClubLayout({ children, params }: { children: React
           {[
             [`/clubs/${clubId}`, "Club"],
             [`/clubs/${clubId}/stats`, "Stats"],
+            ...(c.canEdit ? [[`/clubs/${clubId}/sponsors`, "Sponsors"]] : []),
             ...(c.canEdit ? [[`/clubs/${clubId}/settings`, "Settings"]] : []),
             [`/c/${c.club.slug}`, "Public page"],
           ].map(([href, label]) => (

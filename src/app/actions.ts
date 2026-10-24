@@ -107,6 +107,7 @@ function eventInput(f: FormData) {
     notes: str(f, "notes"),
     squadSize: str(f, "squadSize"),
     repeatWeeks: str(f, "repeat") === "on" ? str(f, "repeatWeeks") : "1",
+    sponsorVisible: (["show", "hide"].includes(str(f, "sponsorVisible")) ? str(f, "sponsorVisible") : "auto") as "auto" | "show" | "hide",
     notify: str(f, "notify") === "on",
   };
 }
@@ -416,7 +417,7 @@ export async function chatOpAction(op: { kind: "react"; messageId: string; emoji
 
 export async function sendTeamMessageAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
   const to = (["all", "players", "staff", "chosen"] as const).find((x) => x === str(f, "to")) ?? "all";
-  const res = await data.sendTeamMessage(teamId, { subject: str(f, "subject"), body: str(f, "body"), to, recipientIds: f.getAll("recipient").map(String) });
+  const res = await data.sendTeamMessage(teamId, { subject: str(f, "subject"), body: str(f, "body"), to, recipientIds: f.getAll("recipient").map(String), toSponsors: str(f, "toSponsors") === "on" });
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath(`/t/${teamId}`, "layout");
   redirect(`/t/${teamId}/messages?sent=${res.data.count}`);
@@ -481,4 +482,33 @@ export async function clubAdminAction(clubId: string, _: FormState, f: FormData)
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath(`/clubs/${clubId}`, "layout");
   return { ok: true, message: remove ? "Removed." : "Added. They got an email." };
+}
+
+export async function saveSponsorAction(scope: { teamId?: string; clubId?: string }, id: string | null, back: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.saveSponsor(scope, id, {
+    name: str(f, "name"),
+    tier: str(f, "tier"),
+    website: str(f, "website"),
+    blurb: str(f, "blurb"),
+    email: str(f, "email"),
+    startsOn: str(f, "startsOn"),
+    endsOn: str(f, "endsOn"),
+    logo: f.has("logo") ? str(f, "logo") : undefined,
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  redirect(`${back}?saved=${id ? "1" : "new"}`);
+}
+
+export async function sponsorOpAction(id: string, op: "end" | "restart" | "resend") {
+  const res = op === "resend" ? await data.resendSponsorInvite(id) : await data.endSponsor(id, op === "end");
+  revalidatePath("/", "layout");
+  return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+}
+
+export async function acceptSponsorInviteAction(token: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.acceptSponsorInvite(token, { firstName: str(f, "firstName"), lastName: str(f, "lastName") });
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  redirect(`/sponsor/${res.data.sponsorId}?welcome=1`);
 }

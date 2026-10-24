@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarPlus, Plus } from "lucide-react";
-import { getTeam, listEvents, listPastEvents } from "@/lib/data";
+import { getTeam, listEvents, listPastEvents, listTeamSponsors, myPerms } from "@/lib/data";
+import { SponsorStrip } from "@/components/sponsor-badge";
 import { EventCard, ScheduleList } from "@/components/event-bits";
 import { Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { MonthView } from "@/components/month-view";
@@ -18,7 +19,7 @@ export default async function SchedulePage({
   const { teamId } = await params;
   const sp = await searchParams;
   const view = sp.view === "month" ? "month" : "list";
-  const [team, events, past] = await Promise.all([getTeam(teamId), listEvents(teamId), listPastEvents(teamId, sp.past ? 20 : 3)]);
+  const [team, events, past, sponsors, perms] = await Promise.all([getTeam(teamId), listEvents(teamId), listPastEvents(teamId, sp.past ? 20 : 3), listTeamSponsors(teamId), myPerms(teamId)]);
   if (!team) return null;
 
   return (
@@ -83,6 +84,7 @@ export default async function SchedulePage({
           )}
         </section>
       )}
+      <SponsorStrip sponsors={sponsors} manageHref={perms.settings ? `/t/${teamId}/sponsors` : undefined} />
     </div>
   );
 }
