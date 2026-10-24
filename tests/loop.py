@@ -165,6 +165,25 @@ with sync_playwright() as p:
     dan.goto(f"{BASE}/t/t-first/roster"); shot(dan, "S12-roster-dan")
     dan.goto(f"{BASE}/t/t-first/e/e-f-g1"); expect(dan.get_by_role("heading", name="Are you in?")).to_be_visible(); step("Dan is asked to answer as a player on his own team")
 
+    # several managers and coaches
+    dan.goto(f"{BASE}/t/t-first/roster")
+    dan.get_by_role("link", name=re.compile("Dev Kapoor")).click(); dan.wait_for_url(re.compile(r"/roster/r-"))
+    dan.locator("label", has_text="Manager").click()
+    expect(dan.get_by_label("Add and change matches")).to_be_checked(); step("picking Manager fills in what managers can do")
+    shot(dan, "S15-edit-roles")
+    dan.get_by_role("button", name="Save").click(); dan.wait_for_url(re.compile(r"saved=member"))
+    expect(dan.get_by_text("Roles saved.")).to_be_visible()
+    dan.get_by_role("link", name=re.compile("Owen Park")).click(); dan.wait_for_url(re.compile(r"/roster/r-"))
+    dan.locator("label", has_text="Coach").click(); dan.get_by_role("button", name="Save").click(); dan.wait_for_url(re.compile(r"saved=member"))
+    dan.goto(f"{BASE}/t/t-first/roster/add")
+    dan.fill("input[name='0.firstName']", "Sara"); dan.fill("input[name='0.lastName']", "Ito"); dan.fill("input[name='0.email']", "sara.ito@example.com")
+    dan.get_by_label("Plays on the team").uncheck()
+    dan.locator("li", has_text="Person 1").locator("label", has_text="Coach").click()
+    dan.get_by_role("button", name="Send 1 invite").click(); dan.wait_for_url(re.compile(r"invited=1"))
+    expect(dan.get_by_text("1 captain · 1 vice captain · 2 managers · 2 coaches")).to_be_visible()
+    expect(dan.get_by_role("region", name="Running the team, not playing").get_by_text("Sara Ito")).to_be_visible()
+    shot(dan, "S12-roster-staff"); step("First Team now has 2 managers and 2 coaches, one coach not playing")
+
     # desktop
     desk = b.new_context(viewport={"width": 1440, "height": 900}); k = desk.new_page(); watch(k, "priya")
     k.goto(f"{BASE}/login"); k.get_by_role("button", name=re.compile("Priya Raman")).click(); k.wait_for_url(f"{BASE}/")

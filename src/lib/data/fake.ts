@@ -398,6 +398,58 @@ export async function listRoster(teamId: ID): Promise<RosterRow[]> {
     );
 }
 
+/** One roster row, for the edit-person screen. Only people who manage permissions can open it. */
+export async function getMember(teamId: ID, memberId: ID): Promise<(RosterRow & { isCreator: boolean }) | null> {
+  const user = await requireUser();
+  const team = teamById(teamId);
+  if (!team || !hasTeamPerm(user.id, teamId, "manage_permissions")) return null;
+  const r = db.roster.find((x) => x.id === memberId && x.teamId === teamId && x.status !== "removed");
+  if (!r) return null;
+  const p = r.userId ? db.profiles.find((x) => x.id === r.userId) : undefined;
+  return {
+    ...r,
+    roles: TEAM_ROLES.filter((x) => r.roles.includes(x)),
+    person: personFor(r),
+    clubRole: r.userId ? clubRoleFor(r.userId, team.clubId) : null,
+    email: p?.email ?? r.invitedEmail,
+    isCreator: !!r.userId && r.userId === team.createdBy,
+  };
+}
+
+/**
+ * Change someone's part on the team: whether they play, their number, their roles and what
+ * they can do. Any number of people can share a role (two managers, three coaches).
+ */
+export async function updateMember(
+  teamId: ID,
+  memberId: ID,
+  input: { isPlayer: boolean; jersey?: string; position?: string; roles: string[]; permissions: string[] },
+): Promise<ActionResult<RosterMember>> {
+  const user = await requireUser();
+  if (!hasTeamPerm(user.id, teamId, "manage_permissions"))
+    return { ok: false, error: "Only someone who manages permissions can change roles." };
+  const team = teamById(teamId)!;
+  const row = db.roster.find((x) => x.id === memberId && x.teamId === teamId && x.status !== "removed");
+  if (!row) return { ok: false, error: "That person isn't on the team any more." };
+  const roles = TEAM_ROLES.filter((r) => input.roles.includes(r));
+  const permissions = TEAM_PERMISSIONS.filter((p) => input.permissions.includes(p));
+  const jersey = input.jersey?.trim() || null;
+  const fieldErrors: Record<string, string> = {};
+  if (!input.isPlayer && roles.length === 0) fieldErrors.roles = "Pick at least one: they play, or a role on the team.";
+  if (input.isPlayer && jersey && !/^\d{1,3}$/.test(jersey)) fieldErrors.jersey = "Use up to 3 digits.";
+  if (input.isPlayer && jersey && db.roster.some((r) => r.teamId === teamId && r.id !== row.id && r.status !== "removed" && r.isPlayer && r.jersey === jersey))
+    fieldErrors.jersey = `Someone already wears ${jersey}.`;
+  if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
+  // The team can't lock itself out: whoever started it always keeps every permission.
+  const isCreator = !!row.userId && row.userId === team.createdBy;
+  row.isPlayer = input.isPlayer;
+  row.jersey = input.isPlayer ? jersey : null;
+  row.position = input.isPlayer ? input.position?.trim() || null : null;
+  row.roles = roles;
+  row.permissions = isCreator ? [...TEAM_PERMISSIONS] : permissions; // whoever started the team keeps every permission
+  return { ok: true, data: row };
+}
+
 export interface InviteRow {
   firstName: string;
   lastName: string;

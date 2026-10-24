@@ -156,3 +156,16 @@ export async function acceptInviteAction(token: string, _: FormState, f: FormDat
   revalidatePath("/", "layout");
   redirect(`/t/${res.data.teamId}/schedule?joined=1`);
 }
+
+export async function updateMemberAction(teamId: string, memberId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.updateMember(teamId, memberId, {
+    isPlayer: str(f, "plays") === "yes",
+    jersey: str(f, "jersey"),
+    position: str(f, "position"),
+    roles: f.getAll("role").map(String),
+    permissions: f.getAll("perm").map(String),
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}`, "layout");
+  redirect(`/t/${teamId}/roster?saved=member`);
+}

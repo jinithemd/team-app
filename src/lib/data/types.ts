@@ -84,6 +84,18 @@ export const ROLE_LABEL: Record<TeamRole, string> = {
 
 export const CLUB_ROLE_LABEL: Record<ClubRole, string> = { owner: "Club owner", admin: "Club admin", treasurer: "Club treasurer" };
 
+export const PERMISSION_LABEL: Record<TeamPermission, string> = {
+  schedule_games: "Add and change matches",
+  schedule_events: "Add trainings and events",
+  roster: "Add and remove people",
+  attendance: "Take attendance",
+  scoring: "Keep score and results",
+  messages: "Message the whole team",
+  payments: "Track dues and payments",
+  edit_settings: "Edit team settings",
+  manage_permissions: "Give out roles and permissions",
+};
+
 /** What each role can do by default. Someone with several roles gets all of them. */
 export const ROLE_PERMISSIONS: Record<TeamRole, TeamPermission[]> = {
   captain: ["roster", "schedule_events", "attendance", "scoring", "messages"],
