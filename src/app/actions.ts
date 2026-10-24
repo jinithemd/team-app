@@ -19,7 +19,8 @@ export async function signInAsAction(f: FormData) {
 export async function signUpAction(_: FormState, f: FormData): Promise<FormState> {
   const res = await data.signUp({ firstName: str(f, "firstName"), lastName: str(f, "lastName"), email: str(f, "email") });
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
-  redirect("/");
+  const next = str(f, "next");
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
 }
 
 export async function signOutAction() {
@@ -437,4 +438,47 @@ export async function savePrefsAction(teamId: string, _: FormState, f: FormData)
 export async function resetFeedAction() {
   await data.resetCalendarFeed();
   return { ok: true as const };
+}
+
+export async function requestToJoinAction(teamId: string, path: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.requestToJoin(teamId, str(f, "message"));
+  if (!res.ok) return { error: res.error };
+  revalidatePath(path);
+  return { ok: true, message: "Sent. The captain will get back to you." };
+}
+
+export async function decideJoinAction(teamId: string, requestId: string, approve: boolean) {
+  const res = await data.decideJoinRequest(requestId, approve);
+  revalidatePath(`/t/${teamId}`, "layout");
+  return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+}
+
+export async function joinByCodeAction(_: FormState, f: FormData): Promise<FormState> {
+  const res = await data.joinByCode(str(f, "code"));
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  redirect(`/t/${res.data.teamId}/schedule?joined=1`);
+}
+
+export async function updateClubAction(clubId: string, _: FormState, f: FormData): Promise<FormState> {
+  const logo = f.get("logo");
+  const res = await data.updateClub(clubId, {
+    name: str(f, "name"),
+    color: str(f, "color"),
+    colorSecondary: str(f, "colorSecondary") || null,
+    blurb: str(f, "blurb"),
+    joinOpen: str(f, "joinOpen") === "on",
+    logo: logo === null ? undefined : String(logo) || null,
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Saved. Every club team now shows the new look." };
+}
+
+export async function clubAdminAction(clubId: string, _: FormState, f: FormData): Promise<FormState> {
+  const remove = str(f, "remove");
+  const res = remove ? await data.removeClubAdmin(clubId, remove) : await data.addClubAdmin(clubId, str(f, "email"), str(f, "role"));
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/clubs/${clubId}`, "layout");
+  return { ok: true, message: remove ? "Removed." : "Added. They got an email." };
 }

@@ -63,7 +63,8 @@ export function seed(): Store {
     ["u-sam", "Sam", "Okafor"], ["u-jordan", "Jordan", "Blake"], ["u-chris", "Chris", "Wong"], ["u-tom", "Tom", "Reyes"],
     ["u-ade", "Ade", "Bello"], ["u-leo", "Leo", "Grant"], ["u-femi", "Femi", "Ade"], ["u-aisha", "Aisha", "Shah"],
     ["u-kofi", "Kofi", "Mensah"], ["u-dev", "Dev", "Kapoor"], ["u-owen", "Owen", "Park"], ["u-ravi", "Ravi", "Patel"],
-    ["u-nia", "Nia", "Brooks"],
+    ["u-nia", "Nia", "Brooks"], ["u-mei", "Mei", "Lin"], ["u-grace", "Grace", "Okoye"], ["u-hana", "Hana", "Sato"],
+    ["u-tariq", "Tariq", "Aziz"], ["u-sana", "Sana", "Iqbal"], ["u-paul", "Paul", "Dubois"],
   ];
   for (const [pid, f, l] of people)
     s.profiles.push({
@@ -92,6 +93,8 @@ export function seed(): Store {
   team("t-strikers", "Kingston Strikers", null, "Sunday league", "#2D0A3E", "#B8964A", "u-priya", "KSTR7A2Q", { pointsEnabled: true, geoCheckinEnabled: true });
   team("t-first", "Limestone City First Team", "c-lcfc", "Division 1", "#0F5C3A", "#F2C14E", "u-dan", "LCFT9K3M", {});
   team("t-reserves", "Limestone City Reserves", "c-lcfc", "Division 2", "#0F5C3A", "#F2C14E", "u-dan", "LCRS4P8X", { pointsEnabled: true, geoCheckinEnabled: true });
+  team("t-women", "Limestone City Women", "c-lcfc", "Women's league", "#0F5C3A", "#F2C14E", "u-dan", "LCWM2H6R", {});
+  team("t-o35", "Limestone City Over-35s", "c-lcfc", "Masters", "#0F5C3A", "#F2C14E", "u-dan", "LCOV5T1D", {});
 
   const member = (teamId: string, userId: string, jersey: string | null, position: string | null, roles: TeamRole[] = [], allPerms = false) => {
     s.roster.push({
@@ -354,5 +357,16 @@ export function seed(): Store {
     recipientIds: strikersPlayers, createdAt: ago(60 * 48),
   });
 
+  // ---- the rest of the club, and people asking to join -------------------------
+  member("t-women", "u-mei", "8", "Midfield", ["captain"]);
+  member("t-women", "u-grace", "1", "Goalkeeper");
+  member("t-women", "u-hana", "10", "Forward");
+  member("t-o35", "u-paul", "6", "Defence", ["captain", "manager"]);
+  member("t-o35", "u-owen", "12", "Midfield");
+  s.joinRequests.push(
+    { id: "jr-tariq", teamId: "t-first", userId: "u-tariq", message: "Played centre-back for Queen's last year. Free most Saturdays.", status: "pending", createdAt: new Date(Date.now() - 26 * 3600_000).toISOString() },
+    { id: "jr-sana", teamId: "t-women", userId: "u-sana", message: "New to Kingston, keen to play!", status: "pending", createdAt: new Date(Date.now() - 5 * 3600_000).toISOString() },
+  );
+  s.clubs[0].blurb = "Five teams, one club. Adult football in Kingston since 1994. New players always welcome.";
   return s;
 }

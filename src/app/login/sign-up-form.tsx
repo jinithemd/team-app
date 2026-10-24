@@ -4,11 +4,12 @@ import { useActionState } from "react";
 import { signUpAction, type FormState } from "../actions";
 import { Field, Input, buttonClass } from "@/components/ui";
 
-export function SignUpForm() {
+export function SignUpForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(signUpAction, null);
   const fe = state?.fieldErrors ?? {};
   return (
     <form action={action} className="grid gap-3" noValidate>
+      {next && <input type="hidden" name="next" value={next} />}
       <div className="grid grid-cols-2 gap-3">
         <Field id="firstName" label="First name" error={fe.firstName}>
           <Input id="firstName" name="firstName" autoComplete="given-name" error={fe.firstName} required />

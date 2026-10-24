@@ -51,7 +51,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <h2 id="new-h" className="text-lg font-semibold">
             New here? Create your account
           </h2>
-          <SignUpForm />
+          <SignUpForm next={next} />
           <Banner>
             Sample-data build: accounts are saved only until the server restarts, and no real emails are sent. Sent emails show up in{" "}
             <a className="font-semibold text-team-ink underline" href="/dev/outbox">

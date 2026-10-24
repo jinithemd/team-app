@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Plus, Search, Users } from "lucide-react";
-import { listMyTeams } from "@/lib/data";
+import { listMyClubs, listMyTeams } from "@/lib/data";
+import { CLUB_ROLE_LABEL } from "@/lib/data/types";
 import { ButtonLink, EmptyState, PageHeader } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
@@ -9,7 +10,7 @@ import { hatLabels } from "@/lib/data/types";
 export const metadata: Metadata = { title: "Teams" };
 
 export default async function TeamsPage() {
-  const teams = await listMyTeams();
+  const [teams, clubs] = await Promise.all([listMyTeams(), listMyClubs()]);
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl gap-5 py-6">
       <PageHeader
@@ -27,6 +28,29 @@ export default async function TeamsPage() {
           </div>
         }
       />
+      {clubs.length > 0 && (
+        <section aria-labelledby="clubs-h" className="grid gap-2">
+          <h2 id="clubs-h" className="eyebrow">
+            Clubs you run
+          </h2>
+          <ul className="grid gap-2">
+            {clubs.map((c) => (
+              <li key={c.id}>
+                <Link href={`/clubs/${c.id}`} className="flex min-h-14 items-center gap-3 rounded-lg border border-border p-3 hover:border-border-input">
+                  <span aria-hidden className="size-10 shrink-0 rounded-md" style={{ background: c.color, boxShadow: c.colorSecondary ? `inset 0 -4px 0 ${c.colorSecondary}` : undefined }} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">{c.name}</span>
+                    <span className="block text-sm text-muted">
+                      {CLUB_ROLE_LABEL[c.myRole]} · {c.teamCount} {c.teamCount === 1 ? "team" : "teams"}
+                    </span>
+                  </span>
+                  <ChevronRight aria-hidden className="size-5 shrink-0 text-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {teams.length ? (
         <ul className="grid gap-2.5">
           {teams.map((t) => (

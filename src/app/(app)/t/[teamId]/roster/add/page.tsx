@@ -28,6 +28,9 @@ export default async function AddRosterPage({ params }: { params: Promise<{ team
         <h2 className="text-xl font-bold">Add people</h2>
         <p className="text-sm text-muted">Each person gets an email invite to their own account. They&apos;re on the roster straight away and see the schedule once they join.</p>
       </div>
+      <p className="rounded-md bg-surface px-3.5 py-3 text-sm">
+        Or share the team code <strong className="font-mono text-base tracking-wider">{team.joinCode}</strong>. Anyone with it joins as a player from Teams → Find a team.
+      </p>
       <InviteForm teamId={teamId} canGiveRoles={team.canManagePermissions} />
     </div>
   );

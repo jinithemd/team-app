@@ -9,4 +9,5 @@ export * from "./carpool";
 export * from "./dues";
 export * from "./chat";
 export * from "./feeds";
+export * from "./clubs";
 export type * from "./types";

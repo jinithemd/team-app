@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Pencil, UserPlus, Users } from "lucide-react";
-import { getTeam, listRoster, listTeamUnavailable } from "@/lib/data";
+import { getTeam, listJoinRequests, listRoster, listTeamUnavailable } from "@/lib/data";
+import { JoinRequests } from "./join-requests";
 import { Avatar, Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { ROLE_LABEL, TEAM_ROLES, hatLabels, type RosterRow } from "@/lib/data/types";
@@ -17,7 +18,7 @@ export default async function RosterPage({
 }) {
   const { teamId } = await params;
   const sp = await searchParams;
-  const [team, roster, out] = await Promise.all([getTeam(teamId), listRoster(teamId), listTeamUnavailable(teamId)]);
+  const [team, roster, out, requests] = await Promise.all([getTeam(teamId), listRoster(teamId), listTeamUnavailable(teamId), listJoinRequests(teamId)]);
   if (!team) return null;
   const players = roster.filter((r) => r.isPlayer);
   const others = roster.filter((r) => !r.isPlayer);
@@ -39,6 +40,10 @@ export default async function RosterPage({
 
   return (
     <div className="grid gap-5">
+      <JoinRequests
+        teamId={teamId}
+        requests={requests.map((r) => ({ id: r.id, name: `${r.person.firstName} ${r.person.lastName}`, email: r.email, message: r.message, when: new Date(r.createdAt).toLocaleDateString("en-CA", { month: "short", day: "numeric" }) }))}
+      />
       {sp.created && <Banner>Your team is ready. Add your players so they get the schedule.</Banner>}
       {sp.saved && (
         <Banner>
