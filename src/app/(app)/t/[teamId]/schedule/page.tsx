@@ -51,8 +51,8 @@ export default async function SchedulePage({
       {events.length === 0 ? (
         <EmptyState
           icon={<CalendarPlus />}
-          title="No games or practices yet"
-          hint={team.isStaff ? "Add the first one and everyone on the roster gets a heads-up." : "Your captains haven't added anything yet. You'll get a notification when they do."}
+          title="Nothing on the schedule yet"
+          hint={team.isStaff ? "Add a match or training and every player gets a heads-up." : "Your captains haven't added anything yet. You'll get a notification when they do."}
           action={
             team.isStaff && (
               <ButtonLink href={`/t/${teamId}/e/new`} size="sm">

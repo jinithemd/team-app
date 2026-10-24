@@ -89,23 +89,46 @@ export async function invitePeopleAction(teamId: string, _: FormState, f: FormDa
   redirect(`/t/${teamId}/roster?invited=${res.data.count}`);
 }
 
-export async function createEventAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
-  const res = await data.createEvent(teamId, {
-    type: (str(f, "type") || "game") as "game" | "practice" | "event",
+function eventInput(f: FormData) {
+  return {
+    type: (str(f, "type") || "match") as data.EventInput["type"],
+    competition: str(f, "competition") as data.EventInput["competition"],
     title: str(f, "title"),
     date: str(f, "date"),
     startTime: str(f, "startTime"),
     endTime: str(f, "endTime"),
+    meetMinutes: str(f, "meetMinutes"),
     tz: str(f, "tz") || undefined,
+    venueId: str(f, "venueId") || undefined,
     locationText: str(f, "locationText"),
     opponent: str(f, "opponent"),
     homeAway: (str(f, "homeAway") || "home") as "home" | "away" | "neutral",
     notes: str(f, "notes"),
+    squadSize: str(f, "squadSize"),
+    repeatWeeks: str(f, "repeat") === "on" ? str(f, "repeatWeeks") : "1",
     notify: str(f, "notify") === "on",
-  });
+  };
+}
+
+export async function createEventAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.createEvent(teamId, eventInput(f));
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath("/", "layout");
   redirect(`/t/${teamId}/e/${res.data.id}?created=1`);
+}
+
+export async function updateEventAction(eventId: string, teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.updateEvent(eventId, { ...eventInput(f), scope: str(f, "scope") === "following" ? "following" : "one" });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  redirect(`/t/${teamId}/e/${eventId}?saved=1`);
+}
+
+export async function deleteEventAction(eventId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.deleteEvent(eventId, str(f, "scope") === "following" ? "following" : "one");
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  redirect(`/t/${res.data.teamId}/schedule?deleted=${res.data.count}`);
 }
 
 export async function setEventStatusAction(eventId: string, teamId: string, _: FormState, f: FormData): Promise<FormState> {
@@ -168,4 +191,78 @@ export async function updateMemberAction(teamId: string, memberId: string, _: Fo
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath(`/t/${teamId}`, "layout");
   redirect(`/t/${teamId}/roster?saved=member`);
+}
+
+export async function updateTeamAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const crest = f.get("crest");
+  const res = await data.updateTeam(teamId, {
+    name: str(f, "name"),
+    level: str(f, "level"),
+    location: str(f, "location"),
+    color: str(f, "color"),
+    colorSecondary: str(f, "colorSecondary") || null,
+    rosterVisible: str(f, "rosterVisible") === "on",
+    membersCanPost: str(f, "membersCanPost") === "on",
+    pointsEnabled: str(f, "pointsEnabled") === "on",
+    pointsPublic: str(f, "pointsPublic") === "on",
+    geoCheckinEnabled: str(f, "geoCheckinEnabled") === "on",
+    pointsRules: {
+      training: str(f, "rule.training"),
+      match: str(f, "rule.match"),
+      away_bonus: str(f, "rule.away_bonus"),
+      late_penalty: str(f, "rule.late_penalty"),
+      late_after_minutes: str(f, "rule.late_after_minutes"),
+      potm: str(f, "rule.potm"),
+    },
+    crest: crest === null ? undefined : String(crest) === "keep" ? undefined : String(crest),
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Settings saved." };
+}
+
+export async function saveVenueAction(teamId: string, venueId: string | null, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.saveVenue(teamId, venueId, {
+    name: str(f, "name"),
+    address: str(f, "address"),
+    lat: str(f, "lat"),
+    lng: str(f, "lng"),
+    radiusM: str(f, "radiusM"),
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}`, "layout");
+  redirect(`/t/${teamId}/venues?saved=1`);
+}
+
+export async function setMemberStatusAction(teamId: string, memberId: string, status: "active" | "inactive" | "removed", _: FormState): Promise<FormState> {
+  const res = await data.setMemberStatus(teamId, memberId, status);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(`/t/${teamId}`, "layout");
+  redirect(`/t/${teamId}/roster?saved=${status}`);
+}
+
+export async function resendInviteAction(teamId: string, memberId: string, _: FormState): Promise<FormState> {
+  const res = await data.resendInvite(teamId, memberId);
+  if (!res.ok) return { error: res.error };
+  return { ok: true, message: "Invite sent again." };
+}
+
+export async function saveAvailabilityAction(periodId: string | null, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.saveAvailability(periodId, {
+    kind: str(f, "kind"),
+    startsOn: str(f, "startsOn"),
+    endsOn: str(f, "endsOn"),
+    note: str(f, "note"),
+    teamIds: f.getAll("teamId").map(String),
+  });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath("/", "layout");
+  redirect(`/availability?saved=${res.data.affected}`);
+}
+
+export async function clearAvailabilityAction(periodId: string, _: FormState): Promise<FormState> {
+  const res = await data.clearAvailability(periodId);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  redirect("/availability?cleared=1");
 }

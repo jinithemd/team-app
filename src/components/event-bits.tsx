@@ -28,10 +28,41 @@ export function StatusBadge({ status }: { status: TeamEvent["status"] | "live" |
   );
 }
 
-export function TypeTag({ e }: { e: Pick<TeamEvent, "type" | "homeAway"> }) {
-  const label = e.type === "game" ? (e.homeAway === "away" ? "Away" : e.homeAway === "neutral" ? "Neutral" : "Home") : null;
-  if (!label) return null;
-  return <span className="rounded-pill bg-sunken px-2 py-0.5 text-[11px] font-bold tracking-[.06em] text-muted uppercase">{label}</span>;
+export function TypeTag({ e }: { e: Pick<TeamEvent, "type" | "homeAway" | "competition"> }) {
+  const labels: string[] = [];
+  if (e.type === "match") labels.push(e.homeAway === "away" ? "Away" : e.homeAway === "neutral" ? "Neutral" : "Home");
+  if (e.competition && e.competition !== "league") labels.push(e.competition === "cup" ? "Cup" : "Friendly");
+  if (e.type === "tournament") labels.push("Tournament");
+  if (e.type === "social") labels.push("Social");
+  if (!labels.length) return null;
+  return (
+    <>
+      {labels.map((l) => (
+        <span key={l} className="rounded-pill bg-sunken px-2 py-0.5 text-[11px] font-bold tracking-[.06em] text-muted uppercase">
+          {l}
+        </span>
+      ))}
+    </>
+  );
+}
+
+export function ScoreBadge({ score }: { score: { us: number; them: number; status: string } | null }) {
+  if (!score) return null;
+  const live = score.status === "live";
+  const result = score.us > score.them ? "W" : score.us < score.them ? "L" : "D";
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-pill px-2 py-0.5 text-xs font-bold tabular ${
+        live ? "bg-live text-on-live" : result === "W" ? "bg-success-soft text-success" : result === "L" ? "bg-danger-soft text-danger" : "bg-sunken text-fg"
+      }`}
+    >
+      {live ? <span aria-hidden className="live-dot size-1.5 rounded-pill bg-current" /> : <span aria-hidden>{result}</span>}
+      <span>
+        {score.us}–{score.them}
+      </span>
+      <span className="sr-only">{live ? "live score" : result === "W" ? "win" : result === "L" ? "loss" : "draw"}</span>
+    </span>
+  );
 }
 
 export function RsvpChip({ response, name }: { response: RsvpResponse | null; name?: string }) {
@@ -56,6 +87,14 @@ export function RsvpChip({ response, name }: { response: RsvpResponse | null; na
   );
 }
 
+export function UnavailableChip({ kind }: { kind: "injured" | "away" | "other" }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-pill bg-warning-soft px-2.5 py-1 text-xs font-semibold text-warning">
+      {kind === "injured" ? "You're injured" : kind === "away" ? "You're away" : "You're unavailable"}
+    </span>
+  );
+}
+
 export function TeamDot({ name }: { name: string }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-muted">
@@ -71,7 +110,7 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
   const cancelled = e.status === "cancelled";
   const today = isToday(e.startAt, e.tz);
   const past = Date.parse(e.endAt) < Date.now();
-  const mineLabel = e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : "no answer yet") : "";
+  const mineLabel = e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : e.mine.unavailable ? "you're marked unavailable" : "no answer yet") : "";
   return (
     <Link
       href={`/t/${e.teamId}/e/${e.id}`}
@@ -93,6 +132,7 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
           </h3>
           <TypeTag e={e} />
           <StatusBadge status={e.status} />
+          <ScoreBadge score={e.score} />
         </div>
         <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-muted [&_svg]:size-3.5">
           {cancelled && e.statusReason ? (
@@ -115,7 +155,7 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
         {(showTeam || (!cancelled && e.mine)) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {showTeam && <TeamDot name={e.team.name} />}
-            {!cancelled && e.mine && <RsvpChip response={e.mine.response} />}
+            {!cancelled && e.mine && (e.mine.unavailable && !e.mine.response ? <UnavailableChip kind={e.mine.unavailable} /> : !past && <RsvpChip response={e.mine.response} />)}
           </div>
         )}
       </div>

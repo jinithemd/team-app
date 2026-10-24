@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Pencil, UserPlus, Users } from "lucide-react";
-import { getTeam, listRoster } from "@/lib/data";
+import { getTeam, listRoster, listTeamUnavailable } from "@/lib/data";
 import { Avatar, Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { ROLE_LABEL, TEAM_ROLES, hatLabels, type RosterRow } from "@/lib/data/types";
@@ -17,18 +17,34 @@ export default async function RosterPage({
 }) {
   const { teamId } = await params;
   const sp = await searchParams;
-  const [team, roster] = await Promise.all([getTeam(teamId), listRoster(teamId)]);
+  const [team, roster, out] = await Promise.all([getTeam(teamId), listRoster(teamId), listTeamUnavailable(teamId)]);
   if (!team) return null;
   const players = roster.filter((r) => r.isPlayer);
   const others = roster.filter((r) => !r.isPlayer);
   const onlyMe = roster.length === 1 && team.me && roster[0].id === team.me.id;
   const roleCounts = TEAM_ROLES.map((r) => [r, roster.filter((m) => m.roles.includes(r)).length] as const).filter(([, n]) => n > 0);
-  const editHref = (r: RosterRow) => (team.canManagePermissions ? (r.id === team.me?.id ? `/t/${teamId}/you` : `/t/${teamId}/roster/${r.id}`) : undefined);
+  const today = new Date().toISOString().slice(0, 10);
+  // One badge per person: who's out now, or soon (next three weeks).
+  const outNow = new Map<string, (typeof out)[number]>();
+  for (const o of out) if (!outNow.has(o.person.id)) outNow.set(o.person.id, o);
+  const editHref = (r: RosterRow) =>
+    r.userId ? `/t/${teamId}/p/${r.userId}` : team.canManagePermissions ? `/t/${teamId}/roster/${r.id}` : undefined;
+  const outLabel = (r: RosterRow) => {
+    const o = r.userId ? outNow.get(r.userId) : undefined;
+    if (!o) return undefined;
+    const f = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(d + "T12:00:00Z"));
+    const what = o.kind === "injured" ? "Injured" : o.kind === "away" ? "Away" : "Unavailable";
+    return o.startsOn <= today ? `${what} until ${f(o.endsOn)}` : `${what} ${f(o.startsOn)} – ${f(o.endsOn)}`;
+  };
 
   return (
     <div className="grid gap-5">
       {sp.created && <Banner>Your team is ready. Add your players so they get the schedule.</Banner>}
-      {sp.saved && <Banner>{sp.saved === "member" ? "Roles saved." : "Saved your part on the team."}</Banner>}
+      {sp.saved && (
+        <Banner>
+          {{ member: "Roles saved.", inactive: "Marked inactive.", active: "Marked active.", removed: "Removed from the team." }[sp.saved] ?? "Saved your part on the team."}
+        </Banner>
+      )}
       {sp.invited && (
         <Banner>
           Invites sent to {sp.invited} {sp.invited === "1" ? "person" : "people"}. They&apos;ll show as pending until they join.{" "}
@@ -69,7 +85,7 @@ export default async function RosterPage({
         <>
           {onlyMe && (
             <ul>
-              <RosterItem r={roster[0]} showContacts={team.isStaff} isMe href={editHref(roster[0])} />
+              <RosterItem r={roster[0]} showContacts={team.isStaff} isMe href={editHref(roster[0])} out={outLabel(roster[0])} />
             </ul>
           )}
           <EmptyState
@@ -90,7 +106,7 @@ export default async function RosterPage({
         <>
           <ul aria-label="Players">
             {players.map((r) => (
-              <RosterItem key={r.id} r={r} showContacts={team.isStaff} isMe={r.id === team.me?.id} href={editHref(r)} />
+              <RosterItem key={r.id} r={r} showContacts={team.isStaff} isMe={r.id === team.me?.id} href={editHref(r)} out={outLabel(r)} />
             ))}
           </ul>
           {others.length > 0 && (
@@ -100,7 +116,7 @@ export default async function RosterPage({
               </h2>
               <ul>
                 {others.map((r) => (
-                  <RosterItem key={r.id} r={r} showContacts={team.isStaff} isMe={r.id === team.me?.id} href={editHref(r)} />
+                  <RosterItem key={r.id} r={r} showContacts={team.isStaff} isMe={r.id === team.me?.id} href={editHref(r)} out={outLabel(r)} />
                 ))}
               </ul>
             </section>
@@ -109,7 +125,7 @@ export default async function RosterPage({
       )}
       {team.canManagePermissions && (
         <p className="text-xs text-muted">
-          Tap anyone to change their roles. A team can have several managers, coaches or captains, and one person can hold several roles.{" "}
+          Open anyone to change their roles. A team can have several managers, coaches or captains, and one person can hold several roles.{" "}
           <Link href={`/t/${teamId}/you`} className="font-semibold text-team-ink underline">
             Change yours
           </Link>
@@ -119,12 +135,12 @@ export default async function RosterPage({
   );
 }
 
-function RosterItem({ r, showContacts, isMe, href }: { r: RosterRow; showContacts: boolean; isMe?: boolean; href?: string }) {
+function RosterItem({ r, showContacts, isMe, href, out }: { r: RosterRow; showContacts: boolean; isMe?: boolean; href?: string; out?: string }) {
   const name = `${r.person.firstName} ${r.person.lastName}`;
   const labels = hatLabels({ isPlayer: false, roles: r.roles, clubRole: r.clubRole, isCreator: false });
   return (
     <li className="border-b border-border last:border-0">
-      <Row href={href} label={`Edit roles for ${name}`}>
+      <Row href={href} label={`Open ${name}`}>
       {r.isPlayer && (
         <span className="w-8 shrink-0 text-center font-display text-xl font-bold text-team-ink tabular" aria-label={r.jersey ? `Number ${r.jersey}` : "No number"}>
           {r.jersey ?? "–"}
@@ -137,9 +153,11 @@ function RosterItem({ r, showContacts, isMe, href }: { r: RosterRow; showContact
           {isMe && <span className="font-normal text-muted"> (you)</span>}
         </p>
         {r.position && <p className="text-sm break-words text-muted">{r.position}</p>}
-        {labels.length > 0 && (
-          <div className="mt-1">
+        {(labels.length > 0 || out || r.status === "inactive") && (
+          <div className="mt-1 flex flex-wrap gap-1">
             <HatBadges labels={labels} />
+            {out && <span className="rounded-pill bg-warning-soft px-2 py-0.5 text-[11px] font-bold tracking-[.04em] text-warning uppercase">{out}</span>}
+            {r.status === "inactive" && <span className="rounded-pill bg-sunken px-2 py-0.5 text-[11px] font-bold tracking-[.04em] text-muted uppercase">Inactive</span>}
           </div>
         )}
         {r.status === "invited" && showContacts && r.email && <p className="text-xs break-all text-muted">{r.email}</p>}

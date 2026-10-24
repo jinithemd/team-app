@@ -54,6 +54,9 @@ export default async function AccountPage() {
           <Link href="/clubs/new" className="text-team-ink">
             Set up a club
           </Link>
+          <Link href="/availability" className="text-team-ink">
+            Unavailable dates
+          </Link>
         </div>
       </section>
 

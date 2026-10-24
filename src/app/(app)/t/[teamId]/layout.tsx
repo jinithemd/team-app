@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getSessionUser, getTeam } from "@/lib/data";
+import { getSessionUser, getTeam, myPerms } from "@/lib/data";
 import { TeamTabs } from "@/components/nav";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
@@ -8,12 +8,16 @@ export default async function TeamLayout({ children, params }: { children: React
   const { teamId } = await params;
   const [team, user] = await Promise.all([getTeam(teamId), getSessionUser()]);
   if (!team) notFound();
+  const perms = await myPerms(teamId);
   const subtitle = [team.club?.name, team.level, team.location].filter(Boolean).join(" · ");
   return (
     // Team colour vars for this id are already emitted by the app layout.
     <div data-team={team.id} className="min-h-full">
       <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(env(safe-area-inset-top,0px)+20px)] pb-4 text-on-team">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
+          {team.settings.crest ? (
+            <img src={team.settings.crest} alt="" className="size-12 shrink-0 rounded-lg bg-bg object-cover ring-2 ring-on-team/40" />
+          ) : (
           <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-pill border-2 border-on-team font-display text-lg font-bold">
             {team.name
               .split(/\s+/)
@@ -23,6 +27,7 @@ export default async function TeamLayout({ children, params }: { children: React
               .join("")
               .toUpperCase()}
           </span>
+          )}
           <div className="min-w-0">
             <h1 className="font-display text-2xl leading-tight font-bold break-words uppercase">{team.name}</h1>
             <p className="text-sm opacity-90">{subtitle}</p>
@@ -32,7 +37,7 @@ export default async function TeamLayout({ children, params }: { children: React
           </div>
         </div>
       </header>
-      <TeamTabs teamId={team.id} />
+      <TeamTabs teamId={team.id} show={{ settings: perms.settings }} />
       <main id="main" className="gutter mx-auto max-w-3xl py-5">
         {children}
       </main>

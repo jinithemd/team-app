@@ -26,7 +26,7 @@ export function StaffEventActions({
   return (
     <section aria-labelledby="staff-h" className="grid gap-3 rounded-lg border border-dashed border-border-input p-4">
       <h2 id="staff-h" className="text-sm font-semibold">
-        Staff tools
+        Captain tools
       </h2>
 
       {status === "active" && noReply > 0 && (

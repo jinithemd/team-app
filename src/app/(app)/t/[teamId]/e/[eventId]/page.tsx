@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronRight, Clock, MapPin, StickyNote } from "lucide-react";
-import { getAvailability, getEvent, getSessionUser, getTeam } from "@/lib/data";
+import { ArrowLeft, ChevronRight, Clock, MapPin, Pencil, StickyNote, Users } from "lucide-react";
+import { getAvailability, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
+import { EVENT_TYPE_LABEL, isFixture } from "@/lib/data/types";
 import { RsvpControl } from "@/components/rsvp-control";
-import { Counts, StatusBadge, TypeTag } from "@/components/event-bits";
+import { Counts, ScoreBadge, StatusBadge, TypeTag } from "@/components/event-bits";
 import { Banner } from "@/components/ui";
 import { eventTitle } from "@/lib/event-title";
-import { formatLongDate, formatTimeRange, zoneLabel } from "@/lib/time";
+import { formatLongDate, formatTime, formatTimeRange, zoneLabel } from "@/lib/time";
 import { StaffEventActions } from "./staff-actions";
 
 export async function generateMetadata({ params }: { params: Promise<{ eventId: string }> }): Promise<Metadata> {
@@ -20,17 +21,22 @@ export default async function EventPage({
   searchParams,
 }: {
   params: Promise<{ teamId: string; eventId: string }>;
-  searchParams: Promise<{ created?: string }>;
+  searchParams: Promise<{ created?: string; saved?: string }>;
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
-  const [team, e, avail, user] = await Promise.all([getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser()]);
+  const [team, e, avail, user, perms] = await Promise.all([getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId)]);
   if (!team || !e || e.teamId !== teamId) notFound();
 
   const title = eventTitle(e);
   const past = Date.parse(e.endAt) < Date.now();
   const cancelled = e.status === "cancelled";
-  const mapsHref = e.locationText ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.locationText)}` : null;
+  const mapsHref = e.venue?.lat != null
+    ? `https://www.google.com/maps/search/?api=1&query=${e.venue.lat},${e.venue.lng}`
+    : e.locationText
+      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.locationText)}`
+      : null;
+  const canEdit = isFixture(e.type) ? perms.games : perms.events;
   const lockReason = cancelled ? "This event was cancelled, so answers are closed." : past ? "This event is over." : undefined;
 
   return (
@@ -41,12 +47,20 @@ export default async function EventPage({
       </Link>
 
       {sp.created && <Banner>Added to the schedule. Every player got an email with one-tap answers.</Banner>}
+      {sp.saved && <Banner>Saved.</Banner>}
 
       <section aria-labelledby="ev-h" className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="eyebrow">{e.type === "game" ? "Match" : e.type === "practice" ? "Training" : "Event"}</span>
+          <span className="eyebrow">{EVENT_TYPE_LABEL[e.type]}</span>
           <TypeTag e={e} />
           <StatusBadge status={e.status} />
+          <ScoreBadge score={e.score} />
+          {canEdit && !past && (
+            <Link href={`/t/${teamId}/e/${eventId}/edit`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
+              <Pencil aria-hidden className="size-4" />
+              Edit
+            </Link>
+          )}
         </div>
         <h2 id="ev-h" className={`text-2xl font-bold break-words ${cancelled ? "text-muted line-through" : ""}`}>
           {title}
@@ -61,6 +75,12 @@ export default async function EventPage({
               <span className="font-semibold">{formatLongDate(e.startAt, e.tz)}</span>
               <br />
               {formatTimeRange(e.startAt, e.endAt, e.tz)} <span className="text-muted">· {zoneLabel(e.tz)}</span>
+              {e.meetAt && (
+                <>
+                  <br />
+                  <span className="text-muted">Meet at {formatTime(e.meetAt, e.tz)}</span>
+                </>
+              )}
             </dd>
           </div>
           {e.locationText && (
@@ -69,10 +89,22 @@ export default async function EventPage({
               <MapPin aria-hidden className="mt-0.5 size-[18px] shrink-0 text-muted" />
               <dd className="min-w-0">
                 <span className="break-words">{e.locationText}</span>
-                <br />
+                {e.venue?.address && <span className="block text-muted break-words">{e.venue.address}</span>}
                 <a href={mapsHref!} target="_blank" rel="noreferrer" className="font-semibold text-team-ink">
                   Open in Maps
                 </a>
+              </dd>
+            </div>
+          )}
+          {e.squadSize && avail && (
+            <div className="flex items-start gap-2.5">
+              <dt className="sr-only">Players needed</dt>
+              <Users aria-hidden className="mt-0.5 size-[18px] shrink-0 text-muted" />
+              <dd>
+                <span className={`font-semibold tabular ${avail.counts.going >= e.squadSize ? "text-success" : "text-warning"}`}>
+                  {avail.counts.going} of {e.squadSize}
+                </span>{" "}
+                players needed so far
               </dd>
             </div>
           )}
@@ -85,6 +117,15 @@ export default async function EventPage({
           )}
         </dl>
       </section>
+
+      {e.mine?.unavailable && !e.mine.response && !past && !cancelled && (
+        <Banner tone="warning">
+          You&apos;re marked {e.mine.unavailable === "injured" ? "injured" : e.mine.unavailable === "away" ? "away" : "unavailable"} that day, so we&apos;ve put you down as can&apos;t make it. Answer below if that&apos;s changed.{" "}
+          <Link href="/availability" className="font-semibold text-team-ink underline">
+            Change dates
+          </Link>
+        </Banner>
+      )}
 
       {e.mine && user && (
         <section aria-labelledby="mine-h" className="grid gap-4 rounded-lg border border-border p-4">

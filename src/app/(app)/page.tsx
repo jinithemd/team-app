@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarPlus, ChevronRight, Plus, Users } from "lucide-react";
-import { getSessionUser, listMyTeams, listPendingRsvps, listUpcomingForMe } from "@/lib/data";
+import { AlertCircle, CalendarPlus, ChevronRight, Plus, Users } from "lucide-react";
+import { getSessionUser, listMyAvailability, listMyTeams, listPendingRsvps, listUpcomingForMe } from "@/lib/data";
 import { EventCard } from "@/components/event-bits";
 import { ButtonLink, EmptyState, SectionTitle } from "@/components/ui";
 import { hatLabels } from "@/lib/data/types";
@@ -9,7 +9,9 @@ import { hatLabels } from "@/lib/data/types";
 export const metadata: Metadata = { title: "Home" };
 
 export default async function HomePage() {
-  const [user, teams, upcoming, pending] = await Promise.all([getSessionUser(), listMyTeams(), listUpcomingForMe(6), listPendingRsvps()]);
+  const [user, teams, upcoming, pending, avail] = await Promise.all([getSessionUser(), listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability()]);
+  const out = avail.periods[0];
+  const fmtDay = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(d + "T12:00:00Z"));
   const staffTeams = teams.filter((t) => t.isStaff);
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl gap-7 py-6">
@@ -54,6 +56,22 @@ export default async function HomePage() {
             ))}
           </ul>
         </section>
+      )}
+
+      {out ? (
+        <Link href="/availability" className="flex items-center gap-2.5 rounded-md bg-warning-soft px-3.5 py-3 text-sm">
+          <AlertCircle aria-hidden className="size-[18px] shrink-0 text-warning" />
+          <span className="flex-1">
+            You&apos;re marked <strong>{out.kind === "injured" ? "injured" : out.kind === "away" ? "away" : "unavailable"}</strong> {fmtDay(out.startsOn)} – {fmtDay(out.endsOn)}. Teammates just see unavailable.
+          </span>
+          <span className="font-semibold text-team-ink">Change</span>
+        </Link>
+      ) : (
+        avail.teams.length > 0 && (
+          <Link href="/availability" className="-mt-3 justify-self-start text-sm font-semibold text-team-ink">
+            Injured or away? Mark your dates
+          </Link>
+        )
       )}
 
       {pending.length > 0 && (

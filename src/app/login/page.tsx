@@ -15,7 +15,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const accounts = await listDemoAccounts();
   return (
     <main className="gutter min-h-dvh bg-surface py-10">
-      <div className="mx-auto grid max-w-md gap-6">
+      <div className="mx-auto grid max-w-md grid-cols-1 gap-6">
         <div>
           <p className="font-display text-display leading-none font-bold uppercase">{APP_NAME}</p>
           <p className="mt-2 text-muted">{APP_TAGLINE}</p>
@@ -28,7 +28,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </h1>
             <p className="text-sm text-muted">Sample accounts. Dan owns a club and plays for, captains and manages one of its teams.</p>
           </div>
-          <ul className="grid gap-2">
+          <ul className="grid grid-cols-1 gap-2">
             {accounts.map((a) => (
               <li key={a.id}>
                 <form action={signInAsAction}>

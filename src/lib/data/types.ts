@@ -30,6 +30,9 @@ export interface Club {
   slug: string;
   color: string;
   colorSecondary: string | null;
+  logo: string | null; // data URL in the sample build
+  blurb: string | null;
+  joinOpen: boolean; // anyone with the link can ask to join a team
   createdBy: ID;
   createdAt: string;
 }
@@ -55,6 +58,16 @@ export interface Team {
   isPublic: boolean;
   rosterVisible: boolean;
   createdBy: ID;
+  createdAt: string;
+  settings: TeamSettings;
+}
+
+export interface JoinRequest {
+  id: ID;
+  teamId: ID;
+  userId: ID;
+  message: string | null;
+  status: "pending" | "approved" | "declined";
   createdAt: string;
 }
 
@@ -125,24 +138,254 @@ export interface RosterMember {
   status: "invited" | "active" | "inactive" | "removed";
 }
 
-export type EventType = "game" | "practice" | "event";
+export const EVENT_TYPES = ["match", "training", "tournament", "social", "other"] as const;
+export type EventType = (typeof EVENT_TYPES)[number];
+export const EVENT_TYPE_LABEL: Record<EventType, string> = {
+  match: "Match",
+  training: "Training",
+  tournament: "Tournament",
+  social: "Social",
+  other: "Other",
+};
+/** Matches and tournaments need schedule_games; everything else schedule_events. */
+export const isFixture = (t: EventType) => t === "match" || t === "tournament";
+export type Competition = "league" | "cup" | "friendly";
 export type EventStatus = "active" | "postponed" | "cancelled";
 
 export interface TeamEvent {
   id: ID;
   teamId: ID;
+  seasonId: ID | null;
+  seriesId: ID | null; // weekly trainings share a series
   type: EventType;
+  competition: Competition | null;
   title: string | null;
   startAt: string; // ISO, UTC
   endAt: string;
+  meetAt: string | null; // "meet 30 min before"
   tz: string; // IANA zone the event happens in
+  venueId: ID | null;
   locationText: string | null;
   opponent: string | null;
   homeAway: "home" | "away" | "neutral" | null;
   notes: string | null;
+  squadSize: number | null;
   status: EventStatus;
   statusReason: string | null;
+  potmOpen: boolean;
   createdBy: ID | null;
+}
+
+export interface Venue {
+  id: ID;
+  teamId: ID;
+  name: string;
+  address: string | null;
+  lat: number | null;
+  lng: number | null;
+  radiusM: number; // check-in area
+}
+
+export interface PointsRules {
+  training: number;
+  match: number;
+  away_bonus: number;
+  late_penalty: number;
+  late_after_minutes: number;
+  potm: number;
+}
+export const DEFAULT_POINTS_RULES: PointsRules = { training: 1, match: 2, away_bonus: 10, late_penalty: -1, late_after_minutes: 15, potm: 3 };
+
+export interface TeamSettings {
+  crest: string | null; // data URL in the sample build; Storage URL later
+  pointsEnabled: boolean;
+  pointsPublic: boolean;
+  pointsRules: PointsRules;
+  geoCheckinEnabled: boolean;
+  membersCanPost: boolean;
+}
+
+export interface Season {
+  id: ID;
+  teamId: ID;
+  name: string;
+  startsOn: string; // YYYY-MM-DD
+  endsOn: string | null;
+  closedAt: string | null;
+}
+
+export type UnavailableKind = "injured" | "away" | "other";
+export interface AvailabilityPeriod {
+  id: ID;
+  userId: ID;
+  teamIds: ID[]; // which of my teams this applies to
+  kind: UnavailableKind;
+  startsOn: string; // YYYY-MM-DD, inclusive
+  endsOn: string; // inclusive
+  note: string | null; // captains only
+  createdAt: string;
+}
+
+export type AttendanceStatus = "present" | "late" | "absent" | "excused";
+export interface Attendance {
+  eventId: ID;
+  userId: ID;
+  status: AttendanceStatus;
+  minutesLate: number | null;
+  method: "staff" | "geo";
+  checkedInAt: string | null;
+  distanceM: number | null;
+  accuracyM: number | null;
+  recordedBy: ID | null;
+  updatedAt: string;
+}
+
+export type PointsReason = "training" | "match" | "away_bonus" | "late_penalty" | "potm" | "manual";
+export interface PointsEntry {
+  id: ID;
+  teamId: ID;
+  seasonId: ID | null;
+  userId: ID;
+  eventId: ID | null;
+  points: number;
+  reason: PointsReason;
+  note: string | null;
+  createdBy: ID | null;
+  createdAt: string;
+}
+
+export interface Score {
+  eventId: ID;
+  us: number;
+  them: number;
+  status: "not_started" | "live" | "final";
+  period: string | null; // "1st half", "HT", "2nd half"
+  version: number;
+  updatedAt: string;
+}
+
+export type MatchEventKind = "goal" | "own_goal" | "assist" | "yellow" | "red";
+export interface MatchEvent {
+  id: ID;
+  eventId: ID;
+  minute: number | null;
+  kind: MatchEventKind;
+  side: "us" | "them";
+  userId: ID | null;
+  assistId: ID | null;
+  note: string | null;
+  createdAt: string;
+}
+
+export interface PotmVote {
+  eventId: ID;
+  voterId: ID;
+  nomineeId: ID;
+}
+
+export interface RideOffer {
+  id: ID;
+  eventId: ID;
+  driverId: ID;
+  seats: number;
+  leavesAt: string; // "11:45"
+  from: string;
+  note: string | null;
+}
+export interface RideRequest {
+  id: ID;
+  eventId: ID;
+  userId: ID;
+  from: string | null;
+  offerId: ID | null; // null = still needs a ride
+}
+
+export interface Fee {
+  id: ID;
+  teamId: ID;
+  seasonId: ID | null;
+  name: string;
+  amountCents: number;
+  dueOn: string | null;
+  createdAt: string;
+}
+export interface Due {
+  id: ID;
+  feeId: ID;
+  userId: ID;
+  amountCents: number;
+}
+export type PaymentMethod = "etransfer" | "cash" | "other";
+export interface Payment {
+  id: ID;
+  dueId: ID;
+  amountCents: number;
+  method: PaymentMethod;
+  ref: string | null;
+  paidOn: string;
+  reportedBy: ID;
+  verifiedBy: ID | null;
+  verifiedAt: string | null;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: ID;
+  teamId: ID;
+  kind: "team" | "staff";
+}
+export interface Poll {
+  question: string;
+  options: string[];
+  multi: boolean;
+}
+export interface ChatMessage {
+  id: ID;
+  conversationId: ID;
+  userId: ID;
+  body: string;
+  imageUrl: string | null;
+  replyToId: ID | null;
+  poll: Poll | null;
+  pinned: boolean;
+  createdAt: string;
+  deletedAt: string | null;
+}
+export interface Reaction {
+  messageId: ID;
+  userId: ID;
+  emoji: string;
+}
+export interface PollVote {
+  messageId: ID;
+  userId: ID;
+  option: number;
+}
+export interface ReadMark {
+  conversationId: ID;
+  userId: ID;
+  lastReadAt: string;
+}
+
+export interface TeamMessage {
+  id: ID;
+  teamId: ID;
+  fromId: ID;
+  subject: string;
+  body: string;
+  recipientIds: ID[];
+  createdAt: string;
+}
+
+export interface NotificationPrefs {
+  userId: ID;
+  teamId: ID;
+  newEvents: boolean;
+  changes: boolean;
+  reminders: boolean;
+  chat: "all" | "mentions" | "off";
+  email: boolean;
+  push: boolean;
 }
 
 export type RsvpResponse = "going" | "not_going" | "maybe";
@@ -199,8 +442,10 @@ export interface RosterRow extends RosterMember {
 
 export interface EventWithMine extends TeamEvent {
   team: Pick<Team, "id" | "name" | "color" | "colorSecondary">;
+  venue: Venue | null;
   /** My answer, when I play on this team. null when I'm only staff there. */
-  mine: { response: RsvpResponse | null; note: string | null } | null;
+  mine: { response: RsvpResponse | null; note: string | null; unavailable: UnavailableKind | null } | null;
+  score: Pick<Score, "us" | "them" | "status"> | null;
 }
 
 export interface Availability {
