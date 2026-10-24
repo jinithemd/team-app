@@ -57,6 +57,12 @@ export default async function AccountPage() {
           <Link href="/availability" className="text-team-ink">
             Unavailable dates
           </Link>
+          <Link href="/account/notifications" className="text-team-ink">
+            Notifications
+          </Link>
+          <Link href="/calendar/subscribe" className="text-team-ink">
+            Add to your phone&apos;s calendar
+          </Link>
         </div>
       </section>
 

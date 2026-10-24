@@ -7,4 +7,6 @@ export * from "./matchday";
 export * from "./events-managers";
 export * from "./carpool";
 export * from "./dues";
+export * from "./chat";
+export * from "./feeds";
 export type * from "./types";

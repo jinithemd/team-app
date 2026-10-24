@@ -41,7 +41,9 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       ) : (
         <EmptyState icon={<CalendarDays />} title="Nothing coming up" hint="Games, trainings and events from all your teams show up here." />
       )}
-      <p className="text-xs text-muted">Adding this calendar to your phone&apos;s calendar app comes in a later build.</p>
+      <Link href="/calendar/subscribe" className="justify-self-start text-sm font-semibold text-team-ink">
+        Add these to your phone&apos;s calendar
+      </Link>
     </main>
   );
 }

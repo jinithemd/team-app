@@ -399,3 +399,42 @@ export async function remindUnpaidAction(teamId: string, _: FormState): Promise<
   if (!res.ok) return { error: res.error };
   return { ok: true, message: res.data.sent ? `Reminder sent to ${res.data.sent} ${res.data.sent === 1 ? "player" : "players"}.` : "Nobody owes anything." };
 }
+
+export async function sendChatAction(convId: string, input: { body: string; replyToId?: string | null; imageUrl?: string | null; poll?: { question: string; options: string[]; multi: boolean } | null }) {
+  const res = await data.sendChat(convId, input);
+  revalidatePath("/", "layout");
+  return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+}
+
+export async function chatOpAction(op: { kind: "react"; messageId: string; emoji: string } | { kind: "vote"; messageId: string; option: number } | { kind: "pin" | "unpin" | "delete"; messageId: string }) {
+  const res =
+    op.kind === "react" ? await data.toggleReaction(op.messageId, op.emoji) : op.kind === "vote" ? await data.votePoll(op.messageId, op.option) : await data.moderateMessage(op.messageId, op.kind);
+  revalidatePath("/", "layout");
+  return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+}
+
+export async function sendTeamMessageAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const to = (["all", "players", "staff", "chosen"] as const).find((x) => x === str(f, "to")) ?? "all";
+  const res = await data.sendTeamMessage(teamId, { subject: str(f, "subject"), body: str(f, "body"), to, recipientIds: f.getAll("recipient").map(String) });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(`/t/${teamId}`, "layout");
+  redirect(`/t/${teamId}/messages?sent=${res.data.count}`);
+}
+
+export async function savePrefsAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await data.savePrefs(teamId, {
+    newEvents: f.has("newEvents"),
+    changes: f.has("changes"),
+    reminders: f.has("reminders"),
+    chat: (str(f, "chat") || "all") as "all" | "mentions" | "off",
+    email: f.has("email"),
+    push: f.has("push"),
+  });
+  if (!res.ok) return { error: res.error };
+  return { ok: true, message: "Saved." };
+}
+
+export async function resetFeedAction() {
+  await data.resetCalendarFeed();
+  return { ok: true as const };
+}

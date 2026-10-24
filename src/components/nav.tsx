@@ -14,7 +14,7 @@ const ITEMS = [
 ];
 
 /** Bottom tab bar under lg, left sidebar at lg and up. */
-export function PrimaryNav({ pendingCount }: { pendingCount: number }) {
+export function PrimaryNav({ pendingCount, chatCount = 0 }: { pendingCount: number; chatCount?: number }) {
   const path = usePathname();
   return (
     <>
@@ -37,6 +37,14 @@ export function PrimaryNav({ pendingCount }: { pendingCount: number }) {
                   {active && <span aria-hidden className="absolute inset-x-[30%] top-0 h-0.5 rounded-pill bg-team-ink" />}
                   <Icon aria-hidden className="size-[22px]" />
                   {label}
+                  {href === "/chat" && chatCount > 0 && (
+                    <>
+                      <span aria-hidden className="absolute top-1 left-[calc(50%+6px)] grid h-4 min-w-4 place-items-center rounded-pill bg-danger px-1 text-[10px] font-bold text-on-danger tabular">
+                        {chatCount}
+                      </span>
+                      <span className="sr-only">, {chatCount} unread</span>
+                    </>
+                  )}
                   {href === "/" && pendingCount > 0 && (
                     <>
                       <span aria-hidden className="absolute top-1 left-[calc(50%+6px)] grid h-4 min-w-4 place-items-center rounded-pill bg-danger px-1 text-[10px] font-bold text-on-danger tabular">
@@ -69,6 +77,12 @@ export function PrimaryNav({ pendingCount }: { pendingCount: number }) {
             >
               <Icon aria-hidden className="size-5" />
               <span className="flex-1">{label}</span>
+              {href === "/chat" && chatCount > 0 && (
+                <span className="grid h-5 min-w-5 place-items-center rounded-pill bg-danger px-1.5 text-[11px] font-bold text-on-danger tabular">
+                  {chatCount}
+                  <span className="sr-only"> unread</span>
+                </span>
+              )}
               {href === "/" && pendingCount > 0 && (
                 <span className="grid h-5 min-w-5 place-items-center rounded-pill bg-danger px-1.5 text-[11px] font-bold text-on-danger tabular">
                   {pendingCount}

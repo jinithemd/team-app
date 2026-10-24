@@ -123,6 +123,14 @@ export default async function RosterPage({
           )}
         </>
       )}
+      {team.isStaff && (
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
+          <span className="text-muted">Export:</span>
+          <a href={`/t/${teamId}/export/players.csv`} className="text-team-ink">Players</a>
+          <a href={`/t/${teamId}/export/attendance.csv`} className="text-team-ink">Attendance</a>
+          <a href={`/t/${teamId}/export/events.csv`} className="text-team-ink">Schedule</a>
+        </p>
+      )}
       {team.canManagePermissions && (
         <p className="text-xs text-muted">
           Open anyone to change their roles. A team can have several managers, coaches or captains, and one person can hold several roles.{" "}
