@@ -1,4 +1,5 @@
 import re, sys
+import _waits  # noqa: F401
 from playwright.sync_api import sync_playwright, expect
 
 BASE = "http://localhost:3000"

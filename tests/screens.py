@@ -2,6 +2,7 @@
 exports, club pages, join requests, find a team. Plus a sweep of every route at phone width
 for console errors and sideways scroll. Run against a fresh server (sample data resets)."""
 import re, sys, urllib.request
+import _waits  # noqa: F401
 from playwright.sync_api import sync_playwright, expect
 
 BASE = "http://localhost:3000"; OUT = "/home/claude/team-app/replica/clone-screens"
