@@ -9,12 +9,12 @@ insert into profiles(id,first_name,last_name,email) values
 insert into clubs(id,name,slug,created_by) values ('10000000-0000-0000-0000-000000000001','Limestone City FC','limestone-city','00000000-0000-0000-0000-0000000000a0');
 insert into club_admins values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000a0','owner'),('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000f0','treasurer');
 insert into teams(id,club_id,name,sport,created_by,points_enabled) values ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Reserves','Soccer','00000000-0000-0000-0000-0000000000a0',true);
-insert into roster_members(team_id,user_id,role,permissions,status) values
- ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c0','captain','{attendance,schedule_events,scoring}','active'),
- ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b1','player','{}','active'),
- ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b2','player','{}','active'),
- ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b3','player','{}','active'),
- ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000e0','player','{}','active');
+insert into roster_members(team_id,user_id,roles,permissions,status) values
+ ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c0','{captain}','{attendance,schedule_events,scoring,roster}','active'),
+ ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b1','{}','{}','active'),
+ ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b2','{}','{}','active'),
+ ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b3','{}','{}','active'),
+ ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000e0','{}','{}','active');
 insert into conversations(team_id,kind) values ('20000000-0000-0000-0000-000000000001','team'),('20000000-0000-0000-0000-000000000001','staff');
 insert into events(id,team_id,type,start_at,end_at,tz,opponent,home_away) values
  ('30000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','match','2026-10-31 18:00Z','2026-10-31 19:45Z','America/Toronto','Napanee Rovers','away'),
@@ -156,3 +156,28 @@ select * from check_in('30000000-0000-0000-0000-000000000003',44.2312,-76.4860,8
 \echo captain sees both check-ins with method (2):
 set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
 select count(*) from attendance where method='geo';
+
+\echo == One person, many hats
+reset role;
+insert into auth.users values ('00000000-0000-0000-0000-0000000000d0');
+insert into profiles(id,first_name,last_name,email) values ('00000000-0000-0000-0000-0000000000d0','Jin','Founder','j@x');
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000d0';
+insert into clubs(id,name,slug,created_by) values ('10000000-0000-0000-0000-000000000002','Athletic FC','athletic-fc','00000000-0000-0000-0000-0000000000d0');
+reset role; insert into club_admins values ('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-0000000000d0','owner'); set role authenticated;
+\echo [ok] founder signs up once and creates the club (owner)
+insert into teams(id,club_id,name,sport,created_by) values ('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','First Team','Soccer','00000000-0000-0000-0000-0000000000d0');
+insert into roster_members(team_id,user_id,is_player,roles,permissions,status,jersey) values
+ ('20000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-0000000000d0',true,'{captain,manager}','{edit_settings,roster,schedule_games,schedule_events,attendance,scoring,payments,messages,manage_permissions}','active','9');
+\echo [ok] and joins the First Team as player + captain + manager in one row
+\echo founder appears once on the roster, with both hats (1, {captain,manager}, t):
+select count(*), max(roles::text), bool_and(is_player) from roster_members where team_id='20000000-0000-0000-0000-000000000002';
+\echo [expect fail] a made-up role:
+insert into roster_members(team_id,invited_email,roles) values ('20000000-0000-0000-0000-000000000002','x@x','{goalkeeper_coach}');
+\echo [expect fail] not a player and no role:
+insert into roster_members(team_id,invited_email,is_player) values ('20000000-0000-0000-0000-000000000002','y@x',false);
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+\echo [expect fail] captain with roster permission makes themself a manager with payments:
+update roster_members set roles='{captain,manager}', permissions=permissions||'{payments}' where user_id='00000000-0000-0000-0000-0000000000c0' and team_id='20000000-0000-0000-0000-000000000001';
+\echo captain can still invite a plain player (1 row):
+insert into roster_members(team_id,invited_email) values ('20000000-0000-0000-0000-000000000001','new@x') returning 1;

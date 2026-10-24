@@ -84,3 +84,5 @@ Club and team stats dashboard,analytics,could,partial,no,"attendance trends, due
 Digital membership card,membership,could,no,no,later
 Sponsor offers and rewards,membership,could,no,no,later; revenue for clubs
 GPS pickup confirmation,carpools,could,no,no,reuse geo check-in: one fix at pickup
+One account with stacked roles (player + captain + manager + club owner),roster,must,partial,no,"original separates staff and players; ours: is_player + roles[] + permissions, club hats in club_admins"
+"Your part on this team step when creating a team",onboarding,must,no,no,do you play; number; position; roles

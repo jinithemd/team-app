@@ -106,8 +106,9 @@ create table teams (
 create index on teams (created_by);
 create index on teams (club_id);
 
--- What a person can do on a team. Captains, coaches and managers are just members with
--- permissions; a playing captain has is_player = true and permissions too.
+-- One row per person per team. Hats stack: the same person can be a player (is_player),
+-- captain and manager at once (roles), and what they can do comes from permissions.
+-- Club-level hats (owner, admin, treasurer) live in club_admins, so one account covers it all.
 create table roster_members (
   id uuid primary key default gen_random_uuid(),
   team_id uuid not null references teams(id) on delete cascade,
@@ -116,7 +117,8 @@ create table roster_members (
   invite_token_hash text unique,
   invited_name text,
   is_player boolean not null default true,
-  role text not null default 'player' check (role in ('player','captain','vice_captain','coach','manager','treasurer')),
+  roles text[] not null default '{}'
+    check (roles <@ array['captain','vice_captain','coach','manager','treasurer']),
   jersey text,
   position text,
   permissions text[] not null default '{}'
@@ -126,12 +128,30 @@ create table roster_members (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint member_target check (user_id is not null or invited_email is not null),
-  constraint active_has_user check (status not in ('active','inactive') or user_id is not null)
+  constraint active_has_user check (status not in ('active','inactive') or user_id is not null),
+  constraint plays_or_has_a_role check (is_player or cardinality(roles) > 0)
 );
 create unique index roster_one_per_user on roster_members (team_id, user_id) where user_id is not null and status <> 'removed';
 create unique index roster_one_invite on roster_members (team_id, invited_email) where status = 'invited';
 create index on roster_members (user_id);
 create index on roster_members (team_id, status);
+
+-- Editing the roster isn't the same as handing out power: changing someone's roles or
+-- permissions needs manage_permissions (the team creator and club admins have it).
+create or replace function guard_roster_perms() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then return new; end if;   -- service role
+  if (tg_op = 'INSERT' and (cardinality(new.permissions) > 0 or cardinality(new.roles) > 0))
+     or (tg_op = 'UPDATE' and (new.permissions is distinct from old.permissions or new.roles is distinct from old.roles)) then
+    if not has_team_perm(new.team_id, 'manage_permissions') then
+      raise exception 'Only someone who manages permissions can change roles' using errcode = 'insufficient_privilege';
+    end if;
+  end if;
+  return new;
+end $$;
+create trigger roster_perms_guard before insert or update on roster_members
+  for each row execute function guard_roster_perms();
 
 create table follows (
   user_id uuid not null references profiles(id) on delete cascade,

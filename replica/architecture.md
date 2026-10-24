@@ -33,7 +33,7 @@ Tables: 36 (+3 views). Full SQL in `schema.sql`. Access rules: row level securit
 | --- | --- | --- |
 | accounts | profiles, member_private | emergency contact and health notes: the player and their team staff only |
 | clubs | clubs, club_admins | owner, admin, treasurer; branding public; only the owner manages admins |
-| teams | teams, roster_members, follows | roles: player, captain, vice captain, coach, manager, treasurer; 9 permissions; a playing captain is a player with permissions |
+| teams | teams, roster_members, follows | one row per person per team: `is_player` plus stacked `roles` (captain, vice captain, coach, manager, treasurer) plus 9 permissions; changing roles or permissions needs manage_permissions (trigger) |
 | availability | availability_periods (+ availability_public view) | away, injured, vacation; teammates see "unavailable", only staff see the reason |
 | schedule | seasons, venues, event_series, events, event_managers | types: training, match, tournament, social; competition: league, cup, friendly; one open season per team; an event manager runs one event without team-wide rights |
 | answers | rsvps (+ rsvps_public view) | answer for yourself; staff can set one for a player; notes for staff only |
@@ -46,6 +46,17 @@ Tables: 36 (+3 views). Full SQL in `schema.sql`. Access rules: row level securit
 | chat | conversations (team, staff, event, direct), chat_messages (replies, pins, soft delete), chat_reactions, chat_reads, poll_options, poll_votes | staff chat hidden from players |
 | messages | messages, message_recipients | subject-line messages to all or chosen players |
 | delivery | notification_prefs, push_subscriptions, calendar_feeds, outbox | outbox dedupe key prevents double sends |
+
+### Signing up: one account, many hats
+
+- Everyone signs up the same way: email link or Google. There are no separate "player", "captain" or "admin" accounts.
+- Hats are added by what you do next, and they stack:
+  - **Create a club** → you're its owner (`club_admins`). Owners can add admins and a treasurer.
+  - **Create a team** → a "Your part on this team" step asks: Do you play? (number, position) and which roles (captain, manager, …). You get one roster row with `is_player`, those `roles` and every permission. Pick none and you're there as a manager only.
+  - **Join by invite or club link** → you arrive as a player; a captain can add roles later.
+- What you can do = the union of your hats: club owner/admin powers on every club team, team permissions on that team, and player things (answer, check in, vote) wherever `is_player` is true.
+- The app never makes you switch modes. A player-captain sees "Going / Can't go" at the top of an event and the captain tools under it. The Account screen lists your hats per club and team.
+- `createClub` runs as one server transaction: insert the club, then the owner row (service role), so nobody can make themselves owner of someone else's club.
 
 **Permissions** (on a roster row): edit_settings, roster, schedule_games, schedule_events, attendance, scoring, payments, messages, manage_permissions. Default for a new captain: schedule_events, attendance, scoring, messages.
 
