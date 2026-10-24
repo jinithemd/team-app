@@ -2,7 +2,7 @@ feature,area,priority,original,clone,notes
 Sign up with email and password,onboarding,must,yes,partial,S01; original also requires age certification; sample-data sign-up by name+email; real email+password/magic link in replica-backend
 Activation / verification email,onboarding,must,yes,no,S01; needs Supabase Auth
 Create a team (name sport age group location colour),teams,must,yes,yes,S05; S05
-Invite players by email,roster,must,yes,partial,"paste a list; sample build asks for parent email, rework to player's own email"
+Invite players by email,roster,must,yes,yes,"paste a list; sample build asks for parent email, rework to player's own email"
 Invite staff with role,roster,must,yes,yes,S13; S13 ?kind=staff with role + permissions
 Roster with Players and Staff tabs (jersey position),roster,must,yes,yes,S12; S12
 Create match / training / tournament / social,schedule,must,yes,partial,"sample build has game/practice/event, rename types"
@@ -19,10 +19,10 @@ Push notifications (web push / PWA),notifications,must,yes,no,replica-backend
 Home with upcoming events across teams,home,must,yes,yes,S02; S02
 Mobile-first responsive layout,platform,must,yes,yes,"clone is web first; 390 and 1440 checked, no sideways scroll"
 RSVP from email without logging in,rsvp,should,yes,yes,signed link; signed 21-day links; saves after page load so link scanners don't answer
-My calendar across all my teams,schedule,should,yes,partial,"S18 list + per-team filter; sample build still filters per kid, rework"
+My calendar across all my teams,schedule,should,yes,yes,"S18 list + per-team filter; sample build still filters per kid, rework"
 Calendar subscribe (iCal / Google / Outlook),schedule,should,yes,no,S19
 Recurring practices,schedule,should,unknown,no,not confirmed in SportsEngine sources
-Staff permissions checklist,roster,should,yes,partial,S15 six permissions; set on invite; editing later (S15) not built
+Staff permissions checklist,roster,should,yes,yes,S15 six permissions; set on invite; editing later (S15) not built
 Email-style messages with subject to selected members,messages,should,yes,no,S17
 Chat reactions with counts,chat,should,yes,no,
 Chat video file and GIF attachments,chat,should,yes,no,
@@ -52,18 +52,18 @@ News articles,hq,could,yes,skip,HQ-gated in original
 Livestreaming,video,could,yes,skip,separate SportsEngine Play product
 League / governing-body affiliation,network,could,yes,skip,their network and partner deals
 Third-party advertising and tracking,ads,could,yes,skip,deliberately not cloned
-"Club account with club name, logo and colours",clubs,must,no,no,the app takes the club's look for its members; powered-by line
-Club teams grouped under the club; club admins run every team,clubs,must,partial,no,original needs SportsEngine HQ for this
+"Club account with club name, logo and colours",clubs,must,no,partial,the app takes the club's look for its members; powered-by line
+Club teams grouped under the club; club admins run every team,clubs,must,partial,partial,original needs SportsEngine HQ for this
 Club join page with all its teams,clubs,should,partial,no,/c/<slug> for posters and WhatsApp
 Club look on the home-screen icon,clubs,should,no,no,per-club web app manifest; no per-club store listing
 Club switcher for families in more than one club,clubs,should,no,no,
-Club admins and owner roles,clubs,should,partial,no,
-Players own their accounts and answer for themselves,roster,must,yes,partial,sample build is parent-centric; rework
-"Roles: captain, vice captain, coach, manager, treasurer",roster,must,partial,no,a playing captain is a player with permissions
+Club admins and owner roles,clubs,should,partial,partial,
+Players own their accounts and answer for themselves,roster,must,yes,yes,sample build is parent-centric; rework
+"Roles: captain, vice captain, coach, manager, treasurer",roster,must,partial,yes,a playing captain is a player with permissions
 "Mark yourself away, injured or on vacation",availability,must,no,no,teammates see unavailable; reason is staff-only; reminders skip you
 "Take attendance: present, late (minutes), absent, excused",attendance,must,partial,no,what happened vs what was said
 Attendance history and rate per player,attendance,should,partial,no,player profile and team stats
-Geo check-in: player taps I'm here at the venue,attendance,should,no,no,"off by default per team; one location fix; within venue radius; present or late from the time; stores distance not coordinates"
+Geo check-in: player taps I'm here at the venue,attendance,should,no,no,off by default per team; one location fix; within venue radius; present or late from the time; stores distance not coordinates
 Venue map pin and check-in radius,schedule,should,partial,no,default 150 m
 Check-in reminder push before kick-off,notifications,could,no,no,only to Going players not yet checked in
 "Event manager for one event (away trip, tournament)",roster,should,no,no,"attendance, scoring, carpools for that event only"
@@ -85,4 +85,4 @@ Digital membership card,membership,could,no,no,later
 Sponsor offers and rewards,membership,could,no,no,later; revenue for clubs
 GPS pickup confirmation,carpools,could,no,no,reuse geo check-in: one fix at pickup
 One account with stacked roles (player + captain + manager + club owner),roster,must,partial,yes,"original separates staff and players; ours: is_player + roles[] + permissions, club hats in club_admins"
-"Your part on this team step when creating a team",onboarding,must,no,yes,do you play; number; position; roles
+Your part on this team step when creating a team,onboarding,must,no,yes,do you play; number; position; roles
