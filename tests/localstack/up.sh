@@ -6,7 +6,7 @@ set -euo pipefail
 HERE=$(cd "$(dirname "$0")" && pwd); REPO=$(cd "$HERE/../.." && pwd); BIN=/var/tmp/sbstack
 SECRET=local-dev-jwt-secret-with-at-least-32-chars
 PSQL="psql -h /var/tmp/pgtest -p 5499 -U postgres -v ON_ERROR_STOP=1 -q"
-for p in 9999 3001 54321 2500; do fuser -k $p/tcp >/dev/null 2>&1 || true; done
+for p in 9999 3001 54321 2500 4010; do fuser -k $p/tcp >/dev/null 2>&1 || true; done
 # Local Postgres (cluster in /var/tmp/pgtest/data, owned by postgres): start it if it isn't running.
 if ! pg_isready -h /var/tmp/pgtest -p 5499 -q; then
   su postgres -s /bin/bash -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/tmp/pgtest/data -l /var/tmp/pgtest/log -o '-p 5499 -k /var/tmp/pgtest' start" >/dev/null 2>&1 < /dev/null
@@ -39,6 +39,8 @@ server-host = "127.0.0.1"
 CONF
 (cd "$BIN" && nohup ./postgrest postgrest.conf > "$BIN/postgrest.log" 2>&1 < /dev/null &)
 node "$HERE/gateway.mjs" > "$BIN/gateway.log" 2>&1 < /dev/null &
+: > "$BIN/resend.jsonl"
+node "$HERE/resend_mock.mjs" "$BIN/resend.jsonl" > "$BIN/resend.log" 2>&1 < /dev/null &
 for i in $(seq 1 40); do curl -sf http://127.0.0.1:3001/ >/dev/null && break; sleep 0.5; done
 ANON=$(node "$HERE/jwt.mjs" $SECRET anon); SERVICE=$(node "$HERE/jwt.mjs" $SECRET service_role)
 cat > "$REPO/.env.localstack" <<ENV
@@ -48,5 +50,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=$ANON
 SUPABASE_SERVICE_ROLE_KEY=$SERVICE
 APP_URL=http://localhost:3000
 DEV_OUTBOX=1
+RESEND_API_URL=http://127.0.0.1:4010
+RESEND_API_KEY=test-resend-key
+EMAIL_FROM="Team App <team@example.test>"
+CRON_SECRET=test-cron-secret
 ENV
 echo "local Supabase up: http://localhost:54321 (env in .env.localstack, mail in $BIN/mail.jsonl)"

@@ -72,6 +72,7 @@ export async function syncChanges(sb: DB, before: Store, after: Store, aux: Aux)
     for (const [k, r] of prev) if (!seen.has(k)) deletes.push([spec, r]);
   }
   if (!inserts.length && !updates.length && !deletes.length && !linkUpdates.length) return;
+  const queuedEmail = inserts.some(([spec]) => spec.key === "outbox");
 
   const client = (spec: TableSpec) => (spec.admin ? adminClient() : sb);
   const from = (spec: TableSpec) => client(spec).from(spec.table as never) as unknown as ReturnType<DB["from"]>;
@@ -122,4 +123,5 @@ export async function syncChanges(sb: DB, before: Store, after: Store, aux: Aux)
       throw new SyncError("You don't have permission to do that.");
     }
   }
+  if (queuedEmail) await (await import("../../email/worker")).kickOutbox();
 }

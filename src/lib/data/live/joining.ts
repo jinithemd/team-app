@@ -4,6 +4,7 @@ import { userClient, adminClient } from "../../supabase/server";
 import { verify } from "../../tokens";
 import { APP_URL } from "../store";
 import { SPONSOR_TIERS, hatLabels, type SponsorTier } from "../types";
+import { kickOutbox } from "../../email/worker";
 
 /*
  * Joining a team in the live build. These go through the database functions in the
@@ -32,6 +33,7 @@ export async function joinByLink(token: string): Promise<ActionResult<{ teamId: 
   const { data, error } = await sb.rpc("join_by_link", { p_token: token });
   const r = data?.[0];
   if (error || !r) return { ok: false, error: error && /sign in/i.test(error.message) ? "Sign in first." : "This invite link doesn't work any more. Ask your captain for the new one." };
+  if (r.status !== "member") await kickOutbox(); // the captains' "joined" / "wants to join" email
   return { ok: true, data: { teamId: r.team_id, status: r.status as "joined" | "requested" | "member" } };
 }
 
@@ -46,6 +48,7 @@ export async function requestToJoin(teamId: ID, message: string): Promise<Action
   const sb = await userClient();
   const { error } = await sb.rpc("request_to_join", { p_team: teamId, p_message: message });
   if (error) return { ok: false, error: /taking/i.test(error.message) ? "That team isn't taking requests." : msg(error, "Couldn't send that. Try again.") };
+  await kickOutbox();
   return { ok: true, data: undefined };
 }
 
@@ -54,6 +57,7 @@ export async function decideJoinRequest(requestId: ID, approve: boolean): Promis
   const { data: req } = await sb.from("join_requests").select("team_id").eq("id", requestId).maybeSingle();
   const { error } = await sb.rpc("decide_join_request", { p_request: requestId, p_approve: approve });
   if (error || !req) return { ok: false, error: error && /sorted/i.test(error.message) ? "Already sorted." : "Only captains and managers can add people." };
+  await kickOutbox();
   return { ok: true, data: { teamId: req.team_id } };
 }
 
