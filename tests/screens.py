@@ -80,7 +80,7 @@ with sync_playwright() as pw:
     expect(anon.get_by_text("Powered by Clbx")).to_be_visible(); shot(anon, "club-public"); step("public club page lists 5 teams, signed out")
     anon.get_by_role("link", name="Sign in to join").first.click(); anon.wait_for_url(re.compile(r"/c/limestone-city/login"))
     shot(anon, "club-signin")
-    anon.fill("#firstName", "Zoe"); anon.fill("#lastName", "Park"); anon.fill("#email", "zoe.park@example.com"); anon.click("text=Create account")
+    anon.fill("#firstName", "Zoe"); anon.fill("#lastName", "Park"); anon.fill("#email", "zoe.park@example.com"); anon.check("#agree"); anon.click("text=Create account")
     anon.wait_for_url(f"{BASE}/c/limestone-city"); step("new player signs up from the club's own sign-in")
     women = anon.locator("li", has_text="Limestone City Women")
     women.get_by_role("button", name="Ask to join").click(); women.locator("textarea").fill("Played at Queen's, any position")

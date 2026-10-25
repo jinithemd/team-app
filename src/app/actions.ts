@@ -19,8 +19,15 @@ export async function signInAsAction(f: FormData) {
 }
 
 export async function signUpAction(_: FormState, f: FormData): Promise<FormState> {
+  // Clbx is 16+ for now (terms, section 2). Checked here so both builds enforce it.
+  if (f.get("agree") !== "on") {
+    return {
+      error: "Confirm you're 16 or older and agree to the terms.",
+      fieldErrors: { agree: "Tick this to create an account. You need to be 16 or older." },
+    };
+  }
   if (LIVE) {
-    const r = await sendSignInLink({ email: str(f, "email"), firstName: str(f, "firstName"), lastName: str(f, "lastName"), next: str(f, "next"), create: true });
+    const r = await sendSignInLink({ email: str(f, "email"), firstName: str(f, "firstName"), lastName: str(f, "lastName"), next: str(f, "next"), create: true, agreed: true });
     return r.ok ? { ok: true, message: r.email } : { error: r.error, fieldErrors: r.fieldErrors };
   }
   const res = await data.signUp({ firstName: str(f, "firstName"), lastName: str(f, "lastName"), email: str(f, "email") });
@@ -38,6 +45,12 @@ export async function signInLinkAction(_: FormState, f: FormData): Promise<FormS
 export async function googleSignInAction(f: FormData) {
   const url = await googleSignInUrl(safeNext(str(f, "next")));
   redirect(url ?? "/login?google=off");
+}
+
+export async function deleteAccountAction(_: FormState, f: FormData): Promise<FormState> {
+  const res = await data.deleteAccount(str(f, "confirmEmail"));
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  redirect("/login?deleted=1");
 }
 
 export async function signOutAction() {

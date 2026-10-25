@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { getSessionUser, listDemoAccounts } from "@/lib/data";
 import { googleSignInAction, signInAsAction } from "../actions";
-import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
+import { APP_NAME, APP_TAGLINE, MIN_AGE } from "@/lib/brand";
 import { LIVE } from "@/lib/mode";
 import { googleEnabled, safeNext } from "@/lib/auth";
 import { Banner, buttonClass } from "@/components/ui";
@@ -11,8 +11,8 @@ import { SignInForm, SignUpForm } from "./sign-up-form";
 
 export const metadata: Metadata = { title: "Sign in" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; expired?: string; google?: string }> }) {
-  const { next, expired, google } = await searchParams;
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; expired?: string; google?: string; deleted?: string }> }) {
+  const { next, expired, google, deleted } = await searchParams;
   if (await getSessionUser()) redirect(safeNext(next));
   const accounts = LIVE ? [] : await listDemoAccounts();
   return (
@@ -22,6 +22,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <p className="font-display text-display leading-none font-bold uppercase">{APP_NAME}</p>
           <p className="mt-2 text-muted">{APP_TAGLINE}</p>
         </div>
+        {deleted && <Banner>Your account and personal data have been deleted. Thanks for using {APP_NAME}.</Banner>}
         {expired && <Banner tone="warning">That sign-in link has expired or was already used. Ask for a new one below.</Banner>}
         {google && <Banner tone="warning">Google sign-in isn&apos;t switched on yet. Use your email instead.</Banner>}
 
@@ -38,6 +39,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <form action={googleSignInAction}>
                 <input type="hidden" name="next" value={next ?? ""} />
                 <button className={buttonClass("secondary", "lg", "w-full")}>Continue with Google</button>
+                <p className="mt-2 text-xs text-muted">
+                  New to {APP_NAME}? Continuing with Google means you&apos;re {MIN_AGE} or older and agree to the terms and privacy policy.
+                </p>
               </form>
             )}
           </section>
@@ -84,6 +88,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </Banner>
           )}
         </section>
+        <p className="text-center text-xs text-muted">
+          <a href="/terms" className="underline">
+            Terms
+          </a>{" "}
+          ·{" "}
+          <a href="/privacy" className="underline">
+            Privacy
+          </a>
+        </p>
       </div>
     </main>
   );

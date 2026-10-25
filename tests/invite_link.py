@@ -21,7 +21,7 @@ def fits(p, label):
 def step(m): print("✓", m, flush=True)
 def sign_up(p, first, last, email):
     p.fill("#firstName", first); p.fill("#lastName", last); p.fill("#email", email)
-    p.get_by_role("button", name="Create account").click()
+    p.check("#agree"); p.get_by_role("button", name="Create account").click()
 
 with sync_playwright() as pw:
     b = pw.chromium.launch()

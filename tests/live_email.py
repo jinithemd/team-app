@@ -30,7 +30,7 @@ def sign_up(p, first, last, email, nxt=""):
     p.goto(f"{BASE}/login{nxt}"); settle(p)
     n = sum(1 for l in open(MAIL) if email in l) if __import__("os").path.exists(MAIL) else 0
     p.fill("#firstName", first); p.fill("#lastName", last); p.fill("#email", email)
-    p.get_by_role("button", name="Create account").click(); expect(p.get_by_text("Check your email")).to_be_visible()
+    p.check("#agree"); p.get_by_role("button", name="Create account").click(); expect(p.get_by_text("Check your email")).to_be_visible()
     p.goto(link_for(email, n)); settle(p)
 
 with sync_playwright() as pw:

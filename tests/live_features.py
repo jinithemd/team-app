@@ -35,7 +35,7 @@ def sign_up(p, first, last, email, next_url=None):
     p.goto(f"{BASE}/login" + (f"?next={next_url}" if next_url else "")); settle(p)
     n = mail_count(email)
     p.fill("#firstName", first); p.fill("#lastName", last); p.fill("#email", email)
-    p.get_by_role("button", name="Create account").click(); expect(p.get_by_text("Check your email")).to_be_visible()
+    p.check("#agree"); p.get_by_role("button", name="Create account").click(); expect(p.get_by_text("Check your email")).to_be_visible()
     p.goto(link_for(email, n)); settle(p)
 def section(name, fn):
     try:

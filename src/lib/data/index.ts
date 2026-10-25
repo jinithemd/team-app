@@ -155,6 +155,8 @@ export const resetInviteLink = pick("resetInviteLink");
 export const setLinkApproval = pick("setLinkApproval");
 export const getJoinPage = pick("getJoinPage");
 export const joinByLink = pick("joinByLink");
+export const accountDeletionBlockers = pick("accountDeletionBlockers");
+export const deleteAccount = pick("deleteAccount");
 
 export { METHOD_LABEL, EMOJI } from "./demo";
 export type { InviteRow, EventInput, CarpoolView, DueStatus, ChatView, SponsorInput } from "./demo";

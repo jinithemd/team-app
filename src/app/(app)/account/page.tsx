@@ -112,9 +112,23 @@ export default async function AccountPage() {
         </form>
       </section>
 
-      <form action={signOutAction}>
-        <button className={buttonClass("secondary")}>Sign out</button>
-      </form>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <form action={signOutAction}>
+          <button className={buttonClass("secondary")}>Sign out</button>
+        </form>
+        <Link href="/account/delete" className="text-sm font-semibold text-danger hover:underline">
+          Delete my account
+        </Link>
+      </div>
+      <p className="text-xs text-muted">
+        <Link href="/privacy" className="underline">
+          Privacy policy
+        </Link>{" "}
+        ·{" "}
+        <Link href="/terms" className="underline">
+          Terms
+        </Link>
+      </p>
     </main>
   );
 }

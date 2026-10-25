@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { signInLinkAction, signUpAction, type FormState } from "../actions";
 import { Field, Input, buttonClass } from "@/components/ui";
+import { MIN_AGE } from "@/lib/brand";
 
 /** After an email link is sent (live build). */
 export function CheckEmail({ email }: { email: string }) {
@@ -42,10 +43,24 @@ export function SignInForm({ next }: { next?: string }) {
 
 export function SignUpForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(signUpAction, null);
-  const fe = state?.fieldErrors ?? {};
+  // Checked here first so a missed tick doesn't submit (and clear) what they typed. The server checks again.
+  const [agreeError, setAgreeError] = useState<string>();
+  const fe: Record<string, string> = { ...(state?.fieldErrors ?? {}), ...(agreeError ? { agree: agreeError } : {}) };
   if (state?.ok && state.message) return <CheckEmail email={state.message} />;
   return (
-    <form action={action} className="grid gap-3" noValidate>
+    <form
+      action={action}
+      className="grid gap-3"
+      noValidate
+      onSubmit={(e) => {
+        const box = e.currentTarget.elements.namedItem("agree") as HTMLInputElement | null;
+        if (box && !box.checked) {
+          e.preventDefault();
+          setAgreeError("Tick this to create an account. You need to be 16 or older.");
+          box.focus();
+        } else setAgreeError(undefined);
+      }}
+    >
       {next && <input type="hidden" name="next" value={next} />}
       <div className="grid grid-cols-2 gap-3">
         <Field id="firstName" label="First name" error={fe.firstName}>
@@ -58,6 +73,36 @@ export function SignUpForm({ next }: { next?: string }) {
       <Field id="email" label="Email" error={fe.email} hint="We'll send a sign-in link here.">
         <Input id="email" name="email" type="email" autoComplete="email" inputMode="email" error={fe.email} required />
       </Field>
+      <div className="grid gap-1.5">
+        <label htmlFor="agree" className="flex items-start gap-2.5 text-sm">
+          <input
+            id="agree"
+            name="agree"
+            type="checkbox"
+            required
+            aria-invalid={!!fe.agree}
+            aria-describedby={fe.agree ? "agree-error" : undefined}
+            onChange={(e) => e.target.checked && setAgreeError(undefined)}
+            className="mt-0.5 size-5 shrink-0 accent-[var(--team)]"
+          />
+          <span>
+            I&apos;m {MIN_AGE} or older and I agree to the{" "}
+            <a href="/terms" target="_blank" className="font-semibold text-team-ink underline">
+              terms
+            </a>{" "}
+            and{" "}
+            <a href="/privacy" target="_blank" className="font-semibold text-team-ink underline">
+              privacy policy
+            </a>
+            .
+          </span>
+        </label>
+        {fe.agree && (
+          <p id="agree-error" className="text-xs font-medium text-danger">
+            {fe.agree}
+          </p>
+        )}
+      </div>
       {state?.error && !Object.keys(fe).length && (
         <p role="alert" className="text-sm text-danger">
           {state.error}

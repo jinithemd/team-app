@@ -1,6 +1,7 @@
 import "server-only";
 import { userClient } from "./supabase/server";
 import { APP_URL, EMAIL_RE, norm } from "./data/store";
+import { TERMS_VERSION } from "./brand";
 
 /*
  * Live build sign-in: Supabase Auth with email links (and Google once it's switched on in the
@@ -13,7 +14,7 @@ const callback = (next: string) => `${APP_URL}/auth/callback?next=${encodeURICom
 export type LinkResult = { ok: true; email: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 /** Email a sign-in link. With names, it also creates the account if there isn't one. */
-export async function sendSignInLink(input: { email: string; firstName?: string; lastName?: string; next?: string; create: boolean }): Promise<LinkResult> {
+export async function sendSignInLink(input: { email: string; firstName?: string; lastName?: string; next?: string; create: boolean; agreed?: boolean }): Promise<LinkResult> {
   const email = norm(input.email);
   const fieldErrors: Record<string, string> = {};
   if (input.create) {
@@ -28,7 +29,15 @@ export async function sendSignInLink(input: { email: string; firstName?: string;
     options: {
       shouldCreateUser: input.create,
       emailRedirectTo: callback(input.next ?? "/"),
-      data: input.create ? { first_name: input.firstName!.trim(), last_name: input.lastName!.trim() } : undefined,
+      data: input.create
+        ? {
+            first_name: input.firstName!.trim(),
+            last_name: input.lastName!.trim(),
+            // When they confirmed 16+ and agreed to the terms and privacy policy.
+            terms_accepted_at: input.agreed ? new Date().toISOString() : null,
+            terms_version: TERMS_VERSION,
+          }
+        : undefined,
     },
   });
   if (error) {

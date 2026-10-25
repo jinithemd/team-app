@@ -73,7 +73,7 @@ with sync_playwright() as p:
     # S01 one sign-up for everyone
     c.goto(f"{BASE}/login"); shot(c, "S01-login")
     c.fill("#firstName", "Jin"); c.fill("#lastName", "Varghese"); c.fill("#email", "jin.founder@example.com")
-    c.click("text=Create account"); c.wait_for_url(f"{BASE}/")
+    c.check("#agree"); c.click("text=Create account"); c.wait_for_url(f"{BASE}/")
     expect(c.get_by_text("You're not on a team yet")).to_be_visible(); shot(c, "S02-home-empty"); step("founder signs up once, sees empty home")
 
     # set up a club: makes you its owner
