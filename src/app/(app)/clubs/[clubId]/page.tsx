@@ -1,3 +1,4 @@
+import { APP_URL } from "@/lib/data/store";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, Plus } from "lucide-react";
@@ -10,7 +11,6 @@ import { CopyLink } from "@/app/(app)/calendar/subscribe/feed-bits";
 export const metadata: Metadata = { title: "Club" };
 
 const money = (c: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(c / 100);
-const APP_URL = process.env.APP_URL || "http://localhost:3000";
 
 // Club admin home: every team, this week's matches, join requests and dues at a glance.
 export default async function ClubAdminPage({ params }: { params: Promise<{ clubId: string }> }) {

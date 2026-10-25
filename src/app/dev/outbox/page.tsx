@@ -1,3 +1,4 @@
+import { APP_URL } from "@/lib/data/store";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail } from "lucide-react";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 // Sample-data build only: every email the app would have sent. Removed when Resend is connected.
 export default async function OutboxPage() {
   const mail = await listOutbox();
-  const base = process.env.APP_URL || "http://localhost:3000";
+  const base = APP_URL;
   const local = (href: string) => (href.startsWith(base) ? href.slice(base.length) || "/" : href);
   return (
     <main className="gutter mx-auto grid max-w-2xl gap-5 py-8">

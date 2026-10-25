@@ -88,7 +88,11 @@ export interface Store {
   outbox: OutboxEmail[];
 }
 
-export const APP_URL = process.env.APP_URL || "http://localhost:3000";
+// The app's own address, for links in emails. On Vercel it's known without setting anything.
+export const APP_URL =
+  process.env.APP_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "") ||
+  "http://localhost:3000";
 export const now = () => new Date().toISOString();
 export const newId = () => randomUUID();
 export const norm = (e: string) => e.trim().toLowerCase();
