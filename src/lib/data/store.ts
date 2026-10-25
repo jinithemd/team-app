@@ -93,8 +93,8 @@ export const norm = (e: string) => e.trim().toLowerCase();
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
-const g = globalThis as unknown as { __teamAppStoreV6?: Store };
-export const db: Store = (g.__teamAppStoreV6 ??= seed());
+const g = globalThis as unknown as { __teamAppStoreV7?: Store };
+export const db: Store = (g.__teamAppStoreV7 ??= seed());
 
 // ---------------------------------------------------------------------------
 // access rules

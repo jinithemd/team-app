@@ -1225,3 +1225,184 @@ begin
       scores, match_events, rsvps, events, ride_offers, ride_requests;
   end if;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- joining a team: the invite link, the team code, and asking to join.
+-- The link's secret sits in its own table so only people who can change the roster
+-- ever read it; everyone else, signed in or not, gets the join page through join_page().
+-- Nobody gets roles or permissions by joining: they come in as a player.
+-- ---------------------------------------------------------------------------
+
+alter table clubs add column if not exists blurb text check (length(blurb) <= 280);
+alter table clubs add column if not exists join_open boolean not null default true;
+
+create table team_invite_links (
+  team_id uuid primary key references teams(id) on delete cascade,
+  token text not null unique default translate(rtrim(encode(gen_random_bytes(16), 'base64'), '='), '+/', '-_'),
+  needs_approval boolean not null default false,
+  reset_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+create trigger team_invite_links_updated before update on team_invite_links for each row execute function set_updated_at();
+-- Every team gets a link the moment it's made.
+create or replace function make_team_invite_link() returns trigger
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  insert into team_invite_links (team_id) values (new.id) on conflict do nothing;
+  return new;
+end $$;
+create trigger teams_invite_link after insert on teams for each row execute function make_team_invite_link();
+insert into team_invite_links (team_id) select id from teams on conflict do nothing;
+
+alter table team_invite_links enable row level security;
+create policy invite_links_read on team_invite_links for select using (has_team_perm(team_id, 'roster'));
+create policy invite_links_update on team_invite_links for update
+  using (has_team_perm(team_id, 'roster')) with check (has_team_perm(team_id, 'roster'));
+
+create table join_requests (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid not null references teams(id) on delete cascade,
+  user_id uuid not null references profiles(id) on delete cascade,
+  message text check (length(message) <= 300),
+  via text not null default 'search' check (via in ('search','club_page','link')),
+  status text not null default 'pending' check (status in ('pending','approved','declined')),
+  decided_by uuid references profiles(id) on delete set null,
+  decided_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create unique index one_pending_request on join_requests (team_id, user_id) where status = 'pending';
+create index on join_requests (user_id);
+
+alter table join_requests enable row level security;
+-- You see your own requests; captains and managers see their team's. Writes go through the functions below.
+create policy join_requests_read on join_requests for select using (user_id = auth.uid() or has_team_perm(team_id, 'roster'));
+
+create or replace function tell_roster_managers(p_team uuid, p_kind text, p_payload jsonb, p_key text)
+returns void language sql security definer set search_path = public, extensions as $$
+  insert into outbox (kind, channel, user_id, payload, dedupe_key)
+  select p_kind, 'email', r.user_id, p_payload, p_key || ':' || r.user_id
+  from roster_members r
+  where r.team_id = p_team and r.status = 'active' and 'roster' = any (r.permissions)
+  on conflict (dedupe_key) do nothing
+$$;
+
+-- Add me to a team as a player. Bypasses guard_roster_perms safely: no roles, no permissions.
+create or replace function add_me_as_player(p_team uuid) returns void
+language sql security definer set search_path = public, extensions as $$
+  insert into roster_members (team_id, user_id, is_player, status, joined_at)
+  values (p_team, auth.uid(), true, 'active', now())
+  on conflict do nothing
+$$;
+revoke all on function add_me_as_player(uuid), tell_roster_managers(uuid, text, jsonb, text) from public, anon, authenticated;
+
+-- Public: what someone opening an invite link sees. No roster, no contacts.
+create or replace function join_page(p_token text)
+returns table (team_id uuid, name text, level text, location text, sport text, color text, color_secondary text,
+               logo_path text, club_name text, club_slug text, players int, needs_approval boolean, me text)
+language sql stable security definer set search_path = public, extensions as $$
+  select t.id, t.name, t.level, t.location, t.sport, t.color, t.color_secondary, t.logo_path, c.name, c.slug,
+         (select count(*)::int from roster_members r where r.team_id = t.id and r.status = 'active' and r.is_player),
+         l.needs_approval,
+         case when auth.uid() is null then 'signed-out'
+              when exists (select 1 from roster_members r where r.team_id = t.id and r.user_id = auth.uid() and r.status in ('active','inactive')) then 'member'
+              when exists (select 1 from join_requests j where j.team_id = t.id and j.user_id = auth.uid() and j.status = 'pending') then 'requested'
+              else 'none' end
+  from team_invite_links l
+  join teams t on t.id = l.team_id and t.archived_at is null
+  left join clubs c on c.id = t.club_id
+  where length(p_token) >= 16 and l.token = p_token
+$$;
+
+-- Open the link: join straight away, or ask when the captain wants to approve each person.
+create or replace function join_by_link(p_token text) returns table (team_id uuid, status text)
+language plpgsql security definer set search_path = public, extensions as $$
+declare l team_invite_links; who text;
+begin
+  if auth.uid() is null then raise exception 'Sign in first' using errcode = 'insufficient_privilege'; end if;
+  select * into l from team_invite_links x where length(p_token) >= 16 and x.token = p_token;
+  if l.team_id is null or exists (select 1 from teams t where t.id = l.team_id and t.archived_at is not null) then
+    raise exception 'This invite link doesn''t work any more' using errcode = 'no_data_found';
+  end if;
+  if exists (select 1 from roster_members r where r.team_id = l.team_id and r.user_id = auth.uid() and r.status in ('active','inactive')) then
+    return query select l.team_id, 'member'::text; return;
+  end if;
+  select p.first_name || ' ' || p.last_name into who from profiles p where p.id = auth.uid();
+  if l.needs_approval then
+    insert into join_requests (team_id, user_id, message, via) values (l.team_id, auth.uid(), 'Opened the team invite link', 'link')
+      on conflict do nothing;
+    perform tell_roster_managers(l.team_id, 'join_request', jsonb_build_object('team_id', l.team_id, 'who', who), 'join:' || l.team_id || ':' || auth.uid());
+    return query select l.team_id, 'requested'::text; return;
+  end if;
+  perform add_me_as_player(l.team_id);
+  perform tell_roster_managers(l.team_id, 'joined_by_link', jsonb_build_object('team_id', l.team_id, 'who', who), 'joined:' || l.team_id || ':' || auth.uid());
+  return query select l.team_id, 'joined'::text;
+end $$;
+
+create or replace function reset_invite_link(p_team uuid) returns text
+language plpgsql security definer set search_path = public, extensions as $$
+declare t text;
+begin
+  if not has_team_perm(p_team, 'roster') then
+    raise exception 'Only captains and managers can reset the link' using errcode = 'insufficient_privilege';
+  end if;
+  update team_invite_links set token = translate(rtrim(encode(gen_random_bytes(16), 'base64'), '='), '+/', '-_'), reset_at = now()
+  where team_id = p_team returning token into t;
+  return t;
+end $$;
+
+-- The team code works like a link that never needs approval.
+create or replace function join_by_code(p_code text) returns uuid
+language plpgsql security definer set search_path = public, extensions as $$
+declare t uuid;
+begin
+  if auth.uid() is null then raise exception 'Sign in first' using errcode = 'insufficient_privilege'; end if;
+  select id into t from teams where upper(join_code) = upper(trim(p_code)) and archived_at is null;
+  if t is null then raise exception 'No team has that code' using errcode = 'no_data_found'; end if;
+  perform add_me_as_player(t);
+  return t;
+end $$;
+
+-- Ask to join a public team you found by searching or on the club page.
+create or replace function request_to_join(p_team uuid, p_message text, p_via text default 'search') returns uuid
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_id uuid; who text;
+begin
+  if auth.uid() is null then raise exception 'Sign in first' using errcode = 'insufficient_privilege'; end if;
+  if not exists (select 1 from teams t left join clubs c on c.id = t.club_id
+                 where t.id = p_team and t.is_public and t.archived_at is null and coalesce(c.join_open, true)) then
+    raise exception 'That team isn''t taking requests' using errcode = 'insufficient_privilege';
+  end if;
+  insert into join_requests (team_id, user_id, message, via)
+    values (p_team, auth.uid(), nullif(left(trim(p_message), 300), ''), case when p_via in ('search','club_page') then p_via else 'search' end)
+    on conflict do nothing returning join_requests.id into v_id;
+  select p.first_name || ' ' || p.last_name into who from profiles p where p.id = auth.uid();
+  perform tell_roster_managers(p_team, 'join_request', jsonb_build_object('team_id', p_team, 'who', who), 'join:' || p_team || ':' || auth.uid());
+  return v_id;
+end $$;
+
+create or replace function decide_join_request(p_request uuid, p_approve boolean) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare j join_requests;
+begin
+  select * into j from join_requests where id = p_request and status = 'pending' for update;
+  if j.id is null then raise exception 'Already sorted' using errcode = 'no_data_found'; end if;
+  if not has_team_perm(j.team_id, 'roster') then
+    raise exception 'Only captains and managers can add people' using errcode = 'insufficient_privilege';
+  end if;
+  update join_requests set status = case when p_approve then 'approved' else 'declined' end, decided_by = auth.uid(), decided_at = now()
+  where id = j.id;
+  if p_approve then
+    insert into roster_members (team_id, user_id, is_player, status, joined_at)
+    values (j.team_id, j.user_id, true, 'active', now()) on conflict do nothing;
+  end if;
+  insert into outbox (kind, channel, user_id, payload, dedupe_key)
+  values (case when p_approve then 'join_approved' else 'join_declined' end, 'email', j.user_id,
+          jsonb_build_object('team_id', j.team_id), 'decided:' || j.id)
+  on conflict (dedupe_key) do nothing;
+end $$;
+
+revoke all on function join_page(text), join_by_link(text), reset_invite_link(uuid), join_by_code(text),
+  request_to_join(uuid, text, text), decide_join_request(uuid, boolean) from public;
+grant execute on function join_page(text) to anon, authenticated;
+grant execute on function join_by_link(text), reset_invite_link(uuid), join_by_code(text),
+  request_to_join(uuid, text, text), decide_join_request(uuid, boolean) to authenticated;

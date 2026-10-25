@@ -1,4 +1,7 @@
 create schema if not exists extensions;
+-- Supabase puts the extensions schema on every role's search path.
+do $$ begin execute format('alter database %I set search_path = public, extensions', current_database()); end $$;
+set search_path = public, extensions;
 create schema auth;
 create table auth.users (id uuid primary key);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.sub', true),'')::uuid $$;

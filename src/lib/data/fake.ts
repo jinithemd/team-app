@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { newInviteToken } from "./invite-token";
 import { setSessionUserId, clearSession, getSessionUserId } from "./session";
 import { sign, verify } from "../tokens";
 import { DEFAULT_TZ, formatLongDate, formatTimeRange, utcToZoned, zonedToUtc } from "../time";
@@ -291,6 +292,7 @@ export async function createTeam(input: {
     color: input.color.toUpperCase(),
     colorSecondary: input.colorSecondary?.toUpperCase() || null,
     joinCode: randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase(),
+    inviteToken: newInviteToken(),
     isPublic: true,
     rosterVisible: true,
     createdBy: user.id,

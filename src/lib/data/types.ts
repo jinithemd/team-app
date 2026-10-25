@@ -55,6 +55,8 @@ export interface Team {
   color: string;
   colorSecondary: string | null;
   joinCode: string;
+  /** Secret in the team's invite link (/join/<token>). Resetting it kills the old link. */
+  inviteToken: string;
   isPublic: boolean;
   rosterVisible: boolean;
   createdBy: ID;
@@ -207,6 +209,8 @@ export interface TeamSettings {
   membersCanPost: boolean;
   /** Sponsors and the whole team share one room. On unless captains switch it off. */
   sponsorChat?: boolean;
+  /** People who join by the invite link wait for a captain's OK instead of joining straight away. */
+  linkNeedsApproval?: boolean;
   /** Where players send e-Transfers, shown on the dues screen. */
   payTo?: string | null;
 }

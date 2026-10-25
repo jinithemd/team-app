@@ -1,4 +1,5 @@
 import { DEFAULT_TZ, utcToZoned, zonedToUtc } from "../time";
+import { newInviteToken } from "./invite-token";
 import type { Store } from "./store";
 import type {
   Attendance,
@@ -85,7 +86,7 @@ export function seed(): Store {
   const team = (tid: string, name: string, clubId: string | null, level: string, color: string, color2: string, by: string, code: string, st: Partial<TeamSettings>): Team => {
     const t: Team = {
       id: tid, clubId, name, sport: "Soccer", level, location: "Kingston, ON", color, colorSecondary: color2,
-      joinCode: code, isPublic: true, rosterVisible: true, createdBy: by, createdAt: nowIso, settings: settings(st),
+      joinCode: code, inviteToken: newInviteToken(), isPublic: true, rosterVisible: true, createdBy: by, createdAt: nowIso, settings: settings(st),
     };
     s.teams.push(t);
     s.conversations.push({ id: `cv-${tid}`, teamId: tid, kind: "team" }, { id: `cv-${tid}-staff`, teamId: tid, kind: "staff" }, { id: `cv-${tid}-sponsors`, teamId: tid, kind: "sponsors" });

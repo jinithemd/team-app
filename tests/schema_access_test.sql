@@ -267,3 +267,63 @@ select count(*) from chat_messages where conversation_id='c5000000-0000-0000-000
 reset role; update teams set sponsor_chat=true where id='20000000-0000-0000-0000-000000000001'; update sponsors set status='ended' where id='a0000000-0000-0000-0000-000000000001'; set role authenticated;
 \echo deal ended: sponsor reads (0):
 select count(*) from chat_messages where conversation_id='c5000000-0000-0000-0000-000000000001';
+
+\echo == Invite link
+reset role;
+insert into auth.users values ('00000000-0000-0000-0000-0000000000d1'),('00000000-0000-0000-0000-0000000000d2');
+insert into profiles(id,first_name,last_name,email) values ('00000000-0000-0000-0000-0000000000d1','Leo','Link','leo@x'),('00000000-0000-0000-0000-0000000000d2','Ana','Ask','ana@x');
+\echo existing team got a link (1):
+select count(*) from team_invite_links where team_id='20000000-0000-0000-0000-000000000001';
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+select token as link from team_invite_links where team_id='20000000-0000-0000-0000-000000000001' \gset
+\echo captain reads the link: 22 chars:
+select length(:'link');
+set request.jwt.sub='00000000-0000-0000-0000-0000000000b1';
+\echo player reads the link (0):
+select count(*) from team_invite_links;
+\echo [expect fail] player resets the link:
+select reset_invite_link('20000000-0000-0000-0000-000000000001');
+reset role; set role anon; set request.jwt.sub='';
+\echo signed-out join page: Reserves, Limestone City FC, signed-out, no roster:
+select name, club_name, me, needs_approval from join_page(:'link');
+\echo made-up link (0):
+select count(*) from join_page('xxxxxxxxxxxxxxxxxxxxxx');
+\echo [expect fail] anon joins:
+select * from join_by_link(:'link');
+reset role; set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000d1';
+\echo Leo joins (joined), again (member):
+select status from join_by_link(:'link');
+select status from join_by_link(:'link');
+\echo Leo is a player with no roles or permissions:
+select is_player, roles, permissions, status from roster_members where user_id='00000000-0000-0000-0000-0000000000d1';
+reset role;
+\echo captain got an email about it (1):
+select count(*) from outbox where kind='joined_by_link' and user_id='00000000-0000-0000-0000-0000000000c0';
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+update team_invite_links set needs_approval = true where team_id='20000000-0000-0000-0000-000000000001';
+\echo [ok] captain turns approval on
+set request.jwt.sub='00000000-0000-0000-0000-0000000000d2';
+\echo Ana asks (requested), join page says requested, not on the team yet (0):
+select status from join_by_link(:'link');
+select me from join_page(:'link');
+select count(*) from roster_members where user_id='00000000-0000-0000-0000-0000000000d2';
+select id as req from join_requests where user_id='00000000-0000-0000-0000-0000000000d2' \gset
+\echo [expect fail] Ana approves herself:
+select decide_join_request(:'req', true);
+\echo [expect fail] Ana inserts herself into the roster:
+insert into roster_members(team_id,user_id,status) values ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000d2','active');
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+select decide_join_request(:'req', true);
+\echo [ok] captain lets Ana in
+\echo Ana on the roster (1):
+select count(*) from roster_members where user_id='00000000-0000-0000-0000-0000000000d2' and status='active';
+\echo captain resets: old link dead (0), new one works (1):
+select reset_invite_link('20000000-0000-0000-0000-000000000001') as newlink \gset
+select count(*) from join_page(:'link');
+select count(*) from join_page(:'newlink');
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a6';
+\echo [expect fail] outsider uses the old link:
+select * from join_by_link(:'link');

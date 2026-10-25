@@ -513,3 +513,28 @@ export async function acceptSponsorInviteAction(token: string, _: FormState, f: 
   revalidatePath("/", "layout");
   redirect(`/sponsor/${res.data.sponsorId}?welcome=1`);
 }
+
+// ---- team invite link -------------------------------------------------------
+
+export async function joinByLinkAction(token: string, _: FormState): Promise<FormState> {
+  const res = await data.joinByLink(token);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  if (res.data.status === "requested") {
+    revalidatePath(`/join/${token}`);
+    return { ok: true, message: "requested" };
+  }
+  redirect(`/t/${res.data.teamId}/schedule?joined=1`);
+}
+
+export async function resetInviteLinkAction(teamId: string) {
+  const res = await data.resetInviteLink(teamId);
+  revalidatePath(`/t/${teamId}/roster/add`);
+  return res.ok ? { ok: true as const, url: res.data.url } : { ok: false as const, error: res.error };
+}
+
+export async function setLinkApprovalAction(teamId: string, needsApproval: boolean) {
+  const res = await data.setLinkApproval(teamId, needsApproval);
+  revalidatePath(`/t/${teamId}/roster/add`);
+  return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
+}
