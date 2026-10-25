@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Link2, LocateFixed, Search } from "lucide-react";
+import { Link2, LocateFixed, MapPin, Search } from "lucide-react";
 import { saveVenueAction, type FormState } from "@/app/actions";
 import { Field, Input, buttonClass } from "@/components/ui";
 import { isShortMapLink, parseLocation } from "@/lib/geo/parse-location";
+import { searchPlaces, type Place } from "@/lib/geo/place-search";
 import type { Venue } from "@/lib/data/types";
 
 const MapPicker = dynamic(() => import("@/components/map-picker").then((m) => m.MapPicker), {
@@ -25,7 +26,7 @@ export function VenueForm({ teamId, venue }: { teamId: string; venue: Venue | nu
   const [radius, setRadius] = useState(String(venue?.radiusM ?? 150));
   const [status, setStatus] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [hits, setHits] = useState<Hit[] | null>(null);
+  const [hits, setHits] = useState<Place[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [paste, setPaste] = useState("");
   const [focus, setFocus] = useState(0);
@@ -41,25 +42,48 @@ export function VenueForm({ teamId, venue }: { teamId: string; venue: Venue | nu
     if (fly) setFocus((f) => f + 1);
   }
 
-  async function search() {
-    const q = query.trim();
-    if (q.length < 3) return setStatus("Type a place name or address, e.g. Caraco Park Kingston.");
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inflight = useRef<AbortController | null>(null);
+
+  function onType(v: string) {
+    setQuery(v);
+    if (timer.current) clearTimeout(timer.current);
     // A pasted link or coordinates in the search box works too.
-    const direct = parseLocation(q);
-    if (direct) return setPin(direct.lat, direct.lng, "Pinned from what you pasted. Drag the pin onto the pitch if needed.", true);
-    setBusy(true);
-    setStatus("Searching…");
-    try {
-      const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-      const body = (await res.json()) as { results?: Hit[]; error?: string };
-      if (!res.ok) return setStatus(body.error ?? "Search didn't work. Try again.");
-      setHits(body.results ?? []);
-      setStatus(body.results?.length ? "Pick the right place, then drag the pin onto the pitch." : "Nothing found. Try adding the city, or tap the map.");
-    } catch {
-      setStatus("Search didn't work. Check your connection and try again.");
-    } finally {
-      setBusy(false);
+    const direct = parseLocation(v);
+    if (direct) {
+      setHits(null);
+      return setPin(direct.lat, direct.lng, "Pinned from what you pasted. Drag the pin onto the pitch if needed.", true);
     }
+    if (v.trim().length < 3) return setHits(null);
+    timer.current = setTimeout(() => void runSearch(v, false), 350);
+  }
+
+  async function runSearch(v: string, explicit: boolean) {
+    const q = v.trim();
+    if (q.length < 3) {
+      if (explicit) setStatus("Type at least 3 letters of the place name or address.");
+      return;
+    }
+    inflight.current?.abort();
+    const ctl = new AbortController();
+    inflight.current = ctl;
+    setBusy(true);
+    try {
+      const near = pinned ? { lat: latN!, lng: lngN! } : undefined;
+      const results = await searchPlaces(q, near, ctl.signal);
+      if (!ctl.signal.aborted) setHits(results);
+    } catch (e) {
+      if ((e as Error).name !== "AbortError") setStatus((e as Error).message || "Search isn't working right now. Tap the map instead.");
+    } finally {
+      if (inflight.current === ctl) setBusy(false);
+    }
+  }
+
+  function choose(h: Place) {
+    setPin(h.lat, h.lng, `Pinned at ${h.label}. Zoom in and drag the pin onto the exact pitch.`, true);
+    setQuery(h.label);
+    if (!address.trim()) setAddress([h.label, h.detail].filter(Boolean).join(", ").slice(0, 120));
+    setHits(null);
   }
 
   async function usePaste(text: string) {
@@ -107,50 +131,57 @@ export function VenueForm({ teamId, venue }: { teamId: string; venue: Venue | nu
 
       <fieldset className="grid gap-3">
         <legend className="mb-1 text-sm font-semibold">Map pin</legend>
-        <p className="-mt-1 text-sm text-muted">Set it from anywhere: search for the place, paste a Google Maps link, or tap the map.</p>
+        <p className="-mt-1 text-sm text-muted">Set it from anywhere: search for the place, then drag the pin onto the pitch. Satellite view helps you find the exact field.</p>
 
-        <div className="grid gap-1.5">
+        <div className="relative grid gap-1.5">
           <label htmlFor="place-q" className="text-sm font-semibold">
-            Find the place
+            Search for the place
           </label>
-          <div className="flex gap-2">
+          <div className="relative">
+            <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted" />
             <Input
               id="place-q"
+              role="combobox"
+              aria-expanded={!!hits?.length}
+              aria-controls="place-results"
+              aria-autocomplete="list"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => onType(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  void search();
+                  if (hits?.[0]) choose(hits[0]);
+                  else void runSearch(query, true);
                 }
+                if (e.key === "Escape") setHits(null);
               }}
-              placeholder="Park, school or address"
+              placeholder="Park, school, field or address"
               autoComplete="off"
               enterKeyHint="search"
+              className="pl-9"
             />
-            <button type="button" onClick={search} disabled={busy} className={buttonClass("secondary", "md", "shrink-0")}>
-              <Search aria-hidden />
-              Search
-            </button>
           </div>
           {hits && hits.length > 0 && (
-            <ul className="grid gap-1" aria-label="Search results">
+            <ul id="place-results" role="listbox" aria-label="Places" className="z-[500] grid max-h-72 overflow-y-auto rounded-md border border-border bg-bg shadow-card">
               {hits.map((h) => (
-                <li key={`${h.lat},${h.lng}`}>
+                <li key={`${h.lat},${h.lng},${h.label}`} role="option" aria-selected={false}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPin(h.lat, h.lng, "Pinned. Drag the pin onto the exact pitch if needed.", true);
-                      if (!address.trim()) setAddress(h.label.split(",").slice(0, 3).join(",").slice(0, 120));
-                      setHits(null);
-                    }}
-                    className="w-full rounded-md border border-border px-3 py-2 text-left text-sm hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
+                    onClick={() => choose(h)}
+                    className="flex w-full items-start gap-2.5 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-surface focus-visible:bg-surface focus-visible:outline-none"
                   >
-                    {h.label}
+                    <MapPin aria-hidden className="mt-0.5 size-4 shrink-0 text-team-ink" />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold break-words">{h.label}</span>
+                      {h.detail && <span className="block text-xs break-words text-muted">{h.detail}</span>}
+                    </span>
                   </button>
                 </li>
               ))}
             </ul>
+          )}
+          {hits && hits.length === 0 && !busy && query.trim().length >= 3 && (
+            <p className="text-xs text-muted">No matches. Try adding the city, or tap the spot on the map below.</p>
           )}
         </div>
 
