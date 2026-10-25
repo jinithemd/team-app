@@ -1,5 +1,6 @@
 import type { Club } from "@/lib/data/types";
 import { teamThemeCss } from "@/lib/team-theme";
+import { APP_NAME } from "@/lib/brand";
 
 /** The club's own look: crest, name and colours. "Powered by" stays small. */
 export function ClubHeader({ club, title, children }: { club: Club; title?: string; children?: React.ReactNode }) {
@@ -28,5 +29,5 @@ export function ClubHeader({ club, title, children }: { club: Club; title?: stri
 }
 
 export function PoweredBy() {
-  return <p className="text-center text-xs text-muted">Powered by Areno</p>;
+  return <p className="text-center text-xs text-muted">Powered by {APP_NAME}</p>;
 }

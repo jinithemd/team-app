@@ -1,4 +1,4 @@
-# Team App
+# Clbx
 
 Team management for youth clubs and amateur teams: roster, schedule, one-tap RSVPs, team chat, in each team's own colours. Working name; the brand comes later.
 

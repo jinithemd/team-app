@@ -151,7 +151,7 @@ export function seed(): Store {
   const addDays = (date: string, n: number) => new Date(Date.parse(date + "T12:00:00Z") + n * 86400000).toISOString().slice(0, 10);
   const dowOf = (date: string) => new Date(Date.parse(date + "T12:00:00Z")).getUTCDay();
   const next = (dow: number, weeks = 0) => {
-    let d = today;
+    let d = addDays(today, 1); // always after today, so sample events never start in the past
     while (dowOf(d) !== dow) d = addDays(d, 1);
     return addDays(d, weeks * 7);
   };

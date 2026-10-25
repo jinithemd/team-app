@@ -2,6 +2,7 @@ import "server-only";
 import { adminClient } from "../supabase/server";
 import { renderOutbox } from "./render";
 import { emailHtml, emailText } from "./template";
+import { APP_NAME } from "../brand";
 
 /*
  * Sends what's waiting in the outbox through Resend. Runs straight after a save that queued
@@ -19,7 +20,7 @@ export async function sendEmail(m: { to: string; subject: string; html: string; 
   const res = await fetch(`${RESEND_URL}/emails`, {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from: process.env.EMAIL_FROM || "Team App <onboarding@resend.dev>", to: [m.to], subject: m.subject, html: m.html, text: m.text }),
+    body: JSON.stringify({ from: process.env.EMAIL_FROM || `${APP_NAME} <onboarding@resend.dev>`, to: [m.to], subject: m.subject, html: m.html, text: m.text }),
   });
   if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 300)}`);
 }

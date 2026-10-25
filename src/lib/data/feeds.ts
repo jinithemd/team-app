@@ -4,6 +4,7 @@ import { EVENT_TYPE_LABEL } from "./types";
 import { APP_URL, db, hasTeamPerm, isTeamMember, isTeamStaff, personFor, profileById, requireUser, teamById } from "./store";
 import { sign, verify } from "../tokens";
 import { eventTitle } from "../event-title";
+import { APP_DOMAIN, APP_NAME } from "../brand";
 
 /*
  * Calendar feed (iCal) and spreadsheet exports. The feed URL carries a signed token so phone
@@ -45,11 +46,11 @@ export async function calendarIcs(token: string): Promise<string | null> {
 
 /** The iCal text for a list of events. Shared with the live build's feed. */
 export function buildIcs(items: { e: TeamEvent; team: Pick<Team, "id" | "name">; venue?: Pick<Venue, "name" | "address" | "lat" | "lng"> }[]): string {
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Team App//Schedule//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:My teams", "REFRESH-INTERVAL;VALUE=DURATION:PT1H"];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", `PRODID:-//${APP_NAME}//Schedule//EN`, "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:My teams", "REFRESH-INTERVAL;VALUE=DURATION:PT1H"];
   for (const { e, team, venue } of items) {
     lines.push(
       "BEGIN:VEVENT",
-      `UID:${e.id}@teamapp`,
+      `UID:${e.id}@${APP_DOMAIN}`,
       `DTSTAMP:${stamp(new Date().toISOString())}`,
       `DTSTART:${stamp(e.startAt)}`,
       `DTEND:${stamp(e.endAt)}`,

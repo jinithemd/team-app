@@ -20,7 +20,7 @@ $PSQL -d sb -f "$HERE/roles.sql"
   GOTRUE_SITE_URL=http://localhost:3000 GOTRUE_URI_ALLOW_LIST="http://localhost:3000/**" \
   GOTRUE_JWT_SECRET=$SECRET GOTRUE_JWT_EXP=3600 GOTRUE_JWT_AUD=authenticated GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated GOTRUE_JWT_ADMIN_ROLES=service_role \
   GOTRUE_EXTERNAL_EMAIL_ENABLED=true GOTRUE_MAILER_AUTOCONFIRM=false GOTRUE_SMTP_HOST=127.0.0.1 GOTRUE_SMTP_PORT=2500 \
-  GOTRUE_SMTP_ADMIN_EMAIL=noreply@local.test GOTRUE_SMTP_SENDER_NAME="Team App" GOTRUE_SMTP_MAX_FREQUENCY=1s \
+  GOTRUE_SMTP_ADMIN_EMAIL=noreply@local.test GOTRUE_SMTP_SENDER_NAME="Clbx" GOTRUE_SMTP_MAX_FREQUENCY=1s \
   GOTRUE_RATE_LIMIT_EMAIL_SENT=10000 GOTRUE_RATE_LIMIT_VERIFY=10000 GOTRUE_RATE_LIMIT_OTP=10000 GOTRUE_EXTERNAL_PHONE_ENABLED=false \
   GOTRUE_MAILER_OTP_EXP=3600 GOTRUE_LOG_LEVEL=warn \
   nohup ./auth > "$BIN/auth.log" 2>&1 < /dev/null &)
@@ -52,7 +52,7 @@ APP_URL=http://localhost:3000
 DEV_OUTBOX=1
 RESEND_API_URL=http://127.0.0.1:4010
 RESEND_API_KEY=test-resend-key
-EMAIL_FROM="Team App <team@example.test>"
+EMAIL_FROM="Clbx <team@example.test>"
 CRON_SECRET=test-cron-secret
 ENV
 echo "local Supabase up: http://localhost:54321 (env in .env.localstack, mail in $BIN/mail.jsonl)"

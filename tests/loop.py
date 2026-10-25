@@ -14,7 +14,7 @@ PNG = _png()
 TOMORROW = (datetime.datetime.now(zoneinfo.ZoneInfo("America/Toronto")) + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
 # The sample Reserves cup match (e-r-g1) is on the coming Sunday, or today when today is Sunday.
 _today = datetime.datetime.now(zoneinfo.ZoneInfo("America/Toronto")).date()
-RES_MATCH_DAY = (_today + datetime.timedelta(days=(6 - _today.weekday()) % 7)).strftime("%Y-%m-%d")
+RES_MATCH_DAY = (_today + datetime.timedelta(days=(5 - _today.weekday()) % 7 + 1)).strftime("%Y-%m-%d")
 OUT = "/home/claude/team-app/replica/clone-screens"
 errors = []
 

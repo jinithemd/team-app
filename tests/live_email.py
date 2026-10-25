@@ -45,7 +45,7 @@ with sync_playwright() as pw:
     sign_up(k, "Kai", "Morgan", "kai@example.com")
     k.goto(link); settle(k); k.get_by_role("button", name="Join Riverside First Team").click(); k.wait_for_url(re.compile(r"/schedule\?joined=1"))
     m = wait_sent(lambda m: m["to"] == ["jin@example.com"] and "Kai Morgan joined" in m["subject"], "joined notice")[0]
-    assert "Open the roster" in m["html"] and m["from"] == "Team App <team@example.test>" and "Change which emails you get" in m["text"]
+    assert "Open the roster" in m["html"] and m["from"] == "Clbx <team@example.test>" and "Change which emails you get" in m["text"]
     step("captain gets 'Kai Morgan joined' by email, from the database's notice")
 
     sql(f"update roster_members set permissions = array_append(permissions, 'messages') where team_id='{team}' and not 'messages' = any(permissions) and user_id is not null and 'manage_permissions' = any(permissions)")

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { clubAdminAction, updateClubAction, type FormState } from "@/app/actions";
 import { Button, Field, Input, buttonClass, inputClass } from "@/components/ui";
+import { APP_NAME } from "@/lib/brand";
 import { ColorField } from "@/app/(app)/teams/new/create-team-form";
 
 /** Read a logo file and shrink anything big, keeping SVGs as they are. */
@@ -97,7 +98,7 @@ export function ClubSettingsForm({ clubId, club }: { clubId: string; club: { nam
       <button className={buttonClass("primary", "lg", "w-full sm:w-auto sm:justify-self-start")} disabled={pending}>
         {pending ? "Saving…" : "Save"}
       </button>
-      <p className="text-xs text-muted">Club teams use these colours. Players see your name and logo everywhere in the app; &quot;Powered by Areno&quot; stays small at the bottom.</p>
+      <p className="text-xs text-muted">Club teams use these colours. Players see your name and logo everywhere in the app; &quot;Powered by {APP_NAME}&quot; stays small at the bottom.</p>
     </form>
   );
 }

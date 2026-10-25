@@ -77,7 +77,7 @@ with sync_playwright() as pw:
     # ---- clubs ----------------------------------------------------------------
     anon = ctx(b).new_page(); watch(anon, "visitor")
     anon.goto(f"{BASE}/c/limestone-city"); expect(anon.get_by_text("5 teams")).to_be_visible()
-    expect(anon.get_by_text("Powered by Areno")).to_be_visible(); shot(anon, "club-public"); step("public club page lists 5 teams, signed out")
+    expect(anon.get_by_text("Powered by Clbx")).to_be_visible(); shot(anon, "club-public"); step("public club page lists 5 teams, signed out")
     anon.get_by_role("link", name="Sign in to join").first.click(); anon.wait_for_url(re.compile(r"/c/limestone-city/login"))
     shot(anon, "club-signin")
     anon.fill("#firstName", "Zoe"); anon.fill("#lastName", "Park"); anon.fill("#email", "zoe.park@example.com"); anon.click("text=Create account")
