@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import * as data from "@/lib/data";
 import type { ActionResult, RsvpResponse } from "@/lib/data/types";
+import { LIVE } from "@/lib/mode";
+import { googleSignInUrl, safeNext, sendSignInLink } from "@/lib/auth";
 
 // Thin server-action wrappers. Permission checks live in the data layer (and in RLS later).
 
@@ -17,10 +19,25 @@ export async function signInAsAction(f: FormData) {
 }
 
 export async function signUpAction(_: FormState, f: FormData): Promise<FormState> {
+  if (LIVE) {
+    const r = await sendSignInLink({ email: str(f, "email"), firstName: str(f, "firstName"), lastName: str(f, "lastName"), next: str(f, "next"), create: true });
+    return r.ok ? { ok: true, message: r.email } : { error: r.error, fieldErrors: r.fieldErrors };
+  }
   const res = await data.signUp({ firstName: str(f, "firstName"), lastName: str(f, "lastName"), email: str(f, "email") });
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   const next = str(f, "next");
   redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/");
+}
+
+/** Live build: email a sign-in link to an existing account. */
+export async function signInLinkAction(_: FormState, f: FormData): Promise<FormState> {
+  const r = await sendSignInLink({ email: str(f, "email"), next: str(f, "next"), create: false });
+  return r.ok ? { ok: true, message: r.email } : { error: r.error, fieldErrors: r.fieldErrors };
+}
+
+export async function googleSignInAction(f: FormData) {
+  const url = await googleSignInUrl(safeNext(str(f, "next")));
+  redirect(url ?? "/login?google=off");
 }
 
 export async function signOutAction() {
@@ -176,6 +193,13 @@ export async function rsvpFromLinkAction(token: string) {
 }
 
 export async function acceptInviteAction(token: string, _: FormState, f: FormData): Promise<FormState> {
+  if (LIVE && !(await data.getSessionUser())) {
+    // Not signed in: email a link to the invited address; it brings them back here signed in.
+    const inv = await data.getInvite(token);
+    if (!inv) return { error: "This invite link has expired. Ask your captain to send a new one." };
+    const r = await sendSignInLink({ email: inv.email, firstName: str(f, "firstName") || inv.person.firstName, lastName: str(f, "lastName") || inv.person.lastName, next: `/invite/${token}`, create: !inv.hasAccount });
+    return r.ok ? { ok: true, message: r.email } : { error: r.error };
+  }
   const res = await data.acceptInvite(token, { firstName: str(f, "firstName"), lastName: str(f, "lastName") });
   if (!res.ok) return { error: res.error };
   revalidatePath("/", "layout");

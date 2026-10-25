@@ -7,7 +7,7 @@ insert into profiles(id,first_name,last_name,email) values
  ('00000000-0000-0000-0000-0000000000b1','Rahul','One','p1@x'),('00000000-0000-0000-0000-0000000000b2','Sana','Two','p2@x'),
  ('00000000-0000-0000-0000-0000000000b3','Tom','Three','p3@x'),('00000000-0000-0000-0000-0000000000e0','Eve','Manager','m@x'),('00000000-0000-0000-0000-0000000000f0','Tess','Treasurer','t@x');
 insert into clubs(id,name,slug,created_by) values ('10000000-0000-0000-0000-000000000001','Limestone City FC','limestone-city','00000000-0000-0000-0000-0000000000a0');
-insert into club_admins values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000a0','owner'),('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000f0','treasurer');
+insert into club_admins values ('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000a0','owner'),('10000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000f0','treasurer') on conflict do nothing;
 insert into teams(id,club_id,name,sport,created_by,points_enabled) values ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Reserves','Soccer','00000000-0000-0000-0000-0000000000a0',true);
 insert into roster_members(team_id,user_id,roles,permissions,status) values
  ('20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c0','{captain}','{attendance,schedule_events,scoring,roster}','active'),
@@ -164,7 +164,7 @@ insert into profiles(id,first_name,last_name,email) values ('00000000-0000-0000-
 set role authenticated;
 set request.jwt.sub='00000000-0000-0000-0000-0000000000d0';
 insert into clubs(id,name,slug,created_by) values ('10000000-0000-0000-0000-000000000002','Athletic FC','athletic-fc','00000000-0000-0000-0000-0000000000d0');
-reset role; insert into club_admins values ('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-0000000000d0','owner'); set role authenticated;
+reset role; insert into club_admins values ('10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-0000000000d0','owner') on conflict do nothing; set role authenticated;
 \echo [ok] founder signs up once and creates the club (owner)
 insert into teams(id,club_id,name,sport,created_by) values ('20000000-0000-0000-0000-000000000002','10000000-0000-0000-0000-000000000002','First Team','Soccer','00000000-0000-0000-0000-0000000000d0');
 insert into roster_members(team_id,user_id,is_player,roles,permissions,status,jersey) values
@@ -327,3 +327,47 @@ select count(*) from join_page(:'newlink');
 set request.jwt.sub='00000000-0000-0000-0000-0000000000a6';
 \echo [expect fail] outsider uses the old link:
 select * from join_by_link(:'link');
+
+\echo == Team messages
+reset role;
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+\echo [expect fail] captain without the messages permission sends one:
+insert into messages(id,team_id,author_id,subject,body) values ('e1000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c0','Kit','Bring both shirts');
+reset role; set request.jwt.sub='';
+update roster_members set permissions = permissions || '{messages}' where user_id='00000000-0000-0000-0000-0000000000c0';
+set request.jwt.sub='00000000-0000-0000-0000-0000000000c0';
+set role authenticated;
+insert into messages(id,team_id,author_id,subject,body) values ('e1000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c0','Kit','Bring both shirts');
+insert into message_recipients(message_id,user_id) values ('e1000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b1');
+\echo [ok] captain with messages sends to one player
+set request.jwt.sub='00000000-0000-0000-0000-0000000000b1';
+\echo the player it was sent to reads it (1) and sees themselves on the list (1):
+select count(*) from messages where id='e1000000-0000-0000-0000-000000000001';
+select count(*) from message_recipients where message_id='e1000000-0000-0000-0000-000000000001';
+set request.jwt.sub='00000000-0000-0000-0000-0000000000b2';
+\echo a player not on the list reads it (0):
+select count(*) from messages where id='e1000000-0000-0000-0000-000000000001';
+\echo [expect fail] that player adds themselves to the list:
+insert into message_recipients(message_id,user_id) values ('e1000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b2');
+
+\echo == Sign-up makes a profile and claims email invites once confirmed
+reset role; set request.jwt.sub='';
+insert into roster_members(team_id,invited_email,invited_name,status) values ('20000000-0000-0000-0000-000000000001','new.player@x','New Player','invited');
+insert into auth.users(id,email,raw_user_meta_data) values ('00000000-0000-0000-0000-0000000000f9','New.Player@X','{"first_name":"New","last_name":"Player"}');
+\echo profile from the sign-up form (New Player, new.player@x), invite not claimed before confirming (invited):
+select first_name, last_name, email from profiles where id='00000000-0000-0000-0000-0000000000f9';
+select status from roster_members where invited_email='new.player@x';
+update auth.users set email_confirmed_at = now() where id='00000000-0000-0000-0000-0000000000f9';
+\echo confirmed: invite claimed (active, linked):
+select status, user_id is not null as linked from roster_members where invited_email='new.player@x';
+insert into auth.users(id,email,raw_user_meta_data,email_confirmed_at) values ('00000000-0000-0000-0000-0000000000f8','g@x','{"full_name":"Grace Hopper Smith"}', now());
+\echo Google-style name split (Grace / Hopper Smith):
+select first_name, last_name from profiles where id='00000000-0000-0000-0000-0000000000f8';
+
+\echo == Club owner is made with the club
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000f8';
+insert into clubs(id,name,slug,created_by) values ('10000000-0000-0000-0000-0000000000f8','Grace FC','grace-fc','00000000-0000-0000-0000-0000000000f8');
+\echo Grace owns Grace FC (owner):
+select role from club_admins where club_id='10000000-0000-0000-0000-0000000000f8';

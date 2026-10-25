@@ -12,6 +12,9 @@ def _png(w=64, h=64, rgb=(200, 30, 60)):
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw)) + chunk(b"IEND", b"")
 PNG = _png()
 TOMORROW = (datetime.datetime.now(zoneinfo.ZoneInfo("America/Toronto")) + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+# The sample Reserves cup match (e-r-g1) is on the coming Sunday, or today when today is Sunday.
+_today = datetime.datetime.now(zoneinfo.ZoneInfo("America/Toronto")).date()
+RES_MATCH_DAY = (_today + datetime.timedelta(days=(6 - _today.weekday()) % 7)).strftime("%Y-%m-%d")
 OUT = "/home/claude/team-app/replica/clone-screens"
 errors = []
 
@@ -228,11 +231,11 @@ with sync_playwright() as p:
     d.goto(f"{BASE}/t/t-strikers/e/e-s-g1/rsvps")
     assert d.get_by_text("Away at a wedding").count() == 0; step("teammates' notes hidden from players")
 
-    # unavailable dates: Rahul marks himself away for tomorrow's Reserves match
+    # unavailable dates: Rahul marks himself away on the day of the Reserves cup match
     d.goto(f"{BASE}/"); expect(d.get_by_text("You're marked injured")).to_be_visible(); step("home shows the injured dates")
     d.goto(f"{BASE}/availability"); shot(d, "availability")
     d.get_by_role("radio", name="Away").click()
-    d.fill("#startsOn", TOMORROW); d.fill("#endsOn", TOMORROW); d.fill("#note", "Cousin's wedding")
+    d.fill("#startsOn", RES_MATCH_DAY); d.fill("#endsOn", RES_MATCH_DAY); d.fill("#note", "Cousin's wedding")
     d.get_by_label("Kingston Strikers").uncheck()
     submit(d, "Save", r"/availability\?saved=")
     expect(d.get_by_text(re.compile(r"You're down as can't make it for 1 event"))).to_be_visible(); step("away for 1 event")

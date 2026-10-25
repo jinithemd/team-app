@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { NavProgress } from "@/components/nav-progress";
 import type { Metadata, Viewport } from "next";
 // Self-hosted (SIL Open Font License): no request to Google, and pages never wait on a font CDN.
 import "@fontsource/inter/latin-400.css";
@@ -30,7 +32,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const theme = user?.theme && user.theme !== "system" ? user.theme : undefined;
   return (
     <html lang="en-CA" data-theme={theme} suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <Suspense fallback={null}>
+          <NavProgress />
+        </Suspense>
+        {children}
+      </body>
     </html>
   );
 }

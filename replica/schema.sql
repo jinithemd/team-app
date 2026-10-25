@@ -1031,14 +1031,22 @@ create policy poll_votes_own on poll_votes for all using (user_id = auth.uid())
     where o.id = option_id and o.message_id = poll_votes.message_id and can_read_conversation(m.conversation_id)));
 
 -- messages
+-- The two tables check each other, so each check goes through a helper that skips the
+-- other table's rules (otherwise Postgres loops: messages -> recipients -> messages ...).
+create or replace function is_message_recipient(m uuid) returns boolean
+language sql stable security definer set search_path = public, extensions as $$
+  select exists (select 1 from message_recipients where message_id = m and user_id = auth.uid())
+$$;
+create or replace function runs_message(m uuid) returns boolean
+language sql stable security definer set search_path = public, extensions as $$
+  select exists (select 1 from messages where id = m and (author_id = auth.uid() or is_team_staff(team_id)))
+$$;
 create policy messages_read on messages for select using (
-  author_id = auth.uid() or is_team_staff(team_id)
-  or exists (select 1 from message_recipients mr where mr.message_id = messages.id and mr.user_id = auth.uid())
+  author_id = auth.uid() or is_team_staff(team_id) or is_message_recipient(id)
 );
-create policy recipients_read on message_recipients for select using (
-  user_id = auth.uid()
-  or exists (select 1 from messages m where m.id = message_id and (m.author_id = auth.uid() or is_team_staff(m.team_id)))
-);
+create policy messages_send on messages for insert with check (author_id = auth.uid() and has_team_perm(team_id, 'messages'));
+create policy recipients_read on message_recipients for select using (user_id = auth.uid() or runs_message(message_id));
+create policy recipients_add on message_recipients for insert with check (runs_message(message_id));
 create policy recipients_mark_read on message_recipients for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 -- personal settings
@@ -1403,6 +1411,106 @@ grant execute on function join_by_link(text), reset_invite_link(uuid), join_by_c
   request_to_join(uuid, text, text), decide_join_request(uuid, boolean) to authenticated;
 
 -- ---------------------------------------------------------------------------
+-- fit for the app: a few fields the screens use
+-- ---------------------------------------------------------------------------
+
+-- An away/injured period can cover several of the player's teams at once.
+alter table availability_periods add column if not exists team_ids uuid[] not null default '{}';
+alter policy avail_own on availability_periods using (user_id = auth.uid())
+  with check (user_id = auth.uid() and (team_id is null or is_team_member(team_id))
+              and coalesce((select bool_and(is_team_member(x)) from unnest(team_ids) x), true));
+create or replace view availability_public with (security_invoker = false) as
+  select a.user_id, a.team_id, a.starts_on, a.ends_on, a.id, a.team_ids
+  from availability_periods a
+  where shares_team_with(a.user_id);
+
+-- The second name on a goal.
+alter table match_events add column if not exists assist_id uuid references profiles(id) on delete set null;
+create index if not exists match_events_assist_id_idx on match_events (assist_id);
+
+-- Separate switches for "new events" and "changes" emails.
+alter table notification_prefs add column if not exists new_events boolean not null default true;
+alter table notification_prefs add column if not exists changes boolean not null default true;
+
+-- Where players send e-Transfers for dues.
+alter table teams add column if not exists pay_to text check (length(pay_to) <= 120);
+
+-- Whoever starts a club owns it: the owner row is made with the club, in the same transaction.
+create or replace function make_club_owner() returns trigger
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  insert into club_admins (club_id, user_id, role) values (new.id, new.created_by, 'owner') on conflict do nothing;
+  return new;
+end $$;
+create trigger clubs_owner after insert on clubs for each row execute function make_club_owner();
+
+-- Captains see who's asking to join (name and email) before they say yes.
+create policy profiles_join_requests on profiles for select using (
+  exists (select 1 from join_requests j where j.user_id = profiles.id and j.status = 'pending' and has_team_perm(j.team_id, 'roster'))
+);
+
+-- Points for turning up, being late or player of the match are written by whoever records
+-- attendance or runs the vote, as the rules say; players still can't touch the ledger.
+create policy points_staff_write on points_ledger for all
+  using (has_team_perm(team_id, 'attendance') or has_team_perm(team_id, 'scoring'))
+  with check (has_team_perm(team_id, 'attendance') or has_team_perm(team_id, 'scoring'));
+
+-- ---------------------------------------------------------------------------
+-- sign-up: every new sign-in account gets a profile. Names come from the sign-up form
+-- (email link) or from Google. Pending email invites to that address are claimed once the
+-- address is confirmed (first email-link sign-in, or straight away for Google).
+-- ---------------------------------------------------------------------------
+
+create or replace function handle_new_user() returns trigger
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  m jsonb := coalesce(new.raw_user_meta_data, '{}'::jsonb);
+  full_name text := nullif(trim(coalesce(m->>'full_name', m->>'name', '')), '');
+  first text := nullif(trim(coalesce(m->>'first_name', m->>'given_name', '')), '');
+  last text := nullif(trim(coalesce(m->>'last_name', m->>'family_name', '')), '');
+begin
+  if new.email is null then return new; end if;  -- email and Google sign-ins only
+  if first is null and full_name is not null then
+    first := split_part(full_name, ' ', 1);
+    last := coalesce(last, nullif(trim(substr(full_name, length(split_part(full_name, ' ', 1)) + 1)), ''));
+  end if;
+  insert into profiles (id, first_name, last_name, email)
+  values (new.id, left(coalesce(first, split_part(new.email, '@', 1)), 60), left(coalesce(last, ''), 60), lower(new.email))
+  on conflict (id) do nothing;
+  if new.email_confirmed_at is not null then perform claim_email_invites(new.id, new.email); end if;
+  return new;
+end $$;
+
+create or replace function claim_email_invites(p_user uuid, p_email text) returns void
+language sql security definer set search_path = public, extensions as $$
+  update roster_members set user_id = p_user, status = 'active', joined_at = now()
+  where invited_email = lower(p_email) and status = 'invited' and user_id is null
+    and not exists (select 1 from roster_members x where x.team_id = roster_members.team_id and x.user_id = p_user and x.status <> 'removed')
+$$;
+
+create or replace function handle_user_confirmed() returns trigger
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if old.email_confirmed_at is null and new.email_confirmed_at is not null then
+    perform claim_email_invites(new.id, new.email);
+  end if;
+  return new;
+end $$;
+create trigger on_auth_user_created after insert on auth.users for each row execute function handle_new_user();
+create trigger on_auth_user_confirmed after update of email_confirmed_at on auth.users for each row execute function handle_user_confirmed();
+
+-- Keep the profile's email in step when someone changes it in their account.
+create or replace function handle_user_email_change() returns trigger
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if new.email is distinct from old.email and new.email is not null then
+    update profiles set email = lower(new.email) where id = new.id;
+  end if;
+  return new;
+end $$;
+create trigger on_auth_user_email_changed after update of email on auth.users for each row execute function handle_user_email_change();
+
+-- ---------------------------------------------------------------------------
 -- hardening and speed (run last). Supabase opens every table and function to the
 -- signed-out "anon" role by default; here signed-out visitors keep only the join page
 -- and the public sponsor list. Trigger functions and inner helpers aren't API endpoints.
@@ -1416,7 +1524,8 @@ alter default privileges in schema public revoke all on tables from anon;
 alter default privileges in schema public revoke execute on functions from anon, public;
 revoke execute on function check_ride_seats(), guard_roster_perms(), make_team_invite_link(), set_updated_at(),
   is_club_admin_of_team(uuid), is_club_treasurer_of_team(uuid), is_sponsor_of_team(uuid),
-  add_me_as_player(uuid), tell_roster_managers(uuid, text, jsonb, text) from authenticated;
+  add_me_as_player(uuid), tell_roster_managers(uuid, text, jsonb, text), handle_new_user(), handle_user_email_change(),
+  handle_user_confirmed(), claim_email_invites(uuid, text), make_club_owner() from authenticated;
 alter function set_updated_at() set search_path = public, extensions;
 
 create index if not exists availability_periods_set_by_idx on availability_periods (set_by);

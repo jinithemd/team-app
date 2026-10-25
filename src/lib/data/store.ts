@@ -44,6 +44,8 @@ import type {
 } from "./types";
 import { TEAM_ROLES } from "./types";
 import { seed } from "./seed";
+import { LIVE } from "../mode";
+import { liveContext } from "./live/context";
 
 /*
  * The sample-data store and the access rules every data function uses. The rules mirror the
@@ -94,7 +96,19 @@ export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const HEX_RE = /^#[0-9a-fA-F]{6}$/;
 
 const g = globalThis as unknown as { __teamAppStoreV7?: Store };
-export const db: Store = (g.__teamAppStoreV7 ??= seed());
+/**
+ * Sample-data build: one in-memory store. Live build: the signed-in person's slice of the
+ * Supabase database, loaded for the current call (live/load.ts) and written back (live/sync.ts).
+ */
+export const db: Store = LIVE
+  ? new Proxy({} as Store, {
+      get(_, key) {
+        const ctx = liveContext();
+        if (!ctx) throw new Error(`Data read outside a live call (${String(key)})`);
+        return ctx.store[key as keyof Store];
+      },
+    })
+  : (g.__teamAppStoreV7 ??= seed());
 
 // ---------------------------------------------------------------------------
 // access rules
