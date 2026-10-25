@@ -57,7 +57,7 @@ export function MatchDay(props: {
     });
 
   const setStatus = (status: Status, period: string | null) =>
-    run(() => updateScoreAction(eventId, { us: score.us, them: score.them, status, period, version: score.version }), status === "final" ? "Full time. Voting for player of the match is open." : "Saved");
+    run(() => updateScoreAction(eventId, { us: score.us, them: score.them, status, period, version: score.version, statusOnly: true }), status === "final" ? "Full time. Voting for player of the match is open." : "Saved");
 
   const home = props.homeAway !== "away";
   const left = home ? { name: props.teamName, n: score.us } : { name: props.opponent, n: score.them };

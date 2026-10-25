@@ -1,5 +1,5 @@
 import "server-only";
-import type { ID } from "./types";
+import type { ID, Team, TeamEvent, Venue } from "./types";
 import { EVENT_TYPE_LABEL } from "./types";
 import { APP_URL, db, hasTeamPerm, isTeamMember, isTeamStaff, personFor, profileById, requireUser, teamById } from "./store";
 import { sign, verify } from "../tokens";
@@ -34,14 +34,19 @@ const stamp = (iso: string) => iso.replace(/[-:]/g, "").replace(/\.\d{3}/, "");
 /** Fold lines at 75 octets as the iCal spec asks. */
 const fold = (line: string) => line.match(/.{1,74}/g)!.join("\r\n ");
 
-export function calendarIcs(token: string): string | null {
+export async function calendarIcs(token: string): Promise<string | null> {
   const t = verify<{ k: string; u: string; v: number }>(token.replace(/\.ics$/, ""));
   if (!t || t.k !== "cal" || t.v !== feedVersion(t.u) || !profileById(t.u)) return null;
   const events = db.events.filter((e) => isTeamMember(t.u, e.teamId) && Date.parse(e.endAt) > Date.now() - 30 * 86400_000);
+  return buildIcs(
+    events.map((e) => ({ e, team: teamById(e.teamId)!, venue: e.venueId ? db.venues.find((v) => v.id === e.venueId) : undefined })),
+  );
+}
+
+/** The iCal text for a list of events. Shared with the live build's feed. */
+export function buildIcs(items: { e: TeamEvent; team: Pick<Team, "id" | "name">; venue?: Pick<Venue, "name" | "address" | "lat" | "lng"> }[]): string {
   const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Team App//Schedule//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:My teams", "REFRESH-INTERVAL;VALUE=DURATION:PT1H"];
-  for (const e of events) {
-    const team = teamById(e.teamId)!;
-    const venue = e.venueId ? db.venues.find((v) => v.id === e.venueId) : undefined;
+  for (const { e, team, venue } of items) {
     lines.push(
       "BEGIN:VEVENT",
       `UID:${e.id}@teamapp`,

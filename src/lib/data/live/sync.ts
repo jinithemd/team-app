@@ -40,12 +40,12 @@ export async function syncChanges(sb: DB, before: Store, after: Store, aux: Aux)
     const prev = new Map<string, Row>();
     for (const o of before[spec.key] as unknown[]) {
       const r = spec.toDb(o as never, aux);
-      if (!isPub(spec, r)) prev.set(keyOf(spec, r), r);
+      if (!isPub(spec, r) && !(o as { _pub?: boolean })._pub) prev.set(keyOf(spec, r), r);
     }
     const seen = new Set<string>();
     for (const o of after[spec.key] as unknown[]) {
       const r = spec.toDb(o as never, aux);
-      if (isPub(spec, r)) continue;
+      if (isPub(spec, r) || (o as { _pub?: boolean })._pub) continue;
       const k = keyOf(spec, r);
       seen.add(k);
       const old = prev.get(k);

@@ -124,6 +124,7 @@ export const savePrefs = pick("savePrefs");
 export const myCalendarFeed = pick("myCalendarFeed");
 export const resetCalendarFeed = pick("resetCalendarFeed");
 export const calendarIcs = pick("calendarIcs");
+export const buildIcs = pick("buildIcs");
 export const exportCsv = pick("exportCsv");
 export const getClubPage = pick("getClubPage");
 export const requestToJoin = pick("requestToJoin");

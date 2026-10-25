@@ -361,8 +361,33 @@ begin
   st := case when mins >= late_after then 'late' else 'present' end;
   insert into attendance (event_id, user_id, status, minutes_late, method, checked_in_at, distance_m, accuracy_m, recorded_by)
   values (p_event, auth.uid(), st, case when st = 'late' then mins end, 'geo', now(), round(d)::int, round(p_accuracy_m)::int, auth.uid());
+  perform award_attendance_points(p_event, auth.uid(), st, case when st = 'late' then mins end);
   return query select st, case when st = 'late' then mins end, round(d)::int;
 end $$;
+
+-- Points for turning up, by the team's rules (same as pointsForAttendance in the app):
+-- match/tournament or training points, an away bonus, and a late penalty past the cut-off.
+create or replace function award_attendance_points(p_event uuid, p_user uuid, p_status text, p_minutes_late int) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare e events%rowtype; t teams%rowtype; r jsonb;
+begin
+  select * into e from events where id = p_event;
+  select * into t from teams where id = e.team_id;
+  -- Only called on a first check-in, so there are no attendance points for this event yet.
+  -- (When staff change a mark, the app rewrites that person's points itself.)
+  if not t.points_enabled or p_status not in ('present','late') then return; end if;
+  r := t.points_rules;
+  insert into points_ledger (team_id, season_id, user_id, event_id, points, reason)
+  select e.team_id, e.season_id, p_user, p_event, x.pts, x.reason
+  from (values
+    ('match', case when e.type in ('match','tournament') then coalesce((r->>'match')::int, 0) else 0 end),
+    ('away_bonus', case when e.type in ('match','tournament') and e.home_away = 'away' then coalesce((r->>'away_bonus')::int, 0) else 0 end),
+    ('training', case when e.type = 'training' then coalesce((r->>'training')::int, 0) else 0 end),
+    ('late_penalty', case when p_status = 'late' and coalesce(p_minutes_late, 0) >= coalesce((r->>'late_after_minutes')::int, 15) then coalesce((r->>'late_penalty')::int, 0) else 0 end)
+  ) as x(reason, pts)
+  where x.pts <> 0;
+end $$;
+revoke all on function award_attendance_points(uuid, uuid, text, int) from public, anon, authenticated;
 revoke all on function check_in(uuid, double precision, double precision, double precision) from public;
 grant execute on function check_in(uuid, double precision, double precision, double precision) to authenticated;
 
@@ -1435,6 +1460,14 @@ alter table notification_prefs add column if not exists changes boolean not null
 -- Where players send e-Transfers for dues.
 alter table teams add column if not exists pay_to text check (length(pay_to) <= 120);
 
+-- Who played in a match, for teammates (player of the match lists them). Only "played", never
+-- late/absent or the minutes: attendance itself stays with the player and staff.
+create or replace view played_public with (security_invoker = false) as
+  select a.event_id, a.user_id
+  from attendance a join events e on e.id = a.event_id
+  where a.status in ('present','late') and e.type in ('match','tournament') and is_team_member(e.team_id);
+grant select on played_public to authenticated;
+
 -- Whoever starts a club owns it: the owner row is made with the club, in the same transaction.
 create or replace function make_club_owner() returns trigger
 language plpgsql security definer set search_path = public, extensions as $$
@@ -1525,7 +1558,8 @@ alter default privileges in schema public revoke execute on functions from anon,
 revoke execute on function check_ride_seats(), guard_roster_perms(), make_team_invite_link(), set_updated_at(),
   is_club_admin_of_team(uuid), is_club_treasurer_of_team(uuid), is_sponsor_of_team(uuid),
   add_me_as_player(uuid), tell_roster_managers(uuid, text, jsonb, text), handle_new_user(), handle_user_email_change(),
-  handle_user_confirmed(), claim_email_invites(uuid, text), make_club_owner() from authenticated;
+  handle_user_confirmed(), claim_email_invites(uuid, text), make_club_owner(),
+  award_attendance_points(uuid, uuid, text, int) from authenticated;
 alter function set_updated_at() set search_path = public, extensions;
 
 create index if not exists availability_periods_set_by_idx on availability_periods (set_by);

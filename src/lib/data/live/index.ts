@@ -2,3 +2,5 @@
 // signed-in person's slice (see live/run.ts). Same names and signatures as the sample build.
 export * from "./accounts";
 export * from "./joining";
+export * from "./features";
+export * from "./sponsors";

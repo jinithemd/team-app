@@ -107,6 +107,13 @@ export const db: Store = LIVE
         if (!ctx) throw new Error(`Data read outside a live call (${String(key)})`);
         return ctx.store[key as keyof Store];
       },
+      // Removing items replaces a whole list (db.points = db.points.filter(...)): write it to the slice.
+      set(_, key, value) {
+        const ctx = liveContext();
+        if (!ctx) throw new Error(`Data write outside a live call (${String(key)})`);
+        (ctx.store as unknown as Record<string, unknown>)[key as string] = value;
+        return true;
+      },
     })
   : (g.__teamAppStoreV7 ??= seed());
 

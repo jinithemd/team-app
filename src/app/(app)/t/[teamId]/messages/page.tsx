@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DEFAULT_TZ } from "@/lib/time";
 import { Mail, PenSquare } from "lucide-react";
 import { listTeamMessages } from "@/lib/data";
 import { Banner, ButtonLink, EmptyState } from "@/components/ui";
@@ -33,7 +34,7 @@ export default async function TeamMessagesPage({ params, searchParams }: { param
                 <summary className="cursor-pointer list-none">
                   <p className="font-semibold break-words">{x.subject}</p>
                   <p className="text-sm text-muted">
-                    From {x.from.firstName} {x.from.lastName} · {new Date(x.createdAt).toLocaleDateString("en-CA", { month: "short", day: "numeric" })} · to {x.recipients} {x.recipients === 1 ? "person" : "people"}
+                    From {x.from.firstName} {x.from.lastName} · {new Date(x.createdAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: DEFAULT_TZ })} · to {x.recipients} {x.recipients === 1 ? "person" : "people"}
                   </p>
                 </summary>
                 <p className="mt-3 whitespace-pre-line break-words">{x.body}</p>

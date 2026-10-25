@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DEFAULT_TZ } from "@/lib/time";
 import Link from "next/link";
 import { ChevronRight, Pencil, UserPlus, Users } from "lucide-react";
 import { getTeam, listJoinRequests, listRoster, listTeamUnavailable } from "@/lib/data";
@@ -42,7 +43,7 @@ export default async function RosterPage({
     <div className="grid gap-5">
       <JoinRequests
         teamId={teamId}
-        requests={requests.map((r) => ({ id: r.id, name: `${r.person.firstName} ${r.person.lastName}`, email: r.email, message: r.message, when: new Date(r.createdAt).toLocaleDateString("en-CA", { month: "short", day: "numeric" }) }))}
+        requests={requests.map((r) => ({ id: r.id, name: `${r.person.firstName} ${r.person.lastName}`, email: r.email, message: r.message, when: new Date(r.createdAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: DEFAULT_TZ }) }))}
       />
       {sp.created && <Banner>Your team is ready. Add your players so they get the schedule.</Banner>}
       {sp.saved && (

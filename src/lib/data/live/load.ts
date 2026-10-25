@@ -1,6 +1,7 @@
 import "server-only";
 import type { Store } from "../store";
 import type { DB } from "../../supabase/server";
+import { adminClient } from "../../supabase/server";
 import { TABLES, type Aux, type Row } from "./tables";
 
 /*
@@ -77,7 +78,7 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
   const people = uniq([uid, ...roster.map((r) => r.user_id as string), ...joinReqs.map((r) => r.user_id as string)]);
   const byEvent = (table: string, cols = "*") => (eventIds.length ? rows(t(table).select(cols).in("event_id", eventIds)) : none);
 
-  const [clubs, clubAdmins, profiles, rsvps, rsvpsPub, avail, availPub, attendance, scores, matchEvents, potm, potmPub, managers, offers, requests, dues, sponsors, chat, reads, recipients] =
+  const [clubs, clubAdmins, profiles, rsvps, rsvpsPub, avail, availPub, attendance, playedPub, scores, matchEvents, potm, potmPub, managers, offers, requests, dues, sponsors, chat, reads, recipients] =
     await Promise.all([
       clubIds.length ? rows(t("clubs").select("*").in("id", clubIds)) : none,
       clubIds.length ? rows(t("club_admins").select("*").in("club_id", clubIds)) : none,
@@ -87,6 +88,7 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
       rows(t("availability_periods").select("*").in("user_id", people)),
       rows(t("availability_public").select("*").in("user_id", people)),
       byEvent("attendance"),
+      byEvent("played_public"),
       byEvent("scores"),
       byEvent("match_events"),
       byEvent("potm_votes"),
@@ -113,6 +115,70 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
     chatIds.length ? rows(t("poll_votes").select("*").in("message_id", chatIds)) : none,
   ]);
 
+  // Sponsors: the teams I sponsor (not as a member). Only what a sponsor may see: the team's
+  // name and colours (never its join code or invite link), the sponsors room and its messages,
+  // and people's names as the room shows them ("First L." for members).
+  const mySponsorRows = sponsors.filter((x) => x.contact_user_id === uid && x.status === "active" && (!x.ends_on || String(x.ends_on) >= new Date().toISOString().slice(0, 10)));
+  const extra = { teams: [] as Row[], clubs: [] as Row[], convs: [] as Row[], chat: [] as Row[], profiles: [] as Row[], sponsors: [] as Row[], reads: [] as Row[] };
+  if (mySponsorRows.length) {
+    const admin = adminClient();
+    const direct = mySponsorRows.map((x) => x.team_id as string).filter(Boolean);
+    const viaClub = mySponsorRows.map((x) => x.club_id as string).filter(Boolean);
+    const teamCols = "id, club_id, name, sport, level, location, color, color_secondary, logo_path, sponsor_chat, is_public, roster_visible, created_by, created_at";
+    const [{ data: t1 }, { data: t2 }] = await Promise.all([
+      direct.length ? admin.from("teams").select(teamCols).in("id", direct) : Promise.resolve({ data: [] as Row[] }),
+      viaClub.length ? admin.from("teams").select(teamCols).in("club_id", viaClub).is("archived_at", null) : Promise.resolve({ data: [] as Row[] }),
+    ]);
+    const sTeams = uniqBy([...(t1 ?? []), ...(t2 ?? [])] as Row[], (r) => r.id as string).filter((r) => !teamIds.includes(r.id as string));
+    extra.teams = sTeams.map((r) => ({ ...r, join_code: "", _pub: true }));
+    const sTeamIds = sTeams.map((r) => r.id as string);
+    const sClubIds = uniq([...viaClub, ...sTeams.map((r) => r.club_id as string)]).filter((c) => !clubIds.includes(c));
+    if (sClubIds.length) extra.clubs = (await rows(t("clubs").select("*").in("id", sClubIds))).map((r) => ({ ...r, _pub: true }));
+    if (sTeamIds.length) {
+      extra.convs = await rows(t("conversations").select("*").in("team_id", sTeamIds).eq("kind", "sponsors"));
+      const roomIds = extra.convs.map((r) => r.id as string);
+      if (roomIds.length) {
+        [extra.chat, extra.reads] = await Promise.all([
+          rows(t("chat_messages").select("*").in("conversation_id", roomIds).order("created_at")),
+          rows(t("chat_reads").select("*").in("conversation_id", roomIds).eq("user_id", uid)),
+        ]);
+      }
+    }
+  }
+  // The sponsor strip on team pages: active sponsors of my teams and their clubs, without emails.
+  const memberClubIds = uniq(teams.map((r) => r.club_id as string));
+  const stripRows = teamIds.length
+    ? await rows(
+        t("sponsors_public")
+          .select("*")
+          .or([`team_id.in.(${teamIds.join(",")})`, memberClubIds.length && `club_id.in.(${memberClubIds.join(",")})`].filter(Boolean).join(",")),
+      )
+    : [];
+  const knownSponsor = new Set(sponsors.map((r) => r.id as string));
+  extra.sponsors.push(...stripRows.filter((r) => !knownSponsor.has(r.id as string)).map((r) => ({ ...r, status: "active", _pub: true })));
+
+  // Every sponsors room (as a member or as a sponsor): names as the room shows them, and which
+  // authors speak for a sponsor, from chat_people(). Members can't read sponsors' own rows.
+  const sponsorRooms = [...convs.filter((r) => r.kind === "sponsors"), ...extra.convs];
+  if (sponsorRooms.length) {
+    const known = new Set<string>([uid, ...profiles.map((r) => r.id as string)]);
+    const people = await Promise.all(sponsorRooms.map((r) => sb.rpc("chat_people", { c: r.id as string })));
+    for (const [i, res] of people.entries()) {
+      const room = sponsorRooms[i];
+      for (const p of res.data ?? []) {
+        if (p.sponsor_name && p.user_id !== uid && !sponsors.some((x) => x.contact_user_id === p.user_id)) {
+          // Attach the author to the matching sponsor already on the strip; otherwise add one.
+          const match = extra.sponsors.find((x) => x.name === p.sponsor_name && x.tier === p.sponsor_tier && !x.contact_user_id);
+          if (match) match.contact_user_id = p.user_id;
+          else extra.sponsors.push({ id: `${PUB}${room.id}:${p.user_id}`, team_id: room.team_id, club_id: null, name: p.sponsor_name, tier: p.sponsor_tier, contact_user_id: p.user_id, status: "active", _pub: true });
+        }
+        if (known.has(p.user_id)) continue;
+        known.add(p.user_id);
+        const [first, ...rest] = String(p.display_name ?? "").split(" ");
+        extra.profiles.push({ id: p.user_id, first_name: first, last_name: rest.join(" "), email: "", _pub: true });
+      }
+    }
+  }
   // Merge what privacy splits in two.
   const fullRsvp = new Set(rsvps.map((r) => `${r.event_id}:${r.user_id}`));
   const allRsvps = [
@@ -121,6 +187,11 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
   ];
   const fullAvail = new Set(avail.map((r) => r.id as string));
   const allAvail = [...avail, ...availPub.filter((r) => !fullAvail.has(r.id as string)).map((r) => ({ ...r, id: `${PUB}${r.id}`, kind: "other", note: null }))];
+  const fullAtt = new Set(attendance.map((r) => `${r.event_id}:${r.user_id}`));
+  const allAttendance = [
+    ...attendance,
+    ...playedPub.filter((r) => !fullAtt.has(`${r.event_id}:${r.user_id}`)).map((r) => ({ ...r, status: "present", method: "staff", _pub: true })),
+  ];
   const myVotes = new Set(potm.map((r) => `${r.event_id}:${r.voter_id}`));
   const allPotm = [...potm];
   if (!potm.some((r) => r.voter_id !== uid)) {
@@ -143,34 +214,34 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
   for (const r of recipients) recBy.set(r.message_id as string, [...(recBy.get(r.message_id as string) ?? []), r.user_id as string]);
 
   const raw: Partial<Record<keyof Store, Row[]>> = {
-    profiles: uniqBy([...me, ...profiles], (r) => r.id as string),
-    clubs,
+    profiles: uniqBy([...me, ...profiles, ...extra.profiles], (r) => r.id as string),
+    clubs: [...clubs, ...extra.clubs],
     clubAdmins,
     joinRequests: joinReqs,
-    teams: teams.map((r) => ({ ...r, _invite_token: linkBy.get(r.id as string)?.token ?? null, _needs_approval: linkBy.get(r.id as string)?.needs_approval ?? false })),
+    teams: [...extra.teams, ...teams].map((r) => ({ ...r, _invite_token: linkBy.get(r.id as string)?.token ?? null, _needs_approval: linkBy.get(r.id as string)?.needs_approval ?? false })),
     roster,
     venues,
     seasons,
     events,
     rsvps: allRsvps,
     availability: allAvail,
-    attendance,
+    attendance: allAttendance,
     points,
     scores,
     matchEvents,
     potmVotes: allPotm,
     eventManagers: managers,
-    sponsors,
+    sponsors: [...sponsors, ...extra.sponsors],
     rideOffers: offers,
     rideRequests: requests,
     fees,
     dues,
     payments,
-    conversations: convs,
-    chat,
+    conversations: [...convs, ...extra.convs],
+    chat: [...chat, ...extra.chat],
     reactions,
     pollVotes,
-    reads,
+    reads: [...reads, ...extra.reads],
     messages: messages.map((m) => ({ ...m, _recipients: recBy.get(m.id as string) ?? [] })),
     prefs,
   };
@@ -180,7 +251,11 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
     const spec = TABLES.find((x) => x.key === key);
     const list = raw[key];
     if (!spec || !list) continue;
-    (store[key] as unknown[]) = list.map((r) => spec.toApp(r, aux));
+    (store[key] as unknown[]) = list.map((r) => {
+      const o = spec.toApp(r, aux) as Record<string, unknown>;
+      if (r._pub || String(r.id ?? "").startsWith(PUB) || String(r.voter_id ?? "").startsWith(PUB)) o._pub = true;
+      return o;
+    });
   }
   store.events.sort((a, b) => a.startAt.localeCompare(b.startAt));
   return { store, aux };

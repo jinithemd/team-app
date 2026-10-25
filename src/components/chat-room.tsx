@@ -8,11 +8,11 @@ import { chatOpAction, sendChatAction } from "@/app/actions";
 import type { ChatView } from "@/lib/data/chat";
 import { Avatar } from "@/components/ui";
 import { TierBadge } from "@/components/sponsor-badge";
+import { LocalTime } from "@/components/local-time";
 
 const EMOJI = ["👍", "😂", "❤️", "🔥", "👏"];
 
-function when(iso: string) {
-  const d = new Date(iso);
+function when(d: Date) {
   const today = new Date().toDateString() === d.toDateString();
   return today
     ? d.toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit" })
@@ -148,7 +148,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
                         <span className="text-fg">{m.authorSponsor.name}</span> <TierBadge tier={m.authorSponsor.tier} />
                       </span>
                     )}
-                    {when(m.createdAt)}
+                    <LocalTime iso={m.createdAt} format={when} />
                     {m.pinned && " · pinned"}
                   </p>
                 )}

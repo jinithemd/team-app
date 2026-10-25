@@ -7,6 +7,11 @@ HERE=$(cd "$(dirname "$0")" && pwd); REPO=$(cd "$HERE/../.." && pwd); BIN=/var/t
 SECRET=local-dev-jwt-secret-with-at-least-32-chars
 PSQL="psql -h /var/tmp/pgtest -p 5499 -U postgres -v ON_ERROR_STOP=1 -q"
 for p in 9999 3001 54321 2500; do fuser -k $p/tcp >/dev/null 2>&1 || true; done
+# Local Postgres (cluster in /var/tmp/pgtest/data, owned by postgres): start it if it isn't running.
+if ! pg_isready -h /var/tmp/pgtest -p 5499 -q; then
+  su postgres -s /bin/bash -c "/usr/lib/postgresql/16/bin/pg_ctl -D /var/tmp/pgtest/data -l /var/tmp/pgtest/log -o '-p 5499 -k /var/tmp/pgtest' start" >/dev/null 2>&1 < /dev/null
+  for i in $(seq 1 30); do pg_isready -h /var/tmp/pgtest -p 5499 -q && break; sleep 0.5; done
+fi
 $PSQL -d postgres -c "drop database if exists sb" -c "create database sb"
 $PSQL -d sb -f "$HERE/roles.sql"
 : > "$BIN/mail.jsonl"
@@ -18,8 +23,8 @@ $PSQL -d sb -f "$HERE/roles.sql"
   GOTRUE_SMTP_ADMIN_EMAIL=noreply@local.test GOTRUE_SMTP_SENDER_NAME="Team App" GOTRUE_SMTP_MAX_FREQUENCY=1s \
   GOTRUE_RATE_LIMIT_EMAIL_SENT=10000 GOTRUE_RATE_LIMIT_VERIFY=10000 GOTRUE_RATE_LIMIT_OTP=10000 GOTRUE_EXTERNAL_PHONE_ENABLED=false \
   GOTRUE_MAILER_OTP_EXP=3600 GOTRUE_LOG_LEVEL=warn \
-  nohup ./auth > "$BIN/auth.log" 2>&1 &)
-python3 "$HERE/mailsink.py" "$BIN/mail.jsonl" > "$BIN/mail.log" 2>&1 &
+  nohup ./auth > "$BIN/auth.log" 2>&1 < /dev/null &)
+python3 "$HERE/mailsink.py" "$BIN/mail.jsonl" > "$BIN/mail.log" 2>&1 < /dev/null &
 for i in $(seq 1 60); do curl -sf http://127.0.0.1:9999/health >/dev/null && break; sleep 0.5; done
 curl -sf http://127.0.0.1:9999/health >/dev/null || { tail -20 "$BIN/auth.log"; exit 1; }
 $PSQL -d sb -f "$HERE/after_auth.sql"
@@ -32,8 +37,8 @@ jwt-secret = "$SECRET"
 server-port = 3001
 server-host = "127.0.0.1"
 CONF
-(cd "$BIN" && nohup ./postgrest postgrest.conf > "$BIN/postgrest.log" 2>&1 &)
-node "$HERE/gateway.mjs" > "$BIN/gateway.log" 2>&1 &
+(cd "$BIN" && nohup ./postgrest postgrest.conf > "$BIN/postgrest.log" 2>&1 < /dev/null &)
+node "$HERE/gateway.mjs" > "$BIN/gateway.log" 2>&1 < /dev/null &
 for i in $(seq 1 40); do curl -sf http://127.0.0.1:3001/ >/dev/null && break; sleep 0.5; done
 ANON=$(node "$HERE/jwt.mjs" $SECRET anon); SERVICE=$(node "$HERE/jwt.mjs" $SECRET service_role)
 cat > "$REPO/.env.localstack" <<ENV

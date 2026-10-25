@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { DEFAULT_TZ } from "@/lib/time";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { CalendarDays, MapPin, Megaphone, MessageCircle, Trophy } from "lucide-react";
@@ -144,7 +145,7 @@ export default async function SponsorView({ params, searchParams }: { params: Pr
                         {n.subject}
                       </p>
                       <p className="mt-1 text-sm whitespace-pre-line">{n.body}</p>
-                      <p className="mt-1 text-xs text-muted">{new Date(n.createdAt).toLocaleDateString("en-CA", { month: "short", day: "numeric" })}</p>
+                      <p className="mt-1 text-xs text-muted">{new Date(n.createdAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: DEFAULT_TZ })}</p>
                     </li>
                   ))}
                 </ul>

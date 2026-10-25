@@ -37,7 +37,8 @@ with sync_playwright() as pw:
     fits(sid, "sponsor view"); shot(sid, "sponsor-view")
     for path in ["/t/t-strikers/roster", "/t/t-strikers/chat", "/t/t-strikers/dues", "/t/t-strikers/e/e-s-g1", "/t/t-strikers/p/u-rahul", "/t/t-strikers/points"]:
         sid.goto(BASE + path)
-        if sid.get_by_text("We couldn't find that page").count() == 0: errors.append(f"sponsor reached {path}")
+        try: expect(sid.get_by_text("We couldn't find that page")).to_be_visible(timeout=8000)
+        except AssertionError: errors.append(f"sponsor reached {path}")
     step("sponsor can't open roster, chat, dues, events, profiles or points")
     r = sid.request.get(f"{BASE}/t/t-strikers/export/players.csv"); assert r.status == 403; step("sponsor can't export")
 

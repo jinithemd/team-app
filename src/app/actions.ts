@@ -339,7 +339,7 @@ export async function closeSeasonAction(teamId: string, _: FormState, f: FormDat
   redirect(`/t/${teamId}/seasons?started=1`);
 }
 
-export async function updateScoreAction(eventId: string, input: { us: number; them: number; period: string | null; status: "not_started" | "live" | "final"; version: number }) {
+export async function updateScoreAction(eventId: string, input: { us: number; them: number; period: string | null; status: "not_started" | "live" | "final"; version: number; statusOnly?: boolean }) {
   const res = await data.updateScore(eventId, input);
   revalidatePath("/", "layout");
   return res;
@@ -532,6 +532,13 @@ export async function sponsorOpAction(id: string, op: "end" | "restart" | "resen
 }
 
 export async function acceptSponsorInviteAction(token: string, _: FormState, f: FormData): Promise<FormState> {
+  if (LIVE && !(await data.getSessionUser())) {
+    // Not signed in: email a link to the invited address; it brings them back here signed in.
+    const inv = await data.getSponsorInvite(token);
+    if (!inv) return { error: "This sponsor link has expired. Ask the team for a new one." };
+    const r = await sendSignInLink({ email: inv.email, firstName: str(f, "firstName"), lastName: str(f, "lastName"), next: `/sponsor-invite/${token}`, create: !inv.hasAccount });
+    return r.ok ? { ok: true, message: r.email } : { error: r.error, fieldErrors: r.fieldErrors };
+  }
   const res = await data.acceptSponsorInvite(token, { firstName: str(f, "firstName"), lastName: str(f, "lastName") });
   if (!res.ok) return { error: res.error };
   revalidatePath("/", "layout");

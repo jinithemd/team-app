@@ -139,9 +139,11 @@ Environment: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPAB
 
 Local testing without network access to Supabase: `tests/localstack/up.sh` runs Supabase's own Auth and PostgREST against local Postgres with `replica/schema.sql`, behind one gateway URL, with a mail catcher for sign-in links. `tests/live_core.py` signs up by email link, creates a club and team, adds a match, answers it, and has a second person join by invite link.
 
-Still running the shared logic but not yet checked live: chat, dues, carpools, match day, attendance and points, sponsors' own views, calendar feeds, one-tap email answers. Those come next, each with a live test.
+Checked live by `tests/live_features.py` (40 steps): chat with polls, team messages, dues (fee, report, confirm), carpools, geo check-in (the database checks the distance and awards the points), attendance and manual points, match day and player of the match, availability, one-tap answers from emails, the calendar feed and its reset, exports, and sponsors (invite by email link, sponsor page from `sponsor_feed`/`sponsor_news`, shared news, the sponsors room both ways, the strip players see, and the sponsor kept out of team pages).
 
-Found and fixed on the way: the two message tables' read rules referred to each other (Postgres loops); nobody could send a team message; a club's owner row couldn't be created (now made by a trigger with the club); attendance points couldn't be written by staff.
+Rows the shared logic needs but privacy hides come from views and are never written back: answers without notes (`rsvps_public`), "unavailable" without the reason (`availability_public`), vote totals (`potm_results`), who played in a match (`played_public`), the sponsor strip (`sponsors_public`), and names in the sponsors room (`chat_people`).
+
+Found and fixed on the way: the two message tables' read rules referred to each other (Postgres loops); nobody could send a team message; a club's owner row couldn't be created (now made by a trigger with the club); attendance points couldn't be written by staff; geo check-in gave no points; "Full time" could be refused right after a goal (the clock buttons now change only the status); chat times were formatted in the server's time zone.
 
 Next 15 note: a `loading.tsx` around every page made forms hang on "Saving…" after a save when pages stream slowly (one in a few saves, in both builds). It's gone; `components/nav-progress.tsx` shows a thin bar while the next page loads instead.
 

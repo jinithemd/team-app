@@ -3,9 +3,11 @@
 import { useActionState } from "react";
 import { acceptSponsorInviteAction, type FormState } from "@/app/actions";
 import { Field, Input, buttonClass } from "@/components/ui";
+import { CheckEmail } from "@/app/login/sign-up-form";
 
 export function AcceptSponsor({ token, email, hasAccount }: { token: string; email: string; hasAccount: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(acceptSponsorInviteAction.bind(null, token), null);
+  if (state?.ok && state.message) return <CheckEmail email={state.message} />;
   return (
     <form action={action} className="grid gap-4 rounded-lg border border-border bg-bg p-4" noValidate>
       <p className="text-sm">

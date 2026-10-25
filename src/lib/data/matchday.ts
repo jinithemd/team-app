@@ -103,13 +103,18 @@ export async function getMatch(eventId: ID) {
 
 export async function updateScore(
   eventId: ID,
-  input: { us: number; them: number; period: string | null; status: Score["status"]; version: number },
+  input: { us: number; them: number; period: string | null; status: Score["status"]; version: number; statusOnly?: boolean },
 ): Promise<ActionResult<Score>> {
   const user = await requireUser();
   const e = eventById(eventId);
   if (!e || !hasEventPerm(user.id, e.id, "scoring")) return { ok: false, error: "You don't have permission to keep score." };
   const s = scoreOf(eventId);
-  if (input.version !== s.version) return { ok: false, error: `Someone else just updated the score to ${s.us}–${s.them}. Check it and try again.` };
+  // The version guards against two scorers overwriting each other. Kick-off, half time and full
+  // time don't change the score, so they go through when the score they show is still right.
+  // statusOnly: the buttons that only move the clock keep whatever score is saved.
+  if (input.statusOnly) Object.assign(input, { us: s.us, them: s.them });
+  const sameScore = input.us === s.us && input.them === s.them;
+  if (input.version !== s.version && !sameScore) return { ok: false, error: `Someone else just updated the score to ${s.us}–${s.them}. Check it and try again.` };
   if (![input.us, input.them].every((n) => Number.isInteger(n) && n >= 0 && n < 100)) return { ok: false, error: "Scores are whole numbers." };
   const wasFinal = s.status === "final";
   Object.assign(s, { us: input.us, them: input.them, period: input.period?.slice(0, 20) || null, status: input.status, version: s.version + 1, updatedAt: now() });
