@@ -632,7 +632,8 @@ export async function saveVenue(
   input: { name: string; address?: string; lat?: string; lng?: string; radiusM?: string },
 ): Promise<ActionResult<Venue>> {
   const user = await requireUser();
-  if (!hasTeamPerm(user.id, teamId, "schedule_events") && !hasTeamPerm(user.id, teamId, "edit_settings"))
+  // Same rule as the venues_write policy: anyone who can schedule games or events.
+  if (!hasTeamPerm(user.id, teamId, "schedule_events") && !hasTeamPerm(user.id, teamId, "schedule_games"))
     return { ok: false, error: "You don't have permission to change venues." };
   const fieldErrors: Record<string, string> = {};
   const name = input.name.trim();

@@ -30,7 +30,9 @@ export async function searchPlaces(q: string, near?: { lat: number; lng: number 
     u.searchParams.set("lon", String(near.lng));
   }
   try {
-    const res = await fetch(u, { signal });
+    // Give up on the direct route quickly and use ours if it's slow (some networks block it).
+    const quick = AbortSignal.any ? AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(4000)]) : signal;
+    const res = await fetch(u, { signal: quick });
     if (!res.ok) throw new Error(String(res.status));
     const body = (await res.json()) as { features: PhotonFeature[] };
     const seen = new Set<string>();
@@ -43,7 +45,8 @@ export async function searchPlaces(q: string, near?: { lat: number; lng: number 
         return true;
       });
   } catch (e) {
-    if ((e as Error).name === "AbortError") throw e;
+    if (signal?.aborted) throw e;
+    console.warn("[place search] direct search failed, using the app's own", e);
     const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`, { signal });
     const body = (await res.json()) as { results?: { lat: number; lng: number; label: string }[]; error?: string };
     if (!res.ok) throw new Error(body.error ?? "Search isn't working right now.");

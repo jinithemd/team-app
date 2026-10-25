@@ -37,13 +37,37 @@ export async function GET(req: NextRequest) {
   }
 
   if (q.length < 3) return NextResponse.json({ error: "Type a place name or address." }, { status: 400 });
+
+  // Photon first (made for search-as-you-type), then Nominatim.
+  const photon = new URL("https://photon.komoot.io/api/");
+  photon.search = new URLSearchParams({ q: q.slice(0, 200), limit: "6", lang: "en" }).toString();
+  const p = await fetch(photon, { headers: { "User-Agent": UA }, signal: AbortSignal.timeout(6000) }).catch((e) => {
+    console.error("[geocode] photon unreachable", String(e));
+    return null;
+  });
+  if (p?.ok) {
+    const body = (await p.json()) as { features: { geometry: { coordinates: [number, number] }; properties: Record<string, string | undefined> }[] };
+    return NextResponse.json({
+      results: body.features.map((f) => {
+        const pr = f.properties;
+        const street = [pr.housenumber, pr.street].filter(Boolean).join(" ");
+        const label = [pr.name || street, pr.city, pr.state, pr.country].filter(Boolean).join(", ");
+        return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0], label };
+      }),
+    });
+  }
+  if (p) console.error("[geocode] photon status", p.status);
+
   const wait = lastNominatim + 1100 - Date.now();
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastNominatim = Date.now();
   const u = new URL("https://nominatim.openstreetmap.org/search");
   u.search = new URLSearchParams({ q: q.slice(0, 200), format: "jsonv2", limit: "5", addressdetails: "0" }).toString();
   const res = await fetch(u, { headers: { "User-Agent": UA, "Accept-Language": "en-CA,en" }, signal: AbortSignal.timeout(8000) }).catch(() => null);
-  if (!res?.ok) return NextResponse.json({ error: "Map search isn't answering. Try again in a moment, or drop the pin on the map." }, { status: 502 });
+  if (!res?.ok) {
+    console.error("[geocode] nominatim failed", res?.status);
+    return NextResponse.json({ error: "Map search isn't answering right now." }, { status: 502 });
+  }
   const rows = (await res.json()) as { lat: string; lon: string; display_name: string }[];
   return NextResponse.json({
     results: rows.map((r) => ({ lat: Number(r.lat), lng: Number(r.lon), label: r.display_name })).filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lng)),

@@ -92,7 +92,7 @@ with sync_playwright() as pw:
     team_id = re.search(r"/t/([^/]+)/", c.url).group(1); step("team saved; Jin is player #9, captain, manager, club owner")
 
     c.goto(f"{BASE}/t/{team_id}/e/new")
-    c.fill("#opponent", "Cataraqui Cobras"); c.fill("#date", "2026-11-07"); c.fill("#startTime", "10:00"); c.fill("#locationText", "Caraco Park")
+    c.fill("#opponent", "Cataraqui Cobras"); c.fill("#date", "2026-11-07"); c.fill("#startTime", "10:00"); c.select_option("#venueId", ""); c.fill("#locationText", "Caraco Park")
     submit(c, lambda: c.get_by_role("button", name="Add match").click(), r"/e/[^/]+\?created=1")
     event_url = c.url.split("?")[0]; expect(c.get_by_text("0 going")).to_be_visible(); step("match saved")
     settle(c); c.get_by_role("button", name="Going", exact=True).click(); expect(c.get_by_text("Saved")).to_be_visible(); c.reload()

@@ -4,6 +4,9 @@ import { useActionState, useEffect, useState } from "react";
 import { createEventAction, updateEventAction, type FormState } from "@/app/actions";
 import { Field, Input, buttonClass, inputClass } from "@/components/ui";
 import { EVENT_TYPE_LABEL, type EventType, type Venue } from "@/lib/data/types";
+import { LocationPicker } from "@/components/location-picker";
+
+const NEW = "__new";
 
 function addMinutes(time: string, mins: number) {
   const [h, m] = time.split(":").map(Number);
@@ -62,7 +65,12 @@ export function EventForm({
   const [start, setStart] = useState(initial.startTime);
   const [end, setEnd] = useState(initial.endTime);
   const [endTouched, setEndTouched] = useState(editing);
-  const [venueId, setVenueId] = useState(initial.venueId);
+  // No saved venue yet: start on "New place" so the map is right there.
+  const [venueId, setVenueId] = useState(initial.venueId || (initial.locationText ? "" : venues.length ? venues[0].id : NEW));
+  const [newLat, setNewLat] = useState("");
+  const [newLng, setNewLng] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newAddress, setNewAddress] = useState("");
   const [repeat, setRepeat] = useState(false);
   const [viewerTz, setViewerTz] = useState<string | null>(null);
 
@@ -179,18 +187,43 @@ export function EventForm({
         </Field>
       </div>
 
-      <Field id="venueId" label="Where" error={fe.venueId} hint={venues.length ? "Saved venues have a map pin for check-in." : undefined}>
+      <Field id="venueId" label="Where" error={fe.venueId} hint={venueId === NEW ? undefined : venues.length ? "Saved venues have a map pin, so players can check in." : undefined}>
         <select id="venueId" name="venueId" value={venueId} onChange={(e) => setVenueId(e.target.value)} className={inputClass}>
-          <option value="">Somewhere else (type it below)</option>
           {venues.map((v) => (
             <option key={v.id} value={v.id}>
               {v.name}
             </option>
           ))}
+          <option value={NEW}>+ New place: search or pick on the map</option>
+          <option value="">Just type a place (no map pin, no check-in)</option>
         </select>
       </Field>
+      {venueId === NEW && (
+        <div className="grid gap-3 rounded-md border border-border p-3">
+          <LocationPicker
+            idPrefix="newvenue"
+            lat={newLat}
+            lng={newLng}
+            radiusM={150}
+            onPin={(la, ln) => {
+              setNewLat(la);
+              setNewLng(ln);
+            }}
+            onPlace={(p) => {
+              setNewName((n) => n || p.label.slice(0, 80));
+              setNewAddress([p.label, p.detail].filter(Boolean).join(", ").slice(0, 120));
+            }}
+          />
+          <input type="hidden" name="newVenueLat" value={newLat} />
+          <input type="hidden" name="newVenueLng" value={newLng} />
+          <input type="hidden" name="newVenueAddress" value={newAddress} />
+          <Field id="newVenueName" label="Name this place" error={fe.newVenueName} hint="Saved to your team's venues, so next time you just pick it.">
+            <Input id="newVenueName" name="newVenueName" maxLength={80} value={newName} onChange={(e) => setNewName(e.target.value)} error={fe.newVenueName} placeholder="e.g. Caraco Park, Pitch 3" />
+          </Field>
+        </div>
+      )}
       {!venueId && (
-        <Field id="locationText" label="Place" hint="Players get a map link">
+        <Field id="locationText" label="Place" hint="Players get a map link. Check-in needs a place with a map pin.">
           <Input id="locationText" name="locationText" maxLength={120} defaultValue={initial.locationText} placeholder="e.g. Mooney's Bay Park, Ottawa" />
         </Field>
       )}

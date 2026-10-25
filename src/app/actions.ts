@@ -142,15 +142,39 @@ function eventInput(f: FormData) {
   };
 }
 
+/**
+ * "New place" on the event form: save it as a team venue first (so it has a map pin for
+ * check-in), then point the event at it. Without a pin it's just a typed place name.
+ */
+async function withNewVenue(teamId: string, f: FormData): Promise<{ input: ReturnType<typeof eventInput> } | { error: FormState }> {
+  const input = eventInput(f);
+  if (str(f, "venueId") !== "__new") return { input };
+  const name = str(f, "newVenueName").trim();
+  const lat = str(f, "newVenueLat");
+  const lng = str(f, "newVenueLng");
+  if (!lat || !lng) {
+    // Nothing picked: the event just has no place yet (it can be added later).
+    return { input: { ...input, venueId: undefined, locationText: name } };
+  }
+  if (!name) return { error: { error: "Give the place a name.", fieldErrors: { newVenueName: "Give the place a name your team will recognise." } } };
+  const v = await data.saveVenue(teamId, null, { name, address: str(f, "newVenueAddress"), lat, lng, radiusM: "150" });
+  if (!v.ok) return { error: { error: v.error, fieldErrors: v.fieldErrors?.name ? { newVenueName: v.fieldErrors.name } : undefined } };
+  return { input: { ...input, venueId: v.data.id, locationText: "" } };
+}
+
 export async function createEventAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
-  const res = await data.createEvent(teamId, eventInput(f));
+  const nv = await withNewVenue(teamId, f);
+  if ("error" in nv) return nv.error;
+  const res = await data.createEvent(teamId, nv.input);
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath("/", "layout");
   redirect(`/t/${teamId}/e/${res.data.id}?created=1`);
 }
 
 export async function updateEventAction(eventId: string, teamId: string, _: FormState, f: FormData): Promise<FormState> {
-  const res = await data.updateEvent(eventId, { ...eventInput(f), scope: str(f, "scope") === "following" ? "following" : "one" });
+  const nv = await withNewVenue(teamId, f);
+  if ("error" in nv) return nv.error;
+  const res = await data.updateEvent(eventId, { ...nv.input, scope: str(f, "scope") === "following" ? "following" : "one" });
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath("/", "layout");
   redirect(`/t/${teamId}/e/${eventId}?saved=1`);

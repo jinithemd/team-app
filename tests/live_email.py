@@ -56,7 +56,7 @@ with sync_playwright() as pw:
     assert "<br>" not in got[0]["html"].split("Sizes")[1][:40] and "Thanks!" in got[0]["html"]; step("team message emailed to Kai, paragraphs kept")
 
     c.goto(f"{BASE}/t/{team}/e/new"); settle(c)
-    c.fill("#opponent", "Cataraqui Cobras"); c.fill("#date", "2026-11-07"); c.fill("#startTime", "10:00"); c.fill("#locationText", "Caraco Park")
+    c.fill("#opponent", "Cataraqui Cobras"); c.fill("#date", "2026-11-07"); c.fill("#startTime", "10:00"); c.select_option("#venueId", ""); c.fill("#locationText", "Caraco Park")
     c.get_by_role("button", name="Add match").click(); c.wait_for_url(re.compile(r"\?created=1"))
     mail = wait_sent(lambda m: "Cataraqui Cobras" in m["subject"] and m["to"] == ["kai@example.com"], "new match")[0]
     hrefs = re.findall(r'href="([^"]+/r/[^"]+)"', mail["html"]); assert len(hrefs) == 3, hrefs; step("new match emailed with Going / Maybe / Can't make it buttons")

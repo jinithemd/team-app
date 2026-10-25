@@ -34,16 +34,15 @@ with sync_playwright() as pw:
     p.locator("form", has_text="Priya").first.get_by_role("button").click()
     p.wait_for_url(f"{BASE}/")
     p.goto(f"{BASE}/t/t-strikers/venues")
-    p.fill("#name", "Test Ground")
 
     # Search as you type: suggestions appear, picking one pins it and fills the address.
-    p.locator("#place-q").press_sequentially("Caraco", delay=40)
+    p.locator("#venue-q").press_sequentially("Caraco", delay=40)
     expect(p.get_by_role("option").first).to_contain_text("Caraco Park")
     p.get_by_role("option").first.click()
     expect(p.get_by_text("Pinned at Caraco Park")).to_be_visible()
     expect(p.locator("#address")).to_have_value(re.compile("Caraco Park"))
-    p.get_by_text("Coordinates and other options").click()
-    expect(p.locator("#lat")).to_have_value("44.2312")
+    expect(p.locator("#name")).to_have_value("Caraco Park")
+    expect(p.locator("input[name=lat]")).to_have_value("44.2312")
 
     # Street tiles: OSM failed, Carto took over. Satellite switch loads imagery.
     p.wait_for_timeout(1500)
@@ -53,18 +52,41 @@ with sync_playwright() as pw:
     assert tiles["esri"] > 0, tiles
 
     # Tap the map: the pin moves.
+    p.get_by_role("application").scroll_into_view_if_needed()
     box = p.get_by_role("application").bounding_box()
     p.mouse.click(box["x"] + box["width"] * 0.8, box["y"] + box["height"] * 0.3)
     expect(p.get_by_text("Pin moved.")).to_be_visible()
 
     # Long Google Maps link.
-    p.fill("#place-link", "https://www.google.com/maps/place/X/@44.2300,-76.4800,17z/data=!3m1!4b1!4m6!3m5!1s0:0!8m2!3d44.2312!4d-76.4861")
+    p.get_by_text("Paste a Google Maps link or coordinates").click()
+    p.fill("#venue-link", "https://www.google.com/maps/place/X/@44.2300,-76.4800,17z/data=!3m1!4b1!4m6!3m5!1s0:0!8m2!3d44.2312!4d-76.4861")
     p.get_by_role("button", name="Use", exact=True).click()
-    expect(p.locator("#lat")).to_have_value("44.2312")
+    expect(p.locator("input[name=lat]")).to_have_value("44.2312")
+    p.fill("#name", "Test Ground")
     p.screenshot(path="/tmp/claude-0/venue.png", full_page=True)
 
     p.get_by_role("button", name="Add venue").click()
     expect(p.locator("li", has_text="Test Ground").get_by_text("Pinned")).to_be_visible()
+
+    # Event form: "New place" right there, saved as a venue, so check-in works.
+    p.goto(f"{BASE}/t/t-strikers/e/new")
+    p.fill("#opponent", "Test United")
+    p.select_option("#venueId", "__new")
+    p.locator("#newvenue-q").press_sequentially("Caraco", delay=40)
+    p.get_by_role("listbox", name="Places").get_by_role("option").nth(1).click()
+    expect(p.locator("#newVenueName")).to_have_value("Caraco Field")
+    p.get_by_role("button", name=re.compile("^Add ")).click()
+    p.wait_for_url(re.compile(r"/e/[^/]+\?created=1"))
+    expect(p.get_by_text("Caraco Field").first).to_be_visible()
+    p.goto(f"{BASE}/t/t-strikers/venues")
+    expect(p.locator("li", has_text="Caraco Field").get_by_text("Pinned")).to_be_visible()
+
+    # Direct search blocked: falls back to the app's own search (unreachable here too) and says so.
+    ctx.unroute("https://photon.komoot.io/**")
+    ctx.route("https://photon.komoot.io/**", lambda r: r.abort())
+    p.goto(f"{BASE}/t/t-strikers/venues")
+    p.locator("#venue-q").press_sequentially("Nowhere park", delay=30)
+    expect(p.get_by_role("status")).to_contain_text("tap the spot on the map", timeout=20000)
     b.close()
 assert not errors, errors
 print("venue_pin: all checks pass", tiles)

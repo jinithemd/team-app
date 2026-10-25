@@ -12,7 +12,7 @@ export default async function VenuesPage({ params, searchParams }: { params: Pro
   const sp = await searchParams;
   const [team, venues, perms] = await Promise.all([getTeam(teamId), listVenues(teamId), myPerms(teamId)]);
   if (!team) return null;
-  const canEdit = perms.events || perms.settings;
+  const canEdit = perms.events || perms.games;
   const editing = venues.find((v) => v.id === sp.edit);
   return (
     <div className="grid gap-5">

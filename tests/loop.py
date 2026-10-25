@@ -136,7 +136,7 @@ with sync_playwright() as p:
     c.get_by_role("button", name="Add match").click(); expect(c.get_by_text("Add who you're playing.")).to_be_visible(); step("validation: match needs an opponent")
     c.fill("#opponent", "Cataraqui Cobras")
     c.fill("#date", "2026-11-07"); c.fill("#startTime", "10:00")
-    c.fill("#locationText", "Caraco Park, Field 1")
+    c.select_option("#venueId", ""); c.fill("#locationText", "Caraco Park, Field 1")
     c.fill("#squadSize", "11")
     submit(c, "Add match", r"/e/[^/]+\?created=1")
     event_url = c.url.split("?")[0]
@@ -195,7 +195,7 @@ with sync_playwright() as p:
     c.wait_for_url(re.compile(r"/schedule\?deleted=1")); expect(c.get_by_text("7:30 pm – 8:45 pm")).to_have_count(3); step("delete removes just one")
 
     # venue with a map pin, team settings with a crest
-    c.goto(f"{BASE}/t/{team_id}/venues"); c.fill("#name", "Riverside Park, Pitch 1"); c.fill("#lat", "44.2312"); c.fill("#lng", "-76.4860")
+    c.goto(f"{BASE}/t/{team_id}/venues"); c.fill("#name", "Riverside Park, Pitch 1"); c.fill("#venue-q", "44.2312, -76.4860")
     submit(c, "Add venue", r"/venues\?saved=1")
     expect(c.get_by_text("Pinned · check-in within 150 m")).to_be_visible(); step("venue saved with a map pin")
     c.goto(f"{BASE}/t/{team_id}/settings"); shot(c, "team-settings")
