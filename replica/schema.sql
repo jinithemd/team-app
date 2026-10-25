@@ -6,8 +6,8 @@
 -- Times are timestamptz (UTC); every event also stores the IANA zone it happens in.
 -- Money is integer cents plus a currency code.
 
-create extension if not exists pgcrypto;
-create extension if not exists citext;
+create extension if not exists pgcrypto with schema extensions;
+create extension if not exists citext with schema extensions;
 
 create or replace function set_updated_at() returns trigger
 language plpgsql as $$
@@ -139,7 +139,7 @@ create index on roster_members (team_id, status);
 -- Editing the roster isn't the same as handing out power: changing someone's roles or
 -- permissions needs manage_permissions (the team creator and club admins have it).
 create or replace function guard_roster_perms() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 begin
   if auth.uid() is null then return new; end if;   -- service role
   if (tg_op = 'INSERT' and (cardinality(new.permissions) > 0 or cardinality(new.roles) > 0))
@@ -311,7 +311,7 @@ create index on attendance (user_id);
 -- A mark a captain already made wins: check-in never overwrites a staff row.
 create or replace function check_in(p_event uuid, p_lat double precision, p_lng double precision, p_accuracy_m double precision)
 returns table (status text, minutes_late int, distance_m int)
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 #variable_conflict use_column
 declare
   e events%rowtype; v venues%rowtype; t teams%rowtype;
@@ -462,7 +462,7 @@ create index on ride_requests (rider_id);
 
 -- Seats are a database rule, not a UI rule: block a match beyond the driver's seats.
 create or replace function check_ride_seats() returns trigger
-language plpgsql security definer set search_path = public as $$
+language plpgsql security definer set search_path = public, extensions as $$
 declare cap int; taken int;
 begin
   if new.status = 'matched' and new.offer_id is not null then
@@ -548,6 +548,7 @@ create table chat_messages (
   client_id uuid not null,
   reply_to uuid references chat_messages(id) on delete set null,
   kind text not null default 'text' check (kind in ('text','poll','system')),
+  poll_multi boolean not null default false,   -- polls: people can pick more than one
   body text check (length(body) <= 4000),
   attachments jsonb not null default '[]',
   pinned_at timestamptz,
@@ -592,8 +593,9 @@ create table poll_votes (
   option_id uuid not null references poll_options(id) on delete cascade,
   user_id uuid not null references profiles(id) on delete cascade,
   created_at timestamptz not null default now(),
-  primary key (message_id, user_id)
+  primary key (option_id, user_id)
 );
+create index on poll_votes (message_id, user_id);
 create index on poll_votes (option_id);
 create index on poll_votes (user_id);
 
@@ -692,17 +694,17 @@ end $$;
 -- ---------------------------------------------------------------------------
 
 create or replace function is_club_admin(c uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (select 1 from club_admins where club_id = c and user_id = auth.uid())
 $$;
 
 create or replace function is_club_owner(c uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (select 1 from club_admins where club_id = c and user_id = auth.uid() and role = 'owner')
 $$;
 
 create or replace function is_club_admin_of_team(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (
     select 1 from teams tm join club_admins ca on ca.club_id = tm.club_id
     where tm.id = t and ca.user_id = auth.uid() and ca.role in ('owner','admin')
@@ -710,7 +712,7 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function is_club_treasurer_of_team(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (
     select 1 from teams tm join club_admins ca on ca.club_id = tm.club_id
     where tm.id = t and ca.user_id = auth.uid()
@@ -718,7 +720,7 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function is_team_member(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (
     select 1 from roster_members r
     where r.team_id = t and r.user_id = auth.uid() and r.status in ('active','inactive')
@@ -728,7 +730,7 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function has_team_perm(t uuid, perm text) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (select 1 from teams where id = t and created_by = auth.uid())
   or is_club_admin_of_team(t)
   or (perm = 'payments' and is_club_treasurer_of_team(t))
@@ -740,7 +742,7 @@ $$;
 
 -- Staff = anyone with at least one permission on the team.
 create or replace function is_team_staff(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (select 1 from teams where id = t and created_by = auth.uid())
   or is_club_admin_of_team(t)
   or exists (
@@ -750,31 +752,31 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function event_team(e uuid) returns uuid
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select team_id from events where id = e
 $$;
 
 -- Team-wide permission, or this person manages this one event.
 create or replace function has_event_perm(e uuid, perm text) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select has_team_perm(event_team(e), perm)
   or exists (select 1 from event_managers m where m.event_id = e and m.user_id = auth.uid() and perm = any (m.permissions))
 $$;
 
 create or replace function played_in(e uuid, u uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (select 1 from attendance where event_id = e and user_id = u and status in ('present','late'))
 $$;
 
 create or replace function can_view_team(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select is_team_member(t)
   or exists (select 1 from teams where id = t and is_public and archived_at is null)
 $$;
 
 -- Teammates: share an active team where the roster is visible (or I'm staff there).
 create or replace function shares_team_with(u uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select u = auth.uid() or exists (
     select 1 from roster_members r join teams tm on tm.id = r.team_id
     where r.user_id = u and r.status in ('active','inactive') and is_team_member(r.team_id)
@@ -783,19 +785,19 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function is_staff_of_user(u uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (
     select 1 from roster_members r where r.user_id = u and r.status <> 'removed' and is_team_staff(r.team_id)
   )
 $$;
 
 create or replace function conversation_team(c uuid) returns uuid
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select team_id from conversations where id = c
 $$;
 
 create or replace function can_read_conversation(c uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select case (select kind from conversations where id = c)
     when 'staff' then is_team_staff(conversation_team(c))
     else is_team_member(conversation_team(c))
@@ -803,12 +805,12 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function fee_team(f uuid) returns uuid
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select team_id from fees where id = f
 $$;
 
 create or replace function due_team(d uuid) returns uuid
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select f.team_id from dues du join fees f on f.id = du.fee_id where du.id = d
 $$;
 
@@ -1044,8 +1046,6 @@ create policy prefs_own on notification_prefs for all using (user_id = auth.uid(
 create policy push_own on push_subscriptions for all using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy feeds_own on calendar_feeds for select using (user_id = auth.uid());
 
--- realtime:
--- alter publication supabase_realtime add table chat_messages, chat_reactions, chat_reads, poll_votes, scores, match_events, rsvps, events, ride_offers, ride_requests;
 
 -- ---------------------------------------------------------------------------
 -- sponsors: a business backing a team or a whole club. They get a tier badge and a
@@ -1088,13 +1088,13 @@ alter table events add column sponsor_visible boolean;
 alter table messages add column to_sponsors boolean not null default false;
 
 create or replace function tier_rank(t text) returns int
-language sql immutable as $$
+language sql immutable set search_path = public, extensions as $$
   select case t when 'diamond' then 1 when 'platinum' then 2 when 'gold' then 3 when 'silver' then 4 else 5 end
 $$;
 
 -- Am I the active contact for a sponsor of this team (directly, or through its club)?
 create or replace function is_sponsor_of_team(t uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select exists (
     select 1 from sponsors s left join teams tm on tm.id = t
     where s.contact_user_id = auth.uid() and s.status = 'active'
@@ -1104,7 +1104,7 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function can_manage_sponsors(p_team uuid, p_club uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select case when p_team is not null then has_team_perm(p_team, 'edit_settings') else is_club_admin(p_club) end
 $$;
 
@@ -1128,7 +1128,7 @@ create or replace function sponsor_feed(p_team uuid)
 returns table (event_id uuid, type text, title text, opponent text, home_away text, competition text,
                start_at timestamptz, end_at timestamptz, tz text, venue_name text, status text,
                team_score int, opponent_score int, score_status text, player_of_match text)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select e.id, e.type, e.title, e.opponent, e.home_away, e.competition, e.start_at, e.end_at, e.tz,
          v.name, e.status, sc.team_score, sc.opponent_score, sc.status,
          case when not e.potm_open then (
@@ -1146,7 +1146,7 @@ $$;
 
 create or replace function sponsor_news(p_team uuid)
 returns table (message_id uuid, subject text, body text, created_at timestamptz)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select m.id, m.subject, m.body, m.created_at from messages m
   where m.team_id = p_team and m.to_sponsors and (is_sponsor_of_team(p_team) or is_team_member(p_team))
   order by m.created_at desc limit 20
@@ -1166,7 +1166,7 @@ alter table conversations add constraint conversations_kind_check check (kind in
 create unique index one_sponsor_room on conversations (team_id) where kind = 'sponsors';
 
 create or replace function can_read_conversation(c uuid) returns boolean
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   select case (select kind from conversations where id = c)
     when 'staff' then is_team_staff(conversation_team(c))
     when 'sponsors' then exists (select 1 from teams t where t.id = conversation_team(c) and t.sponsor_chat)
@@ -1190,7 +1190,7 @@ create policy chat_insert on chat_messages for insert with check (
 -- get full names. Sponsor authors show their business and tier to everyone.
 create or replace function chat_people(c uuid)
 returns table (user_id uuid, display_name text, sponsor_name text, sponsor_tier text)
-language sql stable security definer set search_path = public as $$
+language sql stable security definer set search_path = public, extensions as $$
   with room as (select conversation_team(c) as team_id),
   viewer_is_sponsor as (
     select not is_team_member((select team_id from room)) and is_sponsor_of_team((select team_id from room)) as yes
@@ -1213,3 +1213,15 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function chat_people(uuid) from public;
 grant execute on function chat_people(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- realtime: chat, live score, answers and carpools update on screen as they change.
+-- Realtime still applies RLS, so people only receive rows they're allowed to read.
+-- ---------------------------------------------------------------------------
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    alter publication supabase_realtime add table chat_messages, chat_reactions, chat_reads, poll_votes,
+      scores, match_events, rsvps, events, ride_offers, ride_requests;
+  end if;
+end $$;
