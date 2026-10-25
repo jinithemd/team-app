@@ -205,6 +205,8 @@ export interface TeamSettings {
   pointsRules: PointsRules;
   geoCheckinEnabled: boolean;
   membersCanPost: boolean;
+  /** Sponsors and the whole team share one room. On unless captains switch it off. */
+  sponsorChat?: boolean;
   /** Where players send e-Transfers, shown on the dues screen. */
   payTo?: string | null;
 }
@@ -350,7 +352,7 @@ export interface Payment {
 export interface Conversation {
   id: ID;
   teamId: ID;
-  kind: "team" | "staff";
+  kind: "team" | "staff" | "sponsors";
 }
 export interface Poll {
   question: string;

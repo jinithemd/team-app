@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { CalendarDays, MapPin, Megaphone, Trophy } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, MapPin, Megaphone, MessageCircle, Trophy } from "lucide-react";
 import { getSponsorView } from "@/lib/data";
 import { Banner, EmptyState } from "@/components/ui";
 import { SponsorMark, SponsorStrip, TierBadge } from "@/components/sponsor-badge";
@@ -56,6 +57,12 @@ export default async function SponsorView({ params, searchParams }: { params: Pr
                 </p>
               )}
             </div>
+            {t.chat && (
+              <Link href={`/sponsor-chat/${t.team.id}`} className="flex items-center gap-3 rounded-lg bg-team-soft p-3.5 font-semibold text-team-ink hover:underline">
+                <MessageCircle aria-hidden className="size-5 shrink-0" />
+                <span className="flex-1">Chat with the team</span>
+              </Link>
+            )}
 
             {t.results.length > 0 && (
               <div className="grid gap-2">

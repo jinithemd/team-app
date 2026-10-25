@@ -7,6 +7,7 @@ import { BarChart3, ImagePlus, MoreHorizontal, Pin, Reply, Send, Trash2, X } fro
 import { chatOpAction, sendChatAction } from "@/app/actions";
 import type { ChatView } from "@/lib/data/chat";
 import { Avatar } from "@/components/ui";
+import { TierBadge } from "@/components/sponsor-badge";
 
 const EMOJI = ["👍", "😂", "❤️", "🔥", "👏"];
 
@@ -83,17 +84,18 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
 
   return (
     <div className="grid min-w-0 gap-3 [&>*]:min-w-0">
-      {chat.hasStaffRoom && (
+      {!chat.asSponsor && (chat.hasStaffRoom || chat.hasSponsorRoom) && (
         <nav aria-label="Chat rooms" className="inline-flex gap-1 justify-self-start rounded-md bg-sunken p-1">
           {(
             [
-              ["team", "Whole team", chat.kind === "staff" ? chat.teamUnread : 0],
-              ["staff", "Captains only", chat.kind === "team" ? chat.staffUnread : 0],
+              ["team", "Whole team", chat.kind !== "team" ? chat.teamUnread : 0, true],
+              ["staff", "Captains only", chat.kind !== "staff" ? chat.staffUnread : 0, chat.hasStaffRoom],
+              ["sponsors", "Sponsors", chat.kind !== "sponsors" ? chat.sponsorUnread : 0, chat.hasSponsorRoom],
             ] as const
-          ).map(([k, label, n]) => (
+          ).filter(([, , , show]) => show).map(([k, label, n]) => (
             <Link
               key={k}
-              href={k === "team" ? `/t/${chat.teamId}/chat` : `/t/${chat.teamId}/chat?room=staff`}
+              href={k === "team" ? `/t/${chat.teamId}/chat` : `/t/${chat.teamId}/chat?room=${k}`}
               aria-current={chat.kind === k ? "true" : undefined}
               className={`inline-flex min-h-9 items-center gap-1.5 rounded-sm px-3 text-sm font-semibold ${chat.kind === k ? "bg-team text-on-team" : "text-muted hover:text-fg"}`}
             >
@@ -104,6 +106,13 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
         </nav>
       )}
       {chat.kind === "staff" && <p className="text-xs text-muted">Only captains, managers and coaches see this chat.</p>}
+      {chat.kind === "sponsors" && (
+        <p className="rounded-md bg-surface px-3 py-2 text-xs text-muted">
+          {chat.asSponsor
+            ? `You're chatting with everyone on ${chat.teamName}. Players show as first name and initial. Please keep it friendly: no selling or spam.`
+            : "Everyone on the team and your sponsors can read and post here. Sponsors see your first name and last initial, nothing else about you."}
+        </p>
+      )}
 
       {chat.pinned.length > 0 && (
         <section aria-label="Pinned" className="grid gap-1 rounded-md bg-team-soft px-3 py-2">
@@ -123,7 +132,8 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
         {chat.messages.map((m, i) => {
           const prev = chat.messages[i - 1];
           const grouped = prev && prev.author.id === m.author.id && Date.parse(m.createdAt) - Date.parse(prev.createdAt) < 5 * 60_000;
-          const name = `${m.author.firstName} ${m.author.lastName}`;
+          const name = m.authorName;
+          const first = name.split(" ")[0];
           return (
             <li key={m.id} id={`m-${m.id}`} className={`flex gap-2 ${m.mine ? "flex-row-reverse" : ""} ${grouped ? "-mt-2" : ""}`}>
               <span className={`shrink-0 ${grouped || m.mine ? "invisible" : ""}`} aria-hidden={grouped || m.mine}>
@@ -132,7 +142,12 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
               <div className={`grid max-w-[82%] min-w-0 gap-1 ${m.mine ? "justify-items-end" : "justify-items-start"}`}>
                 {!grouped && (
                   <p className="text-xs text-muted">
-                    {!m.mine && <strong className="text-fg">{m.author.firstName} </strong>}
+                    {!m.mine && <strong className="text-fg">{chat.asSponsor || m.authorSponsor ? name : first} </strong>}
+                    {m.authorSponsor && (
+                      <span className="mr-1 inline-flex items-center gap-1 align-middle">
+                        <span className="text-fg">{m.authorSponsor.name}</span> <TierBadge tier={m.authorSponsor.tier} />
+                      </span>
+                    )}
                     {when(m.createdAt)}
                     {m.pinned && " · pinned"}
                   </p>
@@ -143,7 +158,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
                       <strong>{m.replyTo.who}</strong>: {m.replyTo.text}
                     </a>
                   )}
-                  {m.imageUrl && <img src={m.imageUrl} alt={`Photo from ${m.author.firstName}`} className="max-h-72 rounded-md object-cover" />}
+                  {m.imageUrl && <img src={m.imageUrl} alt={`Photo from ${first}`} className="max-h-72 rounded-md object-cover" />}
                   {m.poll ? (
                     <div className="grid gap-1.5" role="group" aria-label={`Poll: ${m.poll.question}`}>
                       <p className="font-semibold">{m.poll.question}</p>
@@ -196,7 +211,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
                     {!m.deleted && (
                       <button
                         type="button"
-                        aria-label={`More for ${m.author.firstName}'s message`}
+                        aria-label={`More for ${first}'s message`}
                         aria-expanded={openMenu === m.id}
                         onClick={() => setOpenMenu(openMenu === m.id ? null : m.id)}
                         className="grid size-7 place-items-center rounded-pill text-muted hover:bg-sunken"
@@ -249,7 +264,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
           {replyTo && (
             <div className="flex items-center justify-between gap-2 rounded-md bg-surface px-3 py-1.5 text-xs">
               <span className="min-w-0 truncate">
-                Replying to <strong>{replyTo.author.firstName}</strong>: {replyTo.body || "photo"}
+                Replying to <strong>{replyTo.authorName.split(" ")[0]}</strong>: {replyTo.body || "photo"}
               </span>
               <button type="button" aria-label="Cancel reply" onClick={() => setReplyTo(null)} className="grid size-7 place-items-center">
                 <X aria-hidden className="size-4" />
@@ -326,7 +341,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
                     send();
                   }
                 }}
-                placeholder="Message the team"
+                placeholder={chat.kind === "sponsors" ? (chat.asSponsor ? "Message the team" : "Message the team and sponsors") : "Message the team"}
                 className="max-h-32 min-h-11 w-0 min-w-0 flex-1 resize-none rounded-md border border-border-input bg-bg px-3 py-2.5 text-base focus:outline-2 focus:outline-focus"
               />
             )}

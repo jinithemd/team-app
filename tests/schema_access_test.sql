@@ -227,3 +227,43 @@ reset role; update sponsors set ends_on = current_date - 1, starts_on = current_
 set request.jwt.sub='00000000-0000-0000-0000-0000000000a5';
 \echo deal ended yesterday: sponsor view closes (0):
 select count(*) from sponsor_feed('20000000-0000-0000-0000-000000000001');
+
+\echo == Sponsor chat
+reset role;
+update sponsors set ends_on = null, status = 'active' where id='a0000000-0000-0000-0000-000000000001';
+insert into conversations(id,team_id,kind) values ('c5000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','sponsors');
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000b1';
+insert into chat_messages(client_id,conversation_id,author_id,body) values (gen_random_uuid(),'c5000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000b1','Thanks for the shirts!');
+\echo [ok] player posts in the sponsors room
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a5';
+insert into chat_messages(client_id,conversation_id,author_id,body) values (gen_random_uuid(),'c5000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000a5','Coffee is on us after Saturday');
+\echo [ok] sponsor posts in the sponsors room
+\echo sponsor reads the sponsors room (2) and the team chat (0):
+select (select count(*) from chat_messages where conversation_id='c5000000-0000-0000-0000-000000000001'),
+       (select count(*) from chat_messages m join conversations c on c.id = m.conversation_id where c.kind = 'team');
+reset role;
+select id as team_room from conversations where kind='team' and team_id='20000000-0000-0000-0000-000000000001' \gset
+set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a5';
+\echo [expect fail] sponsor posts in the team chat:
+insert into chat_messages(client_id,conversation_id,author_id,body) values (gen_random_uuid(),:'team_room','00000000-0000-0000-0000-0000000000a5','hi');
+\echo sponsor sees the player as "Rahul O.", itself in full with its business:
+select display_name, sponsor_name, sponsor_tier from chat_people('c5000000-0000-0000-0000-000000000001') order by display_name;
+\echo sponsor reads player profiles directly (0):
+select count(*) from profiles where id='00000000-0000-0000-0000-0000000000b1';
+set request.jwt.sub='00000000-0000-0000-0000-0000000000b1';
+\echo player sees full names and the sponsor badge:
+select display_name, sponsor_name, sponsor_tier from chat_people('c5000000-0000-0000-0000-000000000001') order by display_name;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a6';
+\echo outsider reads the room (0):
+select count(*) from chat_messages where conversation_id='c5000000-0000-0000-0000-000000000001';
+\echo [expect fail] outsider posts:
+insert into chat_messages(client_id,conversation_id,author_id,body) values (gen_random_uuid(),'c5000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000a6','buy my stuff');
+reset role; update teams set sponsor_chat=false where id='20000000-0000-0000-0000-000000000001'; set role authenticated;
+set request.jwt.sub='00000000-0000-0000-0000-0000000000a5';
+\echo captain switches sponsor chat off: sponsor reads (0):
+select count(*) from chat_messages where conversation_id='c5000000-0000-0000-0000-000000000001';
+reset role; update teams set sponsor_chat=true where id='20000000-0000-0000-0000-000000000001'; update sponsors set status='ended' where id='a0000000-0000-0000-0000-000000000001'; set role authenticated;
+\echo deal ended: sponsor reads (0):
+select count(*) from chat_messages where conversation_id='c5000000-0000-0000-0000-000000000001';

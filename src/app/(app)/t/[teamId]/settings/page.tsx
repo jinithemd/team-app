@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, MapPin, CalendarRange } from "lucide-react";
+import { ChevronRight, MapPin, CalendarRange, Handshake } from "lucide-react";
 import { getTeam, myPerms } from "@/lib/data";
 import { TeamSettingsForm } from "./settings-form";
 
@@ -24,6 +24,7 @@ export default async function TeamSettingsPage({ params }: { params: Promise<{ t
         {[
           [`/t/${teamId}/venues`, "Venues and map pins", <MapPin key="i" aria-hidden />],
           [`/t/${teamId}/seasons`, "Seasons", <CalendarRange key="i" aria-hidden />],
+          [`/t/${teamId}/sponsors`, "Sponsors", <Handshake key="i" aria-hidden />],
         ].map(([href, label, icon]) => (
           <Link
             key={href as string}
@@ -46,6 +47,7 @@ export default async function TeamSettingsPage({ params }: { params: Promise<{ t
           colorSecondary: team.colorSecondary,
           rosterVisible: team.rosterVisible,
           ...team.settings,
+          sponsorChat: team.settings.sponsorChat !== false,
         }}
         clubName={team.club?.name ?? null}
       />

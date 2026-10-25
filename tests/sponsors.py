@@ -72,10 +72,41 @@ with sync_playwright() as pw:
     sid.goto(f"{BASE}/sponsor/sp-cafe"); expect(sid.get_by_text("New kit arrives Saturday")).to_be_visible(); step("shared announcement reaches the sponsor")
 
     pr.goto(f"{BASE}/sponsor/sp-kit"); expect(pr.get_by_text("This is what Kingston Kit Co sees")).to_be_visible(); step("captain previews what a sponsor sees")
+
+    # ---- sponsor chat --------------------------------------------------------
+    sid.goto(f"{BASE}/sponsor/sp-cafe"); sid.get_by_role("link", name="Chat with the team").click(); sid.wait_for_url(re.compile(r"/sponsor-chat/t-strikers"))
+    msgs = sid.get_by_role("list", name="Messages")
+    expect(msgs.get_by_text("Priya R.")).to_be_visible(); expect(msgs.get_by_text("Rahul M.")).to_be_visible()
+    assert msgs.get_by_text("Priya Raman").count() == 0 and msgs.get_by_text("Rahul Menon").count() == 0; step("sponsor sees players as first name and initial")
+    sid.get_by_label("Message", exact=True).fill("Free coffee Saturday for anyone in a Strikers shirt"); sid.get_by_role("button", name="Send").click()
+    expect(msgs.get_by_text("Free coffee Saturday")).to_be_visible(); fits(sid, "sponsor chat"); shot(sid, "sponsor-chat-sponsor"); step("sponsor posts to the whole team")
+    assert sid.get_by_role("navigation", name="Chat rooms").count() == 0; step("sponsor only gets the sponsor room")
+    sid.goto(f"{BASE}/chat"); expect(sid.get_by_role("link", name=re.compile("Kingston Strikers · sponsor chat"))).to_be_visible(); step("sponsor's chat list has the sponsor room")
+    sid.goto(f"{BASE}/t/t-strikers/chat?room=sponsors"); expect(sid.get_by_text("We couldn't find that page")).to_be_visible(); step("sponsor can't use the team's own chat pages")
+
+    rh = login(b, "Rahul Menon")
+    rh.goto(f"{BASE}/t/t-strikers/chat")
+    tab = rh.get_by_role("navigation", name="Chat rooms").get_by_role("link", name=re.compile("Sponsors"))
+    expect(tab).to_contain_text(re.compile(r"\d")); tab.click(); rh.wait_for_url(re.compile(r"room=sponsors"))
+    rmsgs = rh.get_by_role("list", name="Messages")
+    sidline = rmsgs.locator("li", has_text="Free coffee Saturday")
+    expect(sidline.get_by_text("Corner Cafe")).to_be_visible(); expect(sidline.get_by_text("Gold sponsor", exact=True)).to_be_visible()
+    expect(rmsgs.get_by_text("Priya", exact=True).first).to_be_visible(); step("players see the sponsor's business and Gold badge")
+    rh.get_by_role("button", name="More for Sid's message").last.click(); rh.get_by_role("button", name="Reply").click()
+    rh.get_by_label("Message", exact=True).fill("Cheers Sid!"); rh.get_by_role("button", name="Send").click()
+    expect(rmsgs.get_by_text("Cheers Sid!")).to_be_visible(); shot(rh, "sponsor-chat-player"); step("player replies to the sponsor")
+    sid.goto(f"{BASE}/sponsor-chat/t-strikers"); expect(sid.get_by_text("Cheers Sid!")).to_be_visible(); step("sponsor sees the reply")
+
+    pr.goto(f"{BASE}/t/t-strikers/settings"); pr.get_by_label("Sponsor chat").uncheck(); pr.get_by_role("button", name=re.compile("^Save")).click(); pr.wait_for_timeout(1200)
+    sid.goto(f"{BASE}/sponsor/sp-cafe"); assert sid.get_by_role("link", name="Chat with the team").count() == 0
+    sid.goto(f"{BASE}/sponsor-chat/t-strikers"); expect(sid.get_by_text("We couldn't find that page")).to_be_visible()
+    rh.goto(f"{BASE}/t/t-strikers/chat"); assert rh.get_by_role("link", name=re.compile("^Sponsors")).count() == 0; step("captain switches sponsor chat off for everyone")
+    pr.goto(f"{BASE}/t/t-strikers/settings"); pr.get_by_label("Sponsor chat").check(); pr.get_by_role("button", name=re.compile("^Save")).click(); pr.wait_for_timeout(1200)
     pr.goto(f"{BASE}/t/t-strikers/sponsors")
     pr.locator("li", has_text="Corner Cafe").get_by_role("button", name="End sponsorship").click(); expect(pr.get_by_text("Corner Cafe's sponsorship has ended")).to_be_visible()
     sid.goto(f"{BASE}/sponsor/sp-cafe"); expect(sid.get_by_text("We couldn't find that page")).to_be_visible()
     sid.goto(f"{BASE}/"); assert sid.get_by_role("region", name="You sponsor").count() == 0; step("ending the deal closes the sponsor's page")
+    sid.goto(f"{BASE}/sponsor-chat/t-strikers"); expect(sid.get_by_text("We couldn't find that page")).to_be_visible(); step("and their chat")
 
     pl = login(b, "Rahul Menon")
     pl.goto(f"{BASE}/t/t-strikers/sponsors"); assert pl.get_by_text("dental@example.com").count() == 0 and pl.get_by_role("link", name="Edit").count() == 0; step("players see sponsors but no contact details or edit")

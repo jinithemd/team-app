@@ -298,7 +298,7 @@ export async function createTeam(input: {
     settings: { crest: null, pointsEnabled: false, pointsPublic: true, pointsRules: { ...DEFAULT_POINTS_RULES }, geoCheckinEnabled: false, membersCanPost: true },
   };
   db.teams.push(team);
-  db.conversations.push({ id: newId(), teamId: team.id, kind: "team" }, { id: newId(), teamId: team.id, kind: "staff" });
+  db.conversations.push({ id: newId(), teamId: team.id, kind: "team" }, { id: newId(), teamId: team.id, kind: "staff" }, { id: newId(), teamId: team.id, kind: "sponsors" });
   const today = utcToZoned(now(), DEFAULT_TZ).date;
   db.seasons.push({ id: newId(), teamId: team.id, name: seasonName(today), startsOn: today, endsOn: null, closedAt: null });
   // You're on your own team from the start. The next step ("Your part on the team") sets
@@ -334,6 +334,7 @@ export async function updateTeam(
     colorSecondary?: string | null;
     rosterVisible: boolean;
     membersCanPost: boolean;
+    sponsorChat?: boolean;
     pointsEnabled: boolean;
     pointsPublic: boolean;
     geoCheckinEnabled: boolean;
@@ -368,6 +369,7 @@ export async function updateTeam(
   team.rosterVisible = input.rosterVisible;
   const st: TeamSettings = team.settings;
   st.membersCanPost = input.membersCanPost;
+  if (input.sponsorChat !== undefined) st.sponsorChat = input.sponsorChat;
   st.pointsEnabled = input.pointsEnabled;
   st.pointsPublic = input.pointsPublic;
   st.geoCheckinEnabled = input.geoCheckinEnabled;

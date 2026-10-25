@@ -235,6 +235,7 @@ export async function getSponsorView(sponsorId: ID) {
     const finals = view.filter((e) => e.score?.status === "final");
     return {
       team: { id: t.id, name: t.name, level: t.level, color: t.color, colorSecondary: t.colorSecondary, crest: t.settings.crest },
+      chat: t.settings.sponsorChat !== false && isContact,
       record: { w: finals.filter((e) => e.score!.us > e.score!.them).length, d: finals.filter((e) => e.score!.us === e.score!.them).length, l: finals.filter((e) => e.score!.us < e.score!.them).length },
       upcoming: view.filter((e) => Date.parse(e.endAt) >= Date.now()).slice(0, 8),
       results: view.filter((e) => e.score && (e.score.status === "final" || e.score.status === "live")).reverse().slice(0, 6),
@@ -255,3 +256,12 @@ export async function getSponsorView(sponsorId: ID) {
   };
 }
 
+
+/** A team's name and colours, for pages a sponsor can open (no other team data). */
+export async function teamLook(teamId: ID) {
+  const user = await requireUser();
+  const t = teamById(teamId);
+  if (!t) return null;
+  const allowed = isTeamMember(user.id, teamId) || db.sponsors.some((s) => s.contactUserId === user.id && live(s) && (s.teamId === teamId || (!!s.clubId && s.clubId === t.clubId)));
+  return allowed ? { name: t.name, color: t.color, colorSecondary: t.colorSecondary } : null;
+}

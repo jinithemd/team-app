@@ -137,3 +137,11 @@ Jobs: `send-outbox` (every minute), `event-reminders` (every 15 min; skips playe
 - When a deal's `ends_on` passes, the sponsor view closes on its own.
 - Everyone sees the sponsor strip (`sponsors_public`, no emails) on the team schedule and the club page.
 - Tests: captain without `edit_settings` can't add one; a sponsor reads 0 roster/chat/dues/attendance/event rows directly; the feed has the 2 matches and no trainings; only shared news; can't change its own tier; a hidden match drops out; an outsider gets nothing; an ended deal closes the view.
+
+### Sponsor chat
+
+- Every team has a third room, **Sponsors**, beside the team chat and the captains' room. Everyone on the team and the team's active sponsors (team or club) read and post there. Captains can switch it off (`teams.sponsor_chat`), which hides it for everyone.
+- Sponsors see team members as **"First L."** through `chat_people()`; they never read `profiles`, so no surnames, emails or phones. Members see sponsor posts with the business name and tier badge.
+- A sponsor is in that one room only: no team chat, no captains' room, no direct messages. When the deal ends, the room closes for them.
+- Captains moderate it like any room (pin, delete).
+- Tests: a player and a sponsor both post; the sponsor reads 2 sponsor-room messages and 0 team-chat messages, and can't post to the team chat; `chat_people` gives "Rahul O." to the sponsor and "Rahul One" to a teammate; an outsider reads and posts nothing; switching it off or ending the deal closes it.

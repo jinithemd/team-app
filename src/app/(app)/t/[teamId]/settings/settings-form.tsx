@@ -16,6 +16,7 @@ type Initial = {
   rosterVisible: boolean;
   crest: string | null;
   membersCanPost: boolean;
+  sponsorChat: boolean;
   pointsEnabled: boolean;
   pointsPublic: boolean;
   geoCheckinEnabled: boolean;
@@ -86,6 +87,7 @@ export function TeamSettingsForm({ teamId, initial, clubName }: { teamId: string
         </h3>
         <Toggle name="rosterVisible" label="Players can see the roster" hint="Off: players only see themselves. Captains always see everyone." defaultChecked={initial.rosterVisible} />
         <Toggle name="membersCanPost" label="Everyone can post in team chat" hint="Off: only captains and managers post; players can still react and reply." defaultChecked={initial.membersCanPost} />
+        <Toggle name="sponsorChat" label="Sponsor chat" hint="A room where your sponsors and the whole team talk. Sponsors see first names and last initials only." defaultChecked={initial.sponsorChat} />
       </section>
 
       <section aria-labelledby="c-h" className="grid gap-2 border-t border-border pt-5">

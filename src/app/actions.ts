@@ -205,6 +205,7 @@ export async function updateTeamAction(teamId: string, _: FormState, f: FormData
     colorSecondary: str(f, "colorSecondary") || null,
     rosterVisible: str(f, "rosterVisible") === "on",
     membersCanPost: str(f, "membersCanPost") === "on",
+    sponsorChat: str(f, "sponsorChat") === "on",
     pointsEnabled: str(f, "pointsEnabled") === "on",
     pointsPublic: str(f, "pointsPublic") === "on",
     geoCheckinEnabled: str(f, "geoCheckinEnabled") === "on",

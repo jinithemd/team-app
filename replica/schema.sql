@@ -1153,3 +1153,63 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function sponsor_feed(uuid), sponsor_news(uuid) from public;
 grant execute on function sponsor_feed(uuid), sponsor_news(uuid) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- sponsor chat: one room per team where its sponsors and every team member talk.
+-- Captains can switch it off. Sponsors read and post there and nowhere else; they see
+-- members as "First L." and never get anyone's email, phone or profile.
+-- ---------------------------------------------------------------------------
+
+alter table teams add column sponsor_chat boolean not null default true;
+alter table conversations drop constraint conversations_kind_check;
+alter table conversations add constraint conversations_kind_check check (kind in ('team','staff','event','direct','sponsors'));
+create unique index one_sponsor_room on conversations (team_id) where kind = 'sponsors';
+
+create or replace function can_read_conversation(c uuid) returns boolean
+language sql stable security definer set search_path = public as $$
+  select case (select kind from conversations where id = c)
+    when 'staff' then is_team_staff(conversation_team(c))
+    when 'sponsors' then exists (select 1 from teams t where t.id = conversation_team(c) and t.sponsor_chat)
+                         and (is_team_member(conversation_team(c)) or is_sponsor_of_team(conversation_team(c)))
+    else is_team_member(conversation_team(c))
+  end
+$$;
+
+-- Anyone in the sponsors room can post there; the other rooms keep their rules.
+drop policy chat_insert on chat_messages;
+create policy chat_insert on chat_messages for insert with check (
+  author_id = auth.uid() and can_read_conversation(conversation_id)
+  and (
+    (select kind from conversations where id = conversation_id) = 'sponsors'
+    or is_team_staff(conversation_team(conversation_id))
+    or exists (select 1 from teams t where t.id = conversation_team(conversation_id) and t.members_can_post)
+  )
+);
+
+-- Names in a room, as the viewer is allowed to see them. Sponsors get "First L."; members
+-- get full names. Sponsor authors show their business and tier to everyone.
+create or replace function chat_people(c uuid)
+returns table (user_id uuid, display_name text, sponsor_name text, sponsor_tier text)
+language sql stable security definer set search_path = public as $$
+  with room as (select conversation_team(c) as team_id),
+  viewer_is_sponsor as (
+    select not is_team_member((select team_id from room)) and is_sponsor_of_team((select team_id from room)) as yes
+  )
+  select p.id,
+         case when (select yes from viewer_is_sponsor) and p.id <> auth.uid()
+                   and not exists (select 1 from sponsors s where s.contact_user_id = p.id and s.status = 'active')
+              then p.first_name || ' ' || left(p.last_name, 1) || '.'
+              else p.first_name || ' ' || p.last_name end,
+         s.name, s.tier
+  from profiles p
+  left join lateral (
+    select s.name, s.tier from sponsors s, room r, teams t
+    where s.contact_user_id = p.id and s.status = 'active' and t.id = r.team_id
+      and (s.team_id = r.team_id or s.club_id = t.club_id)
+    order by tier_rank(s.tier) limit 1
+  ) s on true
+  where can_read_conversation(c)
+    and p.id in (select author_id from chat_messages where conversation_id = c)
+$$;
+revoke all on function chat_people(uuid) from public;
+grant execute on function chat_people(uuid) to authenticated;

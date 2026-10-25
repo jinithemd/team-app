@@ -1,6 +1,7 @@
 import "server-only";
 import type { ActionResult, ChatMessage, ID, NotificationPrefs, Person, Poll } from "./types";
-import { APP_URL, activePlayers, db, hasTeamPerm, isTeamMember, isTeamStaff, myRow, newId, now, personOf, profileById, queueEmail, requireUser, teamById } from "./store";
+import { APP_URL, activePlayers, db, hasTeamPerm, isSponsorOfTeam, isTeamMember, isTeamStaff, myRow, newId, now, personOf, profileById, queueEmail, requireUser, teamById } from "./store";
+import type { SponsorTier } from "./types";
 
 /*
  * Team chat (everyone) and a captains-only chat per team, plus email-style messages and
@@ -15,13 +16,19 @@ const MAX_IMAGE = 800_000; // ~600 KB photo as a data URL
 function convo(convId: ID) {
   return db.conversations.find((c) => c.id === convId);
 }
+function sponsorChatOn(teamId: ID) {
+  return teamById(teamId)?.settings.sponsorChat !== false;
+}
+/** Mirrors can_read_conversation(): the sponsors room is for the team and its active sponsors. */
 function canRead(uid: ID, convId: ID) {
   const c = convo(convId);
   if (!c) return false;
+  if (c.kind === "sponsors") return sponsorChatOn(c.teamId) && (isTeamMember(uid, c.teamId) || isSponsorOfTeam(uid, c.teamId));
   return c.kind === "staff" ? isTeamStaff(uid, c.teamId) : isTeamMember(uid, c.teamId);
 }
 function canPost(uid: ID, convId: ID) {
   const c = convo(convId)!;
+  if (c.kind === "sponsors") return canRead(uid, convId);
   if (c.kind === "staff") return isTeamStaff(uid, c.teamId);
   return isTeamStaff(uid, c.teamId) || (teamById(c.teamId)!.settings.membersCanPost && !!myRow(uid, c.teamId));
 }
@@ -42,6 +49,7 @@ export async function listConversations() {
         kind: c.kind,
         teamId: team.id,
         teamName: team.name,
+        asSponsor: !isTeamMember(user.id, c.teamId),
         last: last ? { who: personOf(last.userId).firstName, text: last.poll ? `Poll: ${last.poll.question}` : last.imageUrl && !last.body ? "Photo" : last.body, at: last.createdAt } : null,
         unread: unread(user.id, c.id),
       };
@@ -54,9 +62,25 @@ export async function unreadChatCount() {
   return db.conversations.filter((c) => canRead(user.id, c.id)).reduce((n, c) => n + unread(user.id, c.id), 0);
 }
 
+/** The sponsor someone speaks for in this team's sponsor room, if any (best tier first). */
+function sponsorOf(userId: ID, teamId: ID): { name: string; tier: SponsorTier } | null {
+  const team = teamById(teamId);
+  const today = now().slice(0, 10);
+  const order = ["diamond", "platinum", "gold", "silver", "bronze"];
+  const s = db.sponsors
+    .filter((x) => x.contactUserId === userId && x.status === "active" && (!x.endsOn || x.endsOn >= today) && (x.teamId === teamId || (!!x.clubId && x.clubId === team?.clubId)))
+    .sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))[0];
+  return s ? { name: s.name, tier: s.tier } : null;
+}
+
 export interface ChatView {
   id: ID;
-  kind: "team" | "staff";
+  kind: "team" | "staff" | "sponsors";
+  teamName: string;
+  /** I'm here as a sponsor, not as a member of the team. */
+  asSponsor: boolean;
+  hasSponsorRoom: boolean;
+  sponsorUnread: number;
   teamId: ID;
   me: ID;
   canPost: boolean;
@@ -68,6 +92,9 @@ export interface ChatView {
   messages: {
     id: ID;
     author: Person;
+    /** As this viewer may see it: sponsors see team members as "First L." */
+    authorName: string;
+    authorSponsor: { name: string; tier: SponsorTier } | null;
     mine: boolean;
     body: string;
     imageUrl: string | null;
@@ -80,23 +107,36 @@ export interface ChatView {
   }[];
 }
 
-export async function getChat(teamId: ID, kind: "team" | "staff"): Promise<ChatView | null> {
+export async function getChat(teamId: ID, kind: "team" | "staff" | "sponsors"): Promise<ChatView | null> {
   const user = await requireUser();
   const c = db.conversations.find((x) => x.teamId === teamId && x.kind === kind);
   if (!c || !canRead(user.id, c.id)) return null;
   const msgs = db.chat.filter((m) => m.conversationId === c.id).sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const text = (m: ChatMessage) => (m.deletedAt ? "Message deleted" : m.poll ? `Poll: ${m.poll.question}` : m.body || (m.imageUrl ? "Photo" : ""));
+  const asSponsor = !isTeamMember(user.id, teamId);
+  const sponsorRoom = db.conversations.find((x) => x.teamId === teamId && x.kind === "sponsors");
+  // Sponsors see team members as "First L."; everyone sees a sponsor's business and tier.
+  const nameOf = (uid: ID) => {
+    const p = personOf(uid);
+    const sp = c.kind === "sponsors" ? sponsorOf(uid, teamId) : null;
+    if (sp || !asSponsor || uid === user.id) return `${p.firstName} ${p.lastName}`.trim();
+    return `${p.firstName} ${p.lastName.slice(0, 1)}.`;
+  };
   const view: ChatView = {
     id: c.id,
     kind: c.kind,
+    teamName: teamById(teamId)!.name,
+    asSponsor,
+    hasSponsorRoom: !asSponsor && !!sponsorRoom && sponsorChatOn(teamId),
+    sponsorUnread: !asSponsor && sponsorRoom && kind !== "sponsors" && sponsorChatOn(teamId) ? unread(user.id, sponsorRoom.id) : 0,
     teamId,
     me: user.id,
     canPost: canPost(user.id, c.id),
     canModerate: isTeamStaff(user.id, teamId),
     hasStaffRoom: isTeamStaff(user.id, teamId),
     staffUnread: kind === "team" && isTeamStaff(user.id, teamId) ? unread(user.id, db.conversations.find((x) => x.teamId === teamId && x.kind === "staff")!.id) : 0,
-    teamUnread: kind === "staff" ? unread(user.id, db.conversations.find((x) => x.teamId === teamId && x.kind === "team")!.id) : 0,
-    pinned: msgs.filter((m) => m.pinned && !m.deletedAt).map((m) => ({ id: m.id, who: personOf(m.userId).firstName, text: text(m) })),
+    teamUnread: kind !== "team" && !asSponsor ? unread(user.id, db.conversations.find((x) => x.teamId === teamId && x.kind === "team")!.id) : 0,
+    pinned: msgs.filter((m) => m.pinned && !m.deletedAt).map((m) => ({ id: m.id, who: nameOf(m.userId).split(" ")[0], text: text(m) })),
     messages: msgs.slice(-200).map((m) => {
       const re = m.replyToId ? db.chat.find((x) => x.id === m.replyToId) : undefined;
       const rx = db.reactions.filter((r) => r.messageId === m.id);
@@ -104,13 +144,15 @@ export async function getChat(teamId: ID, kind: "team" | "staff"): Promise<ChatV
       return {
         id: m.id,
         author: personOf(m.userId),
+        authorName: nameOf(m.userId),
+        authorSponsor: c.kind === "sponsors" ? sponsorOf(m.userId, teamId) : null,
         mine: m.userId === user.id,
         body: m.deletedAt ? "" : m.body,
         imageUrl: m.deletedAt ? null : m.imageUrl,
         createdAt: m.createdAt,
         deleted: !!m.deletedAt,
         pinned: m.pinned,
-        replyTo: re ? { id: re.id, who: personOf(re.userId).firstName, text: text(re).slice(0, 80) } : null,
+        replyTo: re ? { id: re.id, who: nameOf(re.userId).split(" ")[0], text: text(re).slice(0, 80) } : null,
         reactions: [...new Set(rx.map((r) => r.emoji))].map((e) => ({ emoji: e, count: rx.filter((r) => r.emoji === e).length, mine: rx.some((r) => r.emoji === e && r.userId === user.id) })),
         poll:
           m.poll && !m.deletedAt
@@ -136,7 +178,8 @@ export async function sendChat(
   input: { body: string; replyToId?: string | null; imageUrl?: string | null; poll?: { question: string; options: string[]; multi: boolean } | null },
 ): Promise<ActionResult> {
   const user = await requireUser();
-  if (!canRead(user.id, convId) || !canPost(user.id, convId)) return { ok: false, error: "Only captains can post in this chat." };
+  if (!canRead(user.id, convId)) return { ok: false, error: "You can't post in this chat." };
+  if (!canPost(user.id, convId)) return { ok: false, error: "Only captains can post in this chat." };
   const body = input.body.trim();
   if (body.length > 2000) return { ok: false, error: "Keep it under 2,000 characters." };
   let image = input.imageUrl || null;

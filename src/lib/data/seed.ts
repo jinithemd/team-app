@@ -88,7 +88,7 @@ export function seed(): Store {
       joinCode: code, isPublic: true, rosterVisible: true, createdBy: by, createdAt: nowIso, settings: settings(st),
     };
     s.teams.push(t);
-    s.conversations.push({ id: `cv-${tid}`, teamId: tid, kind: "team" }, { id: `cv-${tid}-staff`, teamId: tid, kind: "staff" });
+    s.conversations.push({ id: `cv-${tid}`, teamId: tid, kind: "team" }, { id: `cv-${tid}-staff`, teamId: tid, kind: "staff" }, { id: `cv-${tid}-sponsors`, teamId: tid, kind: "sponsors" });
     return t;
   };
   team("t-strikers", "Kingston Strikers", null, "Sunday league", "#2D0A3E", "#B8964A", "u-priya", "KSTR7A2Q", { pointsEnabled: true, geoCheckinEnabled: true });
@@ -380,6 +380,12 @@ export function seed(): Store {
   sp("sp-kit", { teamId: "t-strikers" }, "Kingston Kit Co", "silver", null, null, "Shirts and training tops");
   sp("sp-pizza", { teamId: "t-strikers" }, "Princess St Pizza", "bronze", null, null, null);
   sp("sp-brew", { teamId: "t-reserves" }, "Wolfe Island Brewing", "gold", null, null, null, "invited");
+  msg("m-sp-1", "cv-t-strikers-sponsors", "u-sid", "Great win against Brockville! Coffee's on us at the cafe after Saturday's game, just show your team shirt.", 60 * 20);
+  msg("m-sp-2", "cv-t-strikers-sponsors", "u-priya", "Thanks Sid, we'll be there. The lads loved the new pastries last time 🙌", 60 * 19, { replyToId: "m-sp-1" });
+  msg("m-sp-3", "cv-t-strikers-sponsors", "u-rahul", "Legend. See you Saturday!", 60 * 18);
+  s.reactions.push({ messageId: "m-sp-1", userId: "u-jordan", emoji: "🔥" }, { messageId: "m-sp-1", userId: "u-sam", emoji: "❤️" });
+  msg("m-sp-4", "cv-t-first-sponsors", "u-lena", "Good luck against the Royals this weekend from everyone at Limestone Motors.", 60 * 6);
+
   s.messages.push({
     id: "tm-sp-1", teamId: "t-strikers", fromId: "u-priya", subject: "Through to the cup quarter-final",
     body: "Thanks to everyone who came out. We play Belleville United at home on the 7th. Sponsors: you're welcome at the clubhouse after the game.",
