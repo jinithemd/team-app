@@ -1175,15 +1175,10 @@ language sql stable security definer set search_path = public, extensions as $$
   end
 $$;
 
--- Anyone in the sponsors room can post there; the other rooms keep their rules.
-drop policy chat_insert on chat_messages;
-create policy chat_insert on chat_messages for insert with check (
+-- Anyone in the sponsors room can post there (adds to chat_insert; policies are OR'd).
+create policy chat_insert_sponsors_room on chat_messages for insert with check (
   author_id = auth.uid() and can_read_conversation(conversation_id)
-  and (
-    (select kind from conversations where id = conversation_id) = 'sponsors'
-    or is_team_staff(conversation_team(conversation_id))
-    or exists (select 1 from teams t where t.id = conversation_team(conversation_id) and t.members_can_post)
-  )
+  and (select kind from conversations where id = conversation_id) = 'sponsors'
 );
 
 -- Names in a room, as the viewer is allowed to see them. Sponsors get "First L."; members
@@ -1406,3 +1401,55 @@ revoke all on function join_page(text), join_by_link(text), reset_invite_link(uu
 grant execute on function join_page(text) to anon, authenticated;
 grant execute on function join_by_link(text), reset_invite_link(uuid), join_by_code(text),
   request_to_join(uuid, text, text), decide_join_request(uuid, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- hardening and speed (run last). Supabase opens every table and function to the
+-- signed-out "anon" role by default; here signed-out visitors keep only the join page
+-- and the public sponsor list. Trigger functions and inner helpers aren't API endpoints.
+-- ---------------------------------------------------------------------------
+revoke all on all tables in schema public from anon;
+grant execute on all functions in schema public to authenticated;   -- Supabase does this already; explicit for other hosts
+revoke execute on all functions in schema public from anon, public;
+grant select on sponsors_public to anon;
+grant execute on function join_page(text) to anon;
+alter default privileges in schema public revoke all on tables from anon;
+alter default privileges in schema public revoke execute on functions from anon, public;
+revoke execute on function check_ride_seats(), guard_roster_perms(), make_team_invite_link(), set_updated_at(),
+  is_club_admin_of_team(uuid), is_club_treasurer_of_team(uuid), is_sponsor_of_team(uuid),
+  add_me_as_player(uuid), tell_roster_managers(uuid, text, jsonb, text) from authenticated;
+alter function set_updated_at() set search_path = public, extensions;
+
+create index if not exists availability_periods_set_by_idx on availability_periods (set_by);
+create index if not exists event_series_created_by_idx on event_series (created_by);
+create index if not exists events_created_by_idx on events (created_by);
+create index if not exists rsvps_responded_by_idx on rsvps (responded_by);
+create index if not exists attendance_recorded_by_idx on attendance (recorded_by);
+create index if not exists scores_updated_by_idx on scores (updated_by);
+create index if not exists match_events_created_by_idx on match_events (created_by);
+create index if not exists potm_votes_voter_id_idx on potm_votes (voter_id);
+create index if not exists points_ledger_created_by_idx on points_ledger (created_by);
+create index if not exists points_ledger_season_id_idx on points_ledger (season_id);
+create index if not exists points_ledger_user_id_idx on points_ledger (user_id);
+create index if not exists ride_offers_driver_id_idx on ride_offers (driver_id);
+create index if not exists fees_created_by_idx on fees (created_by);
+create index if not exists fees_season_id_idx on fees (season_id);
+create index if not exists payments_reported_by_idx on payments (reported_by);
+create index if not exists payments_verified_by_idx on payments (verified_by);
+create index if not exists conversations_event_id_idx on conversations (event_id);
+create index if not exists chat_messages_pinned_by_idx on chat_messages (pinned_by);
+create index if not exists chat_messages_reply_to_idx on chat_messages (reply_to);
+create index if not exists sponsors_created_by_idx on sponsors (created_by);
+create index if not exists join_requests_decided_by_idx on join_requests (decided_by);
+
+-- Work out who's asking once per query, not once per row.
+do $$
+declare p record; stmt text;
+begin
+  for p in select * from pg_policies where schemaname = 'public'
+           and (coalesce(qual, '') || coalesce(with_check, '')) like '%auth.uid()%' loop
+    stmt := format('alter policy %I on %I.%I', p.policyname, p.schemaname, p.tablename);
+    if p.qual is not null then stmt := stmt || ' using (' || replace(p.qual, 'auth.uid()', '(select auth.uid())') || ')'; end if;
+    if p.with_check is not null then stmt := stmt || ' with check (' || replace(p.with_check, 'auth.uid()', '(select auth.uid())') || ')'; end if;
+    execute stmt;
+  end loop;
+end $$;
