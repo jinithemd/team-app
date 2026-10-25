@@ -15,6 +15,8 @@ import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   description: APP_TAGLINE,
+  // iPhone "Add to Home Screen": opens full-screen with the Clbx name under the icon.
+  appleWebApp: { capable: true, title: APP_NAME, statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {
