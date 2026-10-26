@@ -105,7 +105,10 @@ export function TeamDot({ name, teamId, crestUrl }: { name: string; teamId?: str
   );
 }
 
-export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?: boolean }) {
+export type TournamentBadge = { name: string; logoUrl: string | null; bannerUrl: string | null };
+
+export function EventCard({ e, showTeam = false, tournament }: { e: EventWithMine; showTeam?: boolean; tournament?: TournamentBadge }) {
+  const badge = tournament?.logoUrl ?? tournament?.bannerUrl ?? null;
   const d = formatDateBlock(e.startAt, e.tz);
   const title = eventTitle(e);
   const cancelled = e.status === "cancelled";
@@ -117,7 +120,7 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
       href={`/t/${e.teamId}/e/${e.id}`}
       data-team={showTeam ? e.teamId : undefined}
       aria-label={`${title}, ${d.dow} ${d.month} ${d.day}, ${formatTimeRange(e.startAt, e.endAt, e.tz)}${cancelled ? ", cancelled" : ""}${mineLabel ? ", " + mineLabel : ""}`}
-      className={`grid grid-cols-[52px_minmax(0,1fr)] gap-3 rounded-lg border p-3.5 shadow-card transition-colors hover:border-border-input focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+      className={`grid ${badge ? "grid-cols-[52px_minmax(0,1fr)_auto]" : "grid-cols-[52px_minmax(0,1fr)]"} gap-3 rounded-lg border p-3.5 shadow-card transition-colors hover:border-border-input focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
         today && !cancelled ? "border-transparent bg-team-soft" : "border-border bg-bg"
       } ${past ? "opacity-75" : ""}`}
     >
@@ -160,12 +163,16 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
           </div>
         )}
       </div>
+      {badge && (
+        // The tournament's own logo (or its banner when there's no logo), big enough to recognise.
+        <img src={badge} alt={`${tournament!.name} logo`} className="size-20 shrink-0 self-center rounded-lg border border-border bg-bg object-contain p-1" />
+      )}
     </Link>
   );
 }
 
 /** Week-grouped list: the default schedule view. */
-export function ScheduleList({ events, showTeam = false }: { events: EventWithMine[]; showTeam?: boolean }) {
+export function ScheduleList({ events, showTeam = false, tournaments = {} }: { events: EventWithMine[]; showTeam?: boolean; tournaments?: Record<string, TournamentBadge> }) {
   const groups: { label: string; items: EventWithMine[] }[] = [];
   for (const e of events) {
     const label = weekLabel(e.startAt, e.tz);
@@ -179,7 +186,7 @@ export function ScheduleList({ events, showTeam = false }: { events: EventWithMi
         <section key={gr.label} aria-label={gr.label} className="grid gap-2.5">
           <h2 className="eyebrow">{gr.label}</h2>
           {gr.items.map((e) => (
-            <EventCard key={e.id} e={e} showTeam={showTeam} />
+            <EventCard key={e.id} e={e} showTeam={showTeam} tournament={e.tournamentId ? tournaments[e.tournamentId] : undefined} />
           ))}
         </section>
       ))}

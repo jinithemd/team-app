@@ -987,3 +987,15 @@ export async function teamHonours(teamId: string): Promise<Honour[]> {
     return [];
   }
 }
+
+/** Logos for tournaments that put events on calendars, for the event cards. */
+export async function tournamentBadges(ids: (string | null | undefined)[]): Promise<Record<string, { name: string; logoUrl: string | null; bannerUrl: string | null }>> {
+  const want = [...new Set(ids.filter((x): x is string => !!x))];
+  if (!want.length) return {};
+  try {
+    const ts = await repo.tournamentsByIds(want);
+    return Object.fromEntries(ts.map((t) => [t.id, { name: t.name, logoUrl: tournamentLogoUrl(t), bannerUrl: tournamentBannerUrl(t) }]));
+  } catch {
+    return {};
+  }
+}

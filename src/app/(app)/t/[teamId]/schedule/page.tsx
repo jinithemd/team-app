@@ -4,6 +4,7 @@ import { CalendarPlus, Plus } from "lucide-react";
 import { getTeam, listEvents, listPastEvents, listTeamSponsors, myPerms } from "@/lib/data";
 import { SponsorStrip } from "@/components/sponsor-badge";
 import { EventCard, ScheduleList } from "@/components/event-bits";
+import { tournamentBadges } from "@/lib/tournaments/service";
 import { Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { MonthView } from "@/components/month-view";
 
@@ -20,6 +21,7 @@ export default async function SchedulePage({
   const sp = await searchParams;
   const view = sp.view === "month" ? "month" : "list";
   const [team, events, past, sponsors, perms] = await Promise.all([getTeam(teamId), listEvents(teamId), listPastEvents(teamId, sp.past ? 20 : 3), listTeamSponsors(teamId), myPerms(teamId)]);
+  const tBadges = await tournamentBadges([...events, ...past].map((e) => e.tournamentId));
   if (!team) return null;
 
   return (
@@ -64,7 +66,7 @@ export default async function SchedulePage({
           }
         />
       ) : view === "list" ? (
-        <ScheduleList events={events} />
+        <ScheduleList events={events} tournaments={tBadges} />
       ) : (
         <MonthView events={events} teamId={teamId} />
       )}
@@ -75,7 +77,7 @@ export default async function SchedulePage({
             Earlier
           </h2>
           {past.map((e) => (
-            <EventCard key={e.id} e={e} />
+            <EventCard key={e.id} e={e} tournament={e.tournamentId ? tBadges[e.tournamentId] : undefined} />
           ))}
           {!sp.past && (
             <Link href={`/t/${teamId}/schedule?past=1`} className="justify-self-start text-sm font-semibold text-team-ink">

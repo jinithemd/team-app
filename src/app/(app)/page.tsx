@@ -9,6 +9,7 @@ import { ButtonLink, EmptyState, SectionTitle } from "@/components/ui";
 import { hatLabels } from "@/lib/data/types";
 import { TeamCrest } from "@/components/ui";
 import { crestUrl } from "@/lib/images";
+import { tournamentBadges } from "@/lib/tournaments/service";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -17,6 +18,7 @@ export default async function HomePage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   const [teams, upcoming, pending, avail, sponsorships] = await Promise.all([listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability(), mySponsorships()]);
+  const tBadges = await tournamentBadges([...upcoming, ...pending].map((e) => e.tournamentId));
   const out = avail.periods[0];
   const fmtDay = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(d + "T12:00:00Z"));
   const staffTeams = teams.filter((t) => t.isStaff);
@@ -119,7 +121,7 @@ export default async function HomePage() {
           </SectionTitle>
           <div className="grid gap-2.5">
             {pending.slice(0, 3).map((e) => (
-              <EventCard key={e.id} e={e} showTeam />
+              <EventCard key={e.id} e={e} showTeam tournament={e.tournamentId ? tBadges[e.tournamentId] : undefined} />
             ))}
           </div>
         </section>
@@ -140,7 +142,7 @@ export default async function HomePage() {
         {upcoming.length ? (
           <div className="grid gap-2.5">
             {upcoming.map((e) => (
-              <EventCard key={e.id} e={e} showTeam={teams.length > 1} />
+              <EventCard key={e.id} e={e} showTeam={teams.length > 1} tournament={e.tournamentId ? tBadges[e.tournamentId] : undefined} />
             ))}
           </div>
         ) : teams.length ? (
