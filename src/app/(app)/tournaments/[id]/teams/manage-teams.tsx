@@ -1,10 +1,10 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { UserPlus } from "lucide-react";
-import { addGuestAction, clearFixturesAction, generateFixturesAction, inviteTeamAction, removeEntryAction, setEntryAction } from "@/app/tournament-actions";
+import { ArrowDown, ArrowUp, Shield, UserPlus } from "lucide-react";
+import { addGuestAction, clearFixturesAction, saveSeedingAction, generateFixturesAction, inviteTeamAction, removeEntryAction, setEntryAction } from "@/app/tournament-actions";
 import type { FormState } from "@/app/actions";
-import { Field, Input, buttonClass } from "@/components/ui";
+import { Field, Input, TeamCrest, buttonClass, inputClass } from "@/components/ui";
 
 export function InviteButton({ id, teamId, teamName }: { id: string; teamId: string; teamName: string }) {
   const [pending, start] = useTransition();
@@ -130,18 +130,18 @@ export function FixtureMaker({ id, accepted, hasFixtures, hasResults }: { id: st
       <p className="text-sm text-muted">
         {hasFixtures
           ? "Fixtures are made. Making them again replaces every match."
-          : `Makes every match for the format from the ${accepted} teams that are in. Groups and seeds are set for you.`}
+          : `Makes every match for the format from the ${accepted} teams that are in. Save the seeding first.`}
       </p>
       <form action={action} className="grid gap-3">
         <fieldset className="grid gap-1.5">
           <legend className="mb-1 text-sm font-semibold">Draw</legend>
           <label className="flex items-center gap-2 text-sm">
-            <input type="radio" name="draw" value="random" defaultChecked className="size-4 accent-[var(--team)]" />
-            Random draw
+            <input type="radio" name="draw" value="order" defaultChecked className="size-4 accent-[var(--team)]" />
+            Use our seeding (top seeds spread across groups)
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input type="radio" name="draw" value="order" className="size-4 accent-[var(--team)]" />
-            Seeded in the order teams joined (first in = top seed)
+            <input type="radio" name="draw" value="random" className="size-4 accent-[var(--team)]" />
+            Random draw (ignores seeding, still keeps sets apart)
           </label>
         </fieldset>
         {hasResults && (
@@ -171,6 +171,120 @@ export function FixtureMaker({ id, accepted, hasFixtures, hasResults }: { id: st
         {(state?.error || msg) && (
           <p role="alert" className={`text-sm ${state?.error ? "text-danger" : "text-success"}`}>
             {state?.error ?? msg}
+          </p>
+        )}
+      </form>
+    </section>
+  );
+}
+
+export interface SeedRow {
+  id: string;
+  name: string;
+  teamId: string | null;
+  crestUrl: string | null;
+  apartSet: number | null;
+  hostClub: boolean;
+}
+
+/**
+ * The host's seeding: drag-free up/down ordering (1 = top seed) and, for group formats,
+ * keep-apart sets so chosen teams (like a club's own teams) never share a group.
+ */
+export function SeedingEditor({ id, rows, groups, groupCount, clubName }: { id: string; rows: SeedRow[]; groups: boolean; groupCount: number; clubName: string | null }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(saveSeedingAction.bind(null, id), null);
+  const [list, setList] = useState(rows);
+  const [dirty, setDirty] = useState(false);
+  const change = (next: SeedRow[]) => {
+    setList(next);
+    setDirty(true);
+  };
+  const move = (i: number, d: -1 | 1) => {
+    const j = i + d;
+    if (j < 0 || j >= list.length) return;
+    const next = [...list];
+    [next[i], next[j]] = [next[j], next[i]];
+    change(next);
+  };
+  const setApart = (eid: string, v: number | null) => change(list.map((r) => (r.id === eid ? { ...r, apartSet: v } : r)));
+  const club = list.filter((r) => r.hostClub);
+  const clubApart = club.length >= 2 && club.every((r) => r.apartSet != null && r.apartSet === club[0].apartSet) && list.filter((r) => r.apartSet === club[0].apartSet).length === club.length;
+  const keepClubApart = () => {
+    const used = new Set(list.filter((r) => !r.hostClub && r.apartSet != null).map((r) => r.apartSet));
+    const free = [1, 2, 3, 4, 5, 6, 7, 8, 9].find((n) => !used.has(n)) ?? 1;
+    change(list.map((r) => (r.hostClub ? { ...r, apartSet: free } : r)));
+  };
+
+  return (
+    <section id="seeding" aria-labelledby="seed-h" className="grid gap-3 rounded-lg border border-border p-4">
+      <div className="grid gap-1">
+        <h2 id="seed-h" className="text-lg font-semibold">
+          Seeding
+        </h2>
+        <p className="text-sm text-muted">
+          Put the strongest team at the top. Everyone can see the seeding, so the draw is open and fair.
+          {groups ? " Teams in the same keep-apart set never go in the same group." : ""}
+        </p>
+      </div>
+      {groups && club.length >= 2 && !clubApart && (
+        <button type="button" onClick={keepClubApart} className={buttonClass("secondary", "md", "justify-self-start")}>
+          <Shield aria-hidden />
+          Keep {clubName ? `${clubName}'s` : "our club's"} {club.length} teams apart
+        </button>
+      )}
+      <form action={action} className="grid gap-3">
+        <ol className="grid gap-2">
+          {list.map((r, i) => (
+            <li key={r.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md border border-border p-2.5">
+              <input type="hidden" name="order" value={r.id} />
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-surface text-sm font-bold tabular-nums" aria-label={`Seed ${i + 1}`}>
+                {i + 1}
+              </span>
+              <TeamCrest teamId={r.teamId ?? "guest"} name={r.name} crestUrl={r.crestUrl} size={24} />
+              <span className="min-w-0 flex-1 text-sm font-semibold break-words">
+                {r.name}
+                {r.hostClub && <span className="ml-1.5 text-xs font-normal text-muted">Host club</span>}
+              </span>
+              {groups && (
+                <label className="flex items-center gap-1.5 text-xs text-muted">
+                  <span className="sr-only">Keep {r.name} apart, set</span>
+                  <span aria-hidden>Apart</span>
+                  <select
+                    name={`apart_${r.id}`}
+                    value={r.apartSet ?? ""}
+                    onChange={(e) => setApart(r.id, e.target.value ? Number(e.target.value) : null)}
+                    className={`${inputClass} h-10 w-16 px-2 py-0 text-sm`}
+                  >
+                    <option value="">—</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <span className="flex gap-1">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move ${r.name} up`} className="grid size-10 place-items-center rounded-md border border-border disabled:opacity-40">
+                  <ArrowUp aria-hidden className="size-4" />
+                </button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === list.length - 1} aria-label={`Move ${r.name} down`} className="grid size-10 place-items-center rounded-md border border-border disabled:opacity-40">
+                  <ArrowDown aria-hidden className="size-4" />
+                </button>
+              </span>
+            </li>
+          ))}
+        </ol>
+        {groups && <p className="text-xs text-muted">Up to {groupCount} teams per set, one for each group.</p>}
+        <div className="flex flex-wrap items-center gap-3">
+          <button className={buttonClass("primary")} disabled={pending} aria-busy={pending} onClick={() => setDirty(false)}>
+            {pending ? "Saving…" : "Save seeding"}
+          </button>
+          {dirty && <span className="text-xs text-muted">Not saved yet</span>}
+        </div>
+        {state && (state.error || state.message) && (
+          <p role={state.error ? "alert" : "status"} className={`text-sm ${state.error ? "text-danger" : "text-success"}`}>
+            {state.error ?? state.message}
           </p>
         )}
       </form>

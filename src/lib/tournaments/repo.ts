@@ -11,6 +11,7 @@ export interface TeamRef {
   id: string;
   name: string;
   crest: string | null;
+  clubId: string | null;
 }
 
 export interface Repo {

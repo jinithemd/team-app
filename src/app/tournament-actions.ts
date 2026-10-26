@@ -126,6 +126,19 @@ export async function generateFixturesAction(id: string, _: FormState, f: FormDa
   redirect(`/tournaments/${id}/fixtures?made=${res.data.count}`);
 }
 
+export async function saveSeedingAction(id: string, _: FormState, f: FormData): Promise<FormState> {
+  const order = f.getAll("order").map(String);
+  const apart: Record<string, number | null> = {};
+  for (const eid of order) {
+    const v = str(f, `apart_${eid}`);
+    apart[eid] = v ? Number(v) : null;
+  }
+  const res = await svc.saveSeeding(id, order, apart);
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: true, message: "Seeding saved. Everyone can see it on the Teams tab and the public page." };
+}
+
 export async function clearFixturesAction(id: string): Promise<FormState> {
   const res = await svc.clearFixtures(id);
   if (!res.ok) return { error: res.error };

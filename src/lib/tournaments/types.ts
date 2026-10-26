@@ -45,6 +45,8 @@ export interface Entry {
   paid: boolean;
   groupLabel: string | null;
   seed: number | null;
+  /** Teams with the same set number are never drawn in the same group (e.g. one club's teams). */
+  apartSet: number | null;
   createdAt: string;
 }
 

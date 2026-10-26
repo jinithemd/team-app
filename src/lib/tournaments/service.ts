@@ -66,6 +66,8 @@ export interface EntryView extends Entry {
   crestUrl: string | null;
   contactEmail?: string;
   mine: boolean;
+  /** One of the host club's own teams. */
+  hostClub: boolean;
 }
 export interface MatchView extends Match {
   home: { name: string; crestUrl: string | null; teamId: string | null } | null;
@@ -115,6 +117,7 @@ export async function getTournament(key: string): Promise<TournamentView | null>
     crestUrl: e.teamId ? crestUrl(e.teamId, refs.get(e.teamId)?.crest) : null,
     contactEmail: contacts[e.id],
     mine: !!e.teamId && myTeamIds.has(e.teamId),
+    hostClub: !!e.teamId && !!t.clubId && refs.get(e.teamId)?.clubId === t.clubId,
   }));
   const byId = new Map(ev.map((e) => [e.id, e]));
   const side = (id: string | null) => {
@@ -322,7 +325,7 @@ export async function inviteTeam(id: string, teamId: string, teamName: string): 
     if (existing) await repo.updateEntry(existing.id, { status: "invited" });
     else {
       if (t.maxTeams && entries.filter((e) => e.status === "accepted").length >= t.maxTeams) return fail(`The tournament is full (${t.maxTeams} teams).`);
-      await repo.insertEntry({ tournamentId: id, teamId, name: teamName.slice(0, 80), status: "invited", paid: false, groupLabel: null, seed: null });
+      await repo.insertEntry({ tournamentId: id, teamId, name: teamName.slice(0, 80), status: "invited", paid: false, groupLabel: null, seed: null, apartSet: null });
     }
     return { ok: true, data: undefined };
   });
@@ -338,7 +341,7 @@ export async function addGuestTeam(id: string, name: string, email: string): Pro
     if (Object.keys(fe).length) return fail("Check the highlighted fields.", fe);
     const entries = await repo.entries(id);
     if (entries.some((e) => !e.teamId && e.name.toLowerCase() === n.toLowerCase() && e.status !== "withdrawn")) return fail(`${n} is already on the list.`, { guestName: "Already added." });
-    await repo.insertEntry({ tournamentId: id, teamId: null, name: n.slice(0, 80), status: "accepted", paid: false, groupLabel: null, seed: null }, email.trim().toLowerCase() || null);
+    await repo.insertEntry({ tournamentId: id, teamId: null, name: n.slice(0, 80), status: "accepted", paid: false, groupLabel: null, seed: null, apartSet: null }, email.trim().toLowerCase() || null);
     return { ok: true, data: undefined };
   });
 }
@@ -399,14 +402,26 @@ export async function generateFixtures(id: string, opts: { random: boolean; repl
     const accepted = (await repo.entries(id)).filter((e) => e.status === "accepted");
     if (accepted.length < 2) return fail("You need at least 2 teams in. Accept some teams first.");
     if (t.format === "groups_knockout" && accepted.length < t.groupCount * 2) return fail(`${t.groupCount} groups need at least ${t.groupCount * 2} teams. Use fewer groups or add teams.`);
-    const order = opts.random ? [...accepted].sort(() => Math.random() - 0.5) : [...accepted].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    const seeded = order.map((e, i) => ({ ...e, seed: i + 1 }));
-    const { matches, groups } = engineFixtures(
-      { format: t.format, legs: t.legs, groupCount: t.groupCount, advancePerGroup: t.advancePerGroup },
-      seeded.map((e) => ({ id: e.id, name: e.name, seed: e.seed, groupLabel: null })),
-      randomUUID,
-    );
-    for (const e of seeded) await repo.updateEntry(e.id, { seed: e.seed, groupLabel: groups[e.id] ?? null });
+    // The host's seeding (unseeded teams after, in the order they joined), or a random draw.
+    // A random draw doesn't change the published seeds. Keep-apart sets apply either way.
+    const order = opts.random ? shuffle(accepted) : seedOrder(accepted);
+    const drawn = order.map((e, i) => ({ ...e, drawSeed: i + 1 }));
+    let made;
+    try {
+      made = engineFixtures(
+        { format: t.format, legs: t.legs, groupCount: t.groupCount, advancePerGroup: t.advancePerGroup },
+        drawn.map((e) => ({ id: e.id, name: e.name, seed: e.drawSeed, groupLabel: null, apartSet: e.apartSet })),
+        randomUUID,
+      );
+    } catch (err) {
+      return fail((err as Error).message);
+    }
+    const { matches, groups } = made;
+    for (const e of drawn) {
+      const patch: Partial<Entry> = { groupLabel: groups[e.id] ?? null };
+      if (!opts.random) patch.seed = e.drawSeed;
+      if (patch.groupLabel !== e.groupLabel || (patch.seed != null && patch.seed !== e.seed)) await repo.updateEntry(e.id, patch);
+    }
     // Spread rounds over the tournament's days, one round per day when there are enough.
     const days = Math.max(1, Math.round((Date.parse(t.endsOn) - Date.parse(t.startsOn)) / 86_400_000) + 1);
     const rounds = Math.max(...matches.map((m) => m.round));
@@ -435,8 +450,51 @@ export async function clearFixtures(id: string): Promise<Result> {
   return caught(async () => {
     const t = await asOrganizer(id);
     await repo.replaceMatches(id, []);
-    for (const e of await repo.entries(id)) if (e.groupLabel || e.seed) await repo.updateEntry(e.id, { groupLabel: null, seed: null });
+    for (const e of await repo.entries(id)) if (e.groupLabel) await repo.updateEntry(e.id, { groupLabel: null });
     if (t.status === "in_progress" || t.status === "finished") await repo.updateTournament(id, { status: "registration" });
+    return { ok: true, data: undefined };
+  });
+}
+
+function seedOrder<T extends Entry>(es: T[]): T[] {
+  return [...es].sort((a, b) => (a.seed ?? 1e9) - (b.seed ?? 1e9) || a.createdAt.localeCompare(b.createdAt));
+}
+function shuffle<T>(xs: T[]): T[] {
+  const a = [...xs];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * The host sets the seeding (1 = top seed) and which teams are kept apart in the group draw.
+ * Everyone can see both. Locked once fixtures are made, so the draw matches what was published.
+ */
+export async function saveSeeding(id: string, order: string[], apart: Record<string, number | null>): Promise<Result> {
+  return caught(async () => {
+    const t = await asOrganizer(id);
+    if ((await repo.matches(id)).length) return fail("Fixtures are made. Clear the fixtures to change the seeding.");
+    const accepted = (await repo.entries(id)).filter((e) => e.status === "accepted");
+    const known = new Set(accepted.map((e) => e.id));
+    const ids = [...new Set(order.filter((x) => known.has(x)))];
+    for (const e of seedOrder(accepted)) if (!ids.includes(e.id)) ids.push(e.id);
+    const sets = new Map<number, number>();
+    for (const e of accepted) {
+      const s = apart[e.id] ?? null;
+      if (s != null && (!Number.isInteger(s) || s < 1 || s > 9)) return fail("Pick a keep-apart set from 1 to 9.");
+      if (s != null) sets.set(s, (sets.get(s) ?? 0) + 1);
+    }
+    if (t.format === "groups_knockout")
+      for (const [s, c] of sets)
+        if (c > t.groupCount) return fail(`Set ${s} has ${c} teams but there are only ${t.groupCount} groups, so they can't all be kept apart.`);
+    for (const [s, c] of sets) if (c < 2) return fail(`Set ${s} has only one team. Put at least 2 teams in a set, or clear it.`);
+    for (const [i, eid] of ids.entries()) {
+      const e = accepted.find((x) => x.id === eid)!;
+      const patch = { seed: i + 1, apartSet: apart[eid] ?? null };
+      if (patch.seed !== e.seed || patch.apartSet !== e.apartSet) await repo.updateEntry(eid, patch);
+    }
     return { ok: true, data: undefined };
   });
 }

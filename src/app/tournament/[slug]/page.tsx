@@ -6,7 +6,7 @@ import { getTournament } from "@/lib/tournaments/service";
 import { FORMAT_LABEL } from "@/lib/tournaments/engine";
 import { APP_NAME } from "@/lib/brand";
 import { TeamCrest } from "@/components/ui";
-import { Bracket, ChampionBanner, FixtureList, StandingsTable, StatusPill, TournamentLogo, fmtDates, money } from "@/components/tournament/bits";
+import { Bracket, ChampionBanner, FixtureList, StandingsTable, StatusPill, TournamentLogo, fmtDates, money, SeededTeams } from "@/components/tournament/bits";
 import { ShareLink } from "@/components/tournament/share-link";
 import { ApplyForm } from "@/components/tournament/entry-actions";
 
@@ -121,15 +121,7 @@ export default async function PublicTournament({ params }: { params: Promise<{ s
           {accepted.length === 0 ? (
             <p className="text-sm text-muted">No teams confirmed yet.</p>
           ) : (
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {accepted.map((e) => (
-                <li key={e.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                  <TeamCrest teamId={e.teamId ?? "guest"} name={e.name} crestUrl={e.crestUrl} size={32} />
-                  <span className="min-w-0 flex-1 font-semibold break-words">{e.name}</span>
-                  {e.groupLabel && <span className="text-xs font-semibold text-muted">Group {e.groupLabel}</span>}
-                </li>
-              ))}
-            </ul>
+            <SeededTeams entries={accepted} groups={v.t.format === "groups_knockout"} />
           )}
         </section>
 

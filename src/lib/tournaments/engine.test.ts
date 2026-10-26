@@ -1,6 +1,6 @@
 // node --experimental-strip-types --no-warnings src/lib/tournaments/engine.test.ts
 import assert from "node:assert/strict";
-import { bracketOrder, champion, generateFixtures, resolveTournament, roundRobinPairs, standings, type EngineEntry, type EngineMatch } from "./engine.ts";
+import { bracketOrder, champion, drawGroups, generateFixtures, resolveTournament, roundRobinPairs, standings, type EngineEntry, type EngineMatch } from "./engine.ts";
 
 let n = 0;
 const id = () => `m${++n}`;
@@ -109,5 +109,30 @@ assert.deepEqual(bracketOrder(8), [1, 8, 4, 5, 2, 7, 3, 6]);
   const t = standings(es, ms, PTS);
   assert.deepEqual(t.map((r) => [r.entryId, r.points, r.gd]), [["t1", 4, 5], ["t2", 4, 1], ["t3", 0, -6]]);
   assert.equal(champion(es, ms, "round_robin", PTS), "t1");
+}
+// Keep apart: the snake when nothing is set, and sets never share a group.
+{
+  const none = Array.from({ length: 8 }, () => ({ apartSet: null }));
+  assert.deepEqual(drawGroups(none, 4), [0, 1, 2, 3, 3, 2, 1, 0]);
+  // Seeds 1 and 8 would both be in A by the snake; with them kept apart, 8 moves.
+  const two = none.map((x, i) => ({ apartSet: i === 0 || i === 7 ? 1 : null }));
+  const g2 = drawGroups(two, 4);
+  assert.notEqual(g2[0], g2[7]);
+  assert.equal(g2[0], 0, "top seed stays in A");
+  for (let k = 0; k < 4; k++) assert.equal(g2.filter((x) => x === k).length, 2, "groups stay even");
+  // A club with three teams in 3 groups of 3 (9 teams): one per group.
+  const nine = Array.from({ length: 9 }, (_, i) => ({ apartSet: [2, 3, 5].includes(i) ? 1 : [0, 8].includes(i) ? 2 : null }));
+  const g9 = drawGroups(nine, 3);
+  assert.equal(new Set([g9[2], g9[3], g9[5]]).size, 3);
+  assert.notEqual(g9[0], g9[8]);
+  for (let k = 0; k < 3; k++) assert.equal(g9.filter((x) => x === k).length, 3);
+  // Too many in one set.
+  assert.throws(() => drawGroups(Array.from({ length: 6 }, (_, i) => ({ apartSet: i < 3 ? 1 : null })), 2), /only 2 groups/);
+  // Through generateFixtures: kept-apart teams are never in the same group, so never meet there.
+  const es = teams(8).map((e, i) => ({ ...e, apartSet: i < 2 || i === 4 || i === 7 ? 1 : null }));
+  const { groups, matches } = generateFixtures({ format: "groups_knockout", legs: 1, groupCount: 4, advancePerGroup: 2 }, es, id);
+  const kept = ["t1", "t2", "t5", "t8"];
+  assert.equal(new Set(kept.map((k) => groups[k])).size, 4);
+  assert.ok(!matches.some((m) => m.stage === "group" && kept.includes(m.homeId!) && kept.includes(m.awayId!)));
 }
 console.log("tournament engine: all checks pass");

@@ -229,3 +229,44 @@ export function ChampionBanner({ entry }: { entry: EntryView | undefined }) {
     </div>
   );
 }
+
+/** Accepted teams in seed order, with seeds, groups and keep-apart sets, for everyone to see. */
+export function SeededTeams({ entries, groups }: { entries: EntryView[]; groups: boolean }) {
+  const list = [...entries].sort((a, b) => (a.seed ?? 1e9) - (b.seed ?? 1e9) || a.createdAt.localeCompare(b.createdAt));
+  const seeded = list.some((e) => e.seed != null);
+  const sets = [...new Set(list.map((e) => e.apartSet).filter((x): x is number => x != null))].sort((a, b) => a - b);
+  return (
+    <div className="grid gap-2">
+      <p className="text-xs text-muted">{seeded ? "In seed order, set by the host. Seed 1 is the top seed." : "The host hasn't set the seeding yet."}</p>
+      <ol className="grid gap-2 sm:grid-cols-2">
+        {list.map((e) => (
+          <li key={e.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
+            {seeded && (
+              <span className="grid size-7 shrink-0 place-items-center rounded-full bg-surface text-xs font-bold tabular-nums" aria-label={e.seed ? `Seed ${e.seed}` : "Not seeded"}>
+                {e.seed ?? "–"}
+              </span>
+            )}
+            <TeamCrest teamId={e.teamId ?? "guest"} name={e.name} crestUrl={e.crestUrl} size={32} />
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold break-words">{e.name}</span>
+              {(e.hostClub || (groups && e.apartSet != null)) && (
+                <span className="block text-xs text-muted">{[e.hostClub ? "Host club" : null, groups && e.apartSet != null ? `Kept apart · set ${e.apartSet}` : null].filter(Boolean).join(" · ")}</span>
+              )}
+            </span>
+            {e.groupLabel && <span className="text-xs font-semibold text-muted">Group {e.groupLabel}</span>}
+          </li>
+        ))}
+      </ol>
+      {groups && sets.length > 0 && (
+        <div className="grid gap-1 rounded-md bg-surface p-3 text-sm">
+          <p className="font-semibold">Kept apart in the group stage</p>
+          {sets.map((s) => (
+            <p key={s} className="text-muted">
+              Set {s}: {list.filter((e) => e.apartSet === s).map((e) => e.name).join(", ")} won&apos;t be in the same group.
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

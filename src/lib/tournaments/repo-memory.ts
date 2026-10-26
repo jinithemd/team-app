@@ -49,7 +49,7 @@ export const memoryRepo: Repo = {
   async teamsIRun() {
     const uid = await me();
     if (!uid) return [];
-    return db.teams.filter((t) => isTeamStaff(uid, t.id)).map((t) => ({ id: t.id, name: t.name, crest: t.settings.crest }));
+    return db.teams.filter((t) => isTeamStaff(uid, t.id)).map((t) => ({ id: t.id, name: t.name, crest: t.settings.crest, clubId: t.clubId }));
   },
   async clubName(clubId) {
     return db.clubs.find((c) => c.id === clubId)?.name ?? null;
@@ -58,7 +58,7 @@ export const memoryRepo: Repo = {
     const m = new Map<string, TeamRef>();
     for (const id of ids) {
       const t = teamById(id);
-      if (t) m.set(id, { id, name: t.name, crest: t.isPublic || true ? t.settings.crest : null });
+      if (t) m.set(id, { id, name: t.name, crest: t.settings.crest, clubId: t.clubId });
     }
     return m;
   },
@@ -188,7 +188,7 @@ export const memoryRepo: Repo = {
       if (["declined", "withdrawn"].includes(existing.status)) existing.status = "applied";
       return;
     }
-    mem.entries.push({ id: randomUUID(), tournamentId: tid, teamId, name: teamById(teamId)!.name, status: "applied", paid: false, groupLabel: null, seed: null, createdAt: now() });
+    mem.entries.push({ id: randomUUID(), tournamentId: tid, teamId, name: teamById(teamId)!.name, status: "applied", paid: false, groupLabel: null, seed: null, apartSet: null, createdAt: now() });
   },
   async withdraw(entryId) {
     const uid = await me();

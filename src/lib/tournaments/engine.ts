@@ -17,6 +17,8 @@ export interface EngineEntry {
   name: string;
   seed: number | null;
   groupLabel: string | null;
+  /** Entries sharing a set number never go in the same group. */
+  apartSet?: number | null;
 }
 
 export interface EngineMatch {
@@ -150,6 +152,53 @@ function knockout(sources: string[], newId: () => string, roundOffset = 0): NewM
   return out;
 }
 
+/** Snake order for draw position i with g groups: A B C D D C B A A B ... */
+function snake(i: number, g: number) {
+  const lap = Math.floor(i / g);
+  const pos = i % g;
+  return lap % 2 === 0 ? pos : g - 1 - pos;
+}
+
+/**
+ * Which group (0..g-1) each entry goes in, entries in seed order. Follows the snake so the
+ * top seeds are spread out, keeps group sizes as even as the snake would, and never puts two
+ * entries with the same apart set in one group. When a team's snake group already holds one
+ * of its set, it moves to the nearest group that has room. Throws if it can't be done.
+ */
+export function drawGroups(ordered: Pick<EngineEntry, "apartSet">[], g: number): number[] {
+  const n = ordered.length;
+  const cap = Array.from({ length: g }, () => 0);
+  for (let i = 0; i < n; i++) cap[snake(i, g)]++;
+  const bySet = new Map<number, number>();
+  for (const e of ordered) if (e.apartSet != null) bySet.set(e.apartSet, (bySet.get(e.apartSet) ?? 0) + 1);
+  for (const [set, count] of bySet)
+    if (count > g) throw new Error(`Can't keep set ${set} apart: it has ${count} teams but there are only ${g} groups. Take some teams out of the set or use more groups.`);
+
+  const size = Array.from({ length: g }, () => 0);
+  const sets = Array.from({ length: g }, () => new Set<number>());
+  const out: number[] = new Array(n);
+  let steps = 0;
+  const place = (i: number): boolean => {
+    if (i === n) return true;
+    if (++steps > 200_000) return false;
+    const want = snake(i, g);
+    const tries = Array.from({ length: g }, (_, k) => k).sort((a, b) => Math.abs(a - want) - Math.abs(b - want) || a - b);
+    const s = ordered[i].apartSet;
+    for (const gi of tries) {
+      if (size[gi] >= cap[gi] || (s != null && sets[gi].has(s))) continue;
+      size[gi]++;
+      if (s != null) sets[gi].add(s);
+      out[i] = gi;
+      if (place(i + 1)) return true;
+      size[gi]--;
+      if (s != null) sets[gi].delete(s);
+    }
+    return false;
+  };
+  if (!place(0)) throw new Error("Couldn't make groups that keep every set apart. Try fewer teams in each set.");
+  return out;
+}
+
 /**
  * Generate every match for the format. Entries come in seed order (best first).
  * Returns the matches and, for groups, which group each entry is in (snake seeding:
@@ -182,12 +231,9 @@ export function generateFixtures(settings: FormatSettings, entries: EngineEntry[
   const g = Math.max(1, Math.min(settings.groupCount, Math.floor(ordered.length / 2)));
   const labels = GROUP_LETTERS.slice(0, g).split("");
   const members: Record<string, EngineEntry[]> = Object.fromEntries(labels.map((l) => [l, []]));
-  ordered.forEach((e, i) => {
-    const lap = Math.floor(i / g);
-    const pos = i % g;
-    const label = labels[lap % 2 === 0 ? pos : g - 1 - pos];
-    members[label].push(e);
-    groups[e.id] = label;
+  drawGroups(ordered, g).forEach((gi, i) => {
+    members[labels[gi]].push(ordered[i]);
+    groups[ordered[i].id] = labels[gi];
   });
   const matches: NewMatch[] = [];
   let maxRound = 0;

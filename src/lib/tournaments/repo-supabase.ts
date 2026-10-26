@@ -40,10 +40,10 @@ const fromT = (t: Partial<Tournament>): Row => {
 };
 const toE = (r: Row): Entry => ({
   id: s(r.id)!, tournamentId: s(r.tournament_id)!, teamId: s(r.team_id), name: s(r.name)!, status: r.status as Entry["status"], paid: !!r.paid,
-  groupLabel: s(r.group_label), seed: n(r.seed), createdAt: s(r.created_at)!,
+  groupLabel: s(r.group_label), seed: n(r.seed), apartSet: n(r.apart_set), createdAt: s(r.created_at)!,
 });
 const fromE = (e: Partial<Entry>): Row => {
-  const map: Record<string, string> = { tournamentId: "tournament_id", teamId: "team_id", name: "name", status: "status", paid: "paid", groupLabel: "group_label", seed: "seed" };
+  const map: Record<string, string> = { tournamentId: "tournament_id", teamId: "team_id", name: "name", status: "status", paid: "paid", groupLabel: "group_label", seed: "seed", apartSet: "apart_set" };
   const out: Row = {};
   for (const [k, v] of Object.entries(e)) if (map[k]) out[map[k]] = v;
   return out;
@@ -123,8 +123,8 @@ export const supabaseRepo: Repo = {
   async teamRefs(ids) {
     const m = new Map<string, TeamRef>();
     if (!ids.length) return m;
-    const { data } = await (await reader()).c.from("teams").select("id, name, logo_path").in("id", ids);
-    for (const r of data ?? []) m.set(s(r.id)!, { id: s(r.id)!, name: s(r.name)!, crest: s(r.logo_path) });
+    const { data } = await (await reader()).c.from("teams").select("id, name, logo_path, club_id").in("id", ids);
+    for (const r of data ?? []) m.set(s(r.id)!, { id: s(r.id)!, name: s(r.name)!, crest: s(r.logo_path), clubId: s(r.club_id) });
     return m;
   },
   async tournament(key) {

@@ -251,3 +251,6 @@ drop trigger if exists tournament_teams_updated on tournament_teams;
 create trigger tournament_teams_updated before update on tournament_teams for each row execute function set_updated_at();
 drop trigger if exists tournament_matches_updated on tournament_matches;
 create trigger tournament_matches_updated before update on tournament_matches for each row execute function set_updated_at();
+
+-- 2026-10-26: keep teams apart in the group draw (same set number = different groups).
+alter table tournament_teams add column if not exists apart_set int check (apart_set between 1 and 9);
