@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient, userClient } from "../supabase/server";
-import type { Repo, TeamRef } from "./repo";
+import type { CalendarEvent, Repo, TeamRef } from "./repo";
 import type { Entry, Match, MatchEvent, OfficialRole, RosterPerson, Tournament } from "./types";
 
 /*
@@ -308,6 +308,51 @@ export const supabaseRepo: Repo = {
     const { error } = await (await sb()).rpc("submit_tournament_roster", { p_entry: entryId });
     check(error, "submit the roster");
   },
+  async setCaptain(entryId, personId) {
+    const c = await sb();
+    // Clear the old one first: only one captain per roster.
+    const off = await c.from("tournament_roster").update({ is_captain: false }).eq("entry_id", entryId).eq("is_captain", true).neq("id", personId ?? "00000000-0000-0000-0000-000000000000");
+    check(off.error, "change the captain");
+    if (personId) {
+      const on = await c.from("tournament_roster").update({ is_captain: true }).eq("id", personId);
+      check(on.error, "change the captain");
+    }
+  },
+  // Team calendars: written with the server key, since the host can't write to other teams'
+  // schedules. Only ever what the tournament's own data says (worked out in the service).
+  async syncCalendar(tid, wanted) {
+    const a = adminClient() as unknown as SupabaseClient;
+    const { data, error } = await a.from("events").select("id, team_id, tournament_match_id, type, title, start_at, end_at, location_text, opponent, notes, status").eq("tournament_id", tid);
+    check(error, "update team calendars");
+    const key = (teamId: unknown, mid: unknown) => `${teamId}:${mid ?? ""}`;
+    const have = new Map((data ?? []).map((r: Row) => [key(r.team_id, r.tournament_match_id), r]));
+    const row = (w: CalendarEvent) => ({
+      type: w.type, competition: w.type === "match" ? "cup" : null, title: w.title, start_at: w.startAt, end_at: w.endAt, tz: "America/Toronto",
+      location_text: w.locationText, opponent: w.opponent, home_away: w.opponent ? "neutral" : null, notes: w.notes, status: w.status,
+    });
+    const keep = new Set<string>();
+    for (const w of wanted) {
+      const k = key(w.teamId, w.tournamentMatchId);
+      keep.add(k);
+      const old = have.get(k);
+      const r = row(w);
+      if (!old) {
+        const ins = await a.from("events").insert({ ...r, team_id: w.teamId, tournament_id: tid, tournament_match_id: w.tournamentMatchId });
+        if (ins.error) console.error("[tournaments] calendar insert:", ins.error.message);
+      } else if (
+        old.title !== r.title || Date.parse(String(old.start_at)) !== Date.parse(r.start_at) || Date.parse(String(old.end_at)) !== Date.parse(r.end_at) ||
+        (old.location_text ?? null) !== r.location_text || (old.opponent ?? null) !== r.opponent || (old.notes ?? null) !== r.notes || old.status !== r.status
+      ) {
+        const up = await a.from("events").update(r).eq("id", String(old.id));
+        if (up.error) console.error("[tournaments] calendar update:", up.error.message);
+      }
+    }
+    const gone = [...have.entries()].filter(([k]) => !keep.has(k)).map(([, r]) => String(r.id));
+    if (gone.length) {
+      const del = await a.from("events").delete().in("id", gone);
+      if (del.error) console.error("[tournaments] calendar delete:", del.error.message);
+    }
+  },
   async teamPlayers(teamId) {
     const c = await sb();
     const { data, error } = await c.from("roster_members").select("user_id, jersey, invited_name, is_player, status").eq("team_id", teamId).eq("is_player", true).eq("status", "active");
@@ -326,6 +371,6 @@ export const supabaseRepo: Repo = {
 };
 
 const toR = (r: Row): RosterPerson => ({
-  id: s(r.id)!, tournamentId: s(r.tournament_id)!, entryId: s(r.entry_id)!, role: r.role as RosterPerson["role"], name: s(r.name)!, jersey: n(r.jersey), userId: s(r.user_id),
-  hostChange: (s(r.host_change) as RosterPerson["hostChange"]) ?? null, hostChangedAt: s(r.host_changed_at), prevName: s(r.prev_name), prevJersey: n(r.prev_jersey), createdAt: s(r.created_at)!,
+  id: s(r.id)!, tournamentId: s(r.tournament_id)!, entryId: s(r.entry_id)!, role: r.role as RosterPerson["role"], name: s(r.name)!, jersey: n(r.jersey), userId: s(r.user_id), isCaptain: !!r.is_captain,
+  hostChange: (s(r.host_change) as RosterPerson["hostChange"]) ?? null, hostChangedAt: s(r.host_changed_at), prevName: s(r.prev_name), prevJersey: n(r.prev_jersey), prevCaptain: r.prev_captain == null ? null : !!r.prev_captain, createdAt: s(r.created_at)!,
 });

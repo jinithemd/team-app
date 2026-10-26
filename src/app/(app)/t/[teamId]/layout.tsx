@@ -3,13 +3,18 @@ import { getSessionUser, getTeam, getTeamDues, myPerms } from "@/lib/data";
 import { TeamTabs } from "@/components/nav";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
+import Link from "next/link";
+import { Medal, Trophy } from "lucide-react";
 import { crestUrl } from "@/lib/images";
+import { teamHonours } from "@/lib/tournaments/service";
 
 export default async function TeamLayout({ children, params }: { children: React.ReactNode; params: Promise<{ teamId: string }> }) {
   const { teamId } = await params;
   const [team, user] = await Promise.all([getTeam(teamId), getSessionUser()]);
   if (!team) notFound();
-  const [perms, dues] = await Promise.all([myPerms(teamId), getTeamDues(teamId)]);
+  const [perms, dues, honours] = await Promise.all([myPerms(teamId), getTeamDues(teamId), teamHonours(teamId)]);
+  const wins = honours.filter((h) => h.place === "champions").length;
+  const seconds = honours.length - wins;
   const hasDues = !!dues && (dues.mine.length > 0 || dues.fees.length > 0);
   const subtitle = [team.club?.name, team.level, team.location].filter(Boolean).join(" · ");
   return (
@@ -33,8 +38,29 @@ export default async function TeamLayout({ children, params }: { children: React
           <div className="min-w-0">
             <h1 className="font-display text-2xl leading-tight font-bold break-words uppercase">{team.name}</h1>
             <p className="text-sm opacity-90">{subtitle}</p>
-            <div className="mt-1.5">
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               <HatBadges labels={hatLabels(team.hats, team.me?.jersey)} onTeam />
+              {honours.length > 0 && (
+                <Link
+                  href={`/t/${team.id}/achievements`}
+                  className="inline-flex min-h-7 items-center gap-1 rounded-pill bg-on-team px-2.5 text-xs font-bold text-team"
+                  aria-label={[wins ? `${wins} time${wins === 1 ? "" : "s"} champions` : null, seconds ? `${seconds} time${seconds === 1 ? "" : "s"} runners-up` : null].filter(Boolean).join(", ")}
+                >
+                  {wins > 0 && (
+                    <>
+                      <Trophy aria-hidden className="size-3.5" />
+                      {wins}× Champions
+                    </>
+                  )}
+                  {wins > 0 && seconds > 0 && <span aria-hidden>·</span>}
+                  {seconds > 0 && (
+                    <>
+                      <Medal aria-hidden className="size-3.5" />
+                      {seconds}× Runners-up
+                    </>
+                  )}
+                </Link>
+              )}
             </div>
           </div>
         </div>

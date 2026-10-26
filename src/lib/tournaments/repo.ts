@@ -14,6 +14,20 @@ export interface TeamRef {
   clubId: string | null;
 }
 
+/** A team event a tournament puts on a team's calendar: the tournament itself, or one game. */
+export interface CalendarEvent {
+  teamId: string;
+  tournamentMatchId: string | null;
+  type: "tournament" | "match";
+  title: string;
+  startAt: string;
+  endAt: string;
+  locationText: string | null;
+  opponent: string | null;
+  notes: string;
+  status: "active" | "postponed" | "cancelled";
+}
+
 export interface Repo {
   uid(): Promise<string | null>;
   myName(): Promise<string>;
@@ -63,6 +77,10 @@ export interface Repo {
   /** Before submission it's deleted; after, it stays on the roster marked "removed". */
   deleteRosterPerson(id: string): Promise<void>;
   submitRoster(entryId: string): Promise<void>;
+  /** Make the tournament's events on team calendars exactly these (adds, updates, removes). */
+  syncCalendar(tid: string, wanted: CalendarEvent[]): Promise<void>;
+  /** One captain per roster (null: none). */
+  setCaptain(entryId: string, personId: string | null): Promise<void>;
   /** Players on a Clbx team, to pick from. */
   teamPlayers(teamId: string): Promise<{ userId: string | null; name: string; jersey: number | null }[]>;
 }

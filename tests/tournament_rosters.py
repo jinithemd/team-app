@@ -97,6 +97,11 @@ with sync_playwright() as pw:
     expect(p.locator("#staff-h ~ ul")).to_contain_text("Priya Raman")
     p.fill("#coach-new-name", "Coach Kim"); p.locator("form", has_text="Add the coach").get_by_role("button", name="Add").click()
     expect(p.locator("#staff-h ~ ul")).to_contain_text("Coach Kim")
+    # Captain.
+    p.locator("#captain").select_option(p.locator("#captain option", has_text="Sam Okafor").get_attribute("value"))
+    p.locator("form", has=p.locator("#captain")).get_by_role("button", name="Save").click()
+    expect(p.get_by_text("Captain saved.")).to_be_visible()
+    expect(p.locator("#players-h ~ ul li", has_text="Sam Okafor").get_by_label("Captain")).to_be_visible()
     p.screenshot(path=f"{SHOTS}/roster-team.png", full_page=True)
     no_sideways(p, "roster page")
 
@@ -118,8 +123,9 @@ with sync_playwright() as pw:
     p.goto(roster_url)
     expect(p.get_by_text("You're the host: you can still change this roster")).to_be_visible()
     p.get_by_role("button", name="Edit Sam Okafor").click()
-    p.locator("form", has_text="This will show on the roster as changed by the host.").get_by_label("Number").fill("10")
-    p.get_by_role("button", name="Save").click()
+    edit_form = p.locator("form", has_text="This will show on the roster as changed by the host.")
+    edit_form.get_by_label("Number").fill("10")
+    edit_form.get_by_role("button", name="Save").click()
     sam = p.locator("#players-h ~ ul li", has_text="Sam Okafor")
     expect(sam).to_contain_text("Changed by host"); expect(sam).to_contain_text("was #99")
     second = p.locator("#players-h ~ ul li").filter(has_not_text="Sam Okafor").first
@@ -129,13 +135,26 @@ with sync_playwright() as pw:
     p.fill("#player-new-jersey", "7"); p.fill("#player-new-name", "Late Signing")
     p.get_by_role("button", name="Add", exact=True).last.click()
     expect(p.locator("#players-h ~ ul li", has_text="Late Signing")).to_contain_text("Added by host")
+    # The host moves the captaincy: both players show the change.
+    p.locator("#captain").select_option(p.locator("#captain option", has_text="Late Signing").get_attribute("value"))
+    p.locator("form", has=p.locator("#captain")).get_by_role("button", name="Save").click()
+    expect(p.locator("#players-h ~ ul li", has_text="Sam Okafor")).to_contain_text("no longer captain")
+    expect(p.locator("#players-h ~ ul li", has_text="Late Signing").get_by_label("Captain")).to_be_visible()
 
     # The guest team: only the host fills it in.
     p.goto(f"{BASE}/tournaments/{tid}/teams")
     rosters = p.locator("#rosters")
     expect(rosters).to_contain_text("1 of 2 submitted")
     expect(rosters.locator("li", has_text="Kingston Strikers")).to_contain_text("Changed by host (3)")
-    rosters.get_by_role("link", name=re.compile("Bath Road Rovers")).click()
+    # The Strikers' calendar has the tournament on it.
+    login(p, "Priya")
+    p.goto(f"{BASE}/teams"); p.get_by_role("link", name=re.compile("Kingston Strikers")).first.click(); p.wait_for_url(re.compile(r"/t/[^/]+/"))
+    team_url = re.search(r"(/t/[^/]+)/", p.url).group(1)
+    p.goto(f"{BASE}{team_url}/schedule")
+    expect(p.get_by_text("Roster Cup").first).to_be_visible()
+    login(p, "Dan")
+    p.goto(f"{BASE}/tournaments/{tid}/teams")
+    p.locator("#rosters").get_by_role("link", name=re.compile("Bath Road Rovers")).click()
     p.wait_for_url(re.compile(r"/teams/[^/?]+$"))
     expect(p.get_by_text("Submit it for this team once it's complete.")).to_be_visible()
 
@@ -145,6 +164,7 @@ with sync_playwright() as pw:
     expect(p.get_by_text("The host changed this roster after it was submitted (3 changes)")).to_be_visible()
     expect(p.locator("#players-h ~ ul li", has_text="Sam Okafor")).to_contain_text("was #99")
     expect(p.get_by_role("button", name=re.compile("^Edit "))).to_have_count(0)
+    expect(p.get_by_text("Captain: Late Signing")).to_be_visible()
     p.screenshot(path=f"{SHOTS}/roster-marked.png", full_page=True)
     b.close()
 

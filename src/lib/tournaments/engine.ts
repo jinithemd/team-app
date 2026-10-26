@@ -410,3 +410,15 @@ export function champion(entries: EngineEntry[], matches: EngineMatch[], format:
   if (!matches.every((m) => m.status === "finished" || m.status === "cancelled")) return null;
   return standings(entries, matches, pts)[0]?.entryId ?? null;
 }
+
+/** Second place: the beaten finalist, or second in the table once every game is played. */
+export function runnerUp(entries: EngineEntry[], matches: EngineMatch[], format: Format, pts: PointsRules): string | null {
+  const champ = champion(entries, matches, format, pts);
+  if (!champ) return null;
+  if (format === "knockout" || format === "groups_knockout") {
+    const final = matches.filter((m) => m.stage === "knockout").sort((a, b) => b.round - a.round)[0];
+    if (!final || final.homeSource === "BYE" || final.awaySource === "BYE") return null;
+    return (final.homeId === champ ? final.awayId : final.homeId) ?? null;
+  }
+  return standings(entries, matches, pts)[1]?.entryId ?? null;
+}

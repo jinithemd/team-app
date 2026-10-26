@@ -1,6 +1,6 @@
 // node --experimental-strip-types --no-warnings src/lib/tournaments/engine.test.ts
 import assert from "node:assert/strict";
-import { bracketOrder, champion, drawGroups, generateFixtures, resolveTournament, roundRobinPairs, standings, type EngineEntry, type EngineMatch } from "./engine.ts";
+import { bracketOrder, champion, drawGroups, runnerUp, generateFixtures, resolveTournament, roundRobinPairs, standings, type EngineEntry, type EngineMatch } from "./engine.ts";
 
 let n = 0;
 const id = () => `m${++n}`;
@@ -71,6 +71,7 @@ assert.deepEqual(bracketOrder(8), [1, 8, 4, 5, 2, 7, 3, 6]);
   play(ms, f.id, 2, 0);
   apply(es, ms);
   assert.equal(champion(es, ms, "knockout", PTS), f.homeId);
+  assert.equal(runnerUp(es, ms, "knockout", PTS), f.awayId);
 }
 
 // Groups + knockout: 8 teams, 2 groups, top 2 through → semis A1 v B2, B1 v A2.
@@ -109,6 +110,7 @@ assert.deepEqual(bracketOrder(8), [1, 8, 4, 5, 2, 7, 3, 6]);
   const t = standings(es, ms, PTS);
   assert.deepEqual(t.map((r) => [r.entryId, r.points, r.gd]), [["t1", 4, 5], ["t2", 4, 1], ["t3", 0, -6]]);
   assert.equal(champion(es, ms, "round_robin", PTS), "t1");
+  assert.equal(runnerUp(es, ms, "round_robin", PTS), "t2");
 }
 // Keep apart: the snake when nothing is set, and sets never share a group.
 {

@@ -105,6 +105,7 @@ export function TeamTabs({ teamId, show = {} }: { teamId: string; show?: { point
     { href: `/t/${teamId}/schedule`, label: "Schedule", match: (p: string) => p.includes("/schedule") || p.includes("/e/") },
     { href: `/t/${teamId}/roster`, label: "Roster", match: (p: string) => p.includes("/roster") || p.includes("/you") || p.includes("/p/") },
     { href: `/t/${teamId}/chat`, label: "Chat", match: (p: string) => p.includes("/chat") },
+    { href: `/t/${teamId}/achievements`, label: "Achievements", match: (p: string) => p.includes("/achievements") },
     ...(show.points ? [{ href: `/t/${teamId}/points`, label: "Points", match: (p: string) => p.includes("/points") || p.includes("/seasons") }] : []),
     ...(show.dues ? [{ href: `/t/${teamId}/dues`, label: "Dues", match: (p: string) => p.includes("/dues") }] : []),
     { href: `/t/${teamId}/messages`, label: "Messages", match: (p: string) => p.includes("/messages") },

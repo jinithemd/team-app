@@ -4,8 +4,8 @@ import { LIVE } from "../mode";
 import { crestUrl } from "../images";
 import { memoryRepo } from "./repo-memory";
 import { supabaseRepo } from "./repo-supabase";
-import type { Repo } from "./repo";
-import { champion, describeSource, generateFixtures as engineFixtures, resolveTournament, standings, type EngineEntry, type Format, type StandingRow } from "./engine";
+import type { CalendarEvent, Repo } from "./repo";
+import { champion, runnerUp, describeSource, generateFixtures as engineFixtures, resolveTournament, standings, type EngineEntry, type Format, type StandingRow } from "./engine";
 import type { Entry, EventKind, Match, MatchEvent, Official, OfficialRole, RosterPerson, RosterRole, Tournament, TournamentStatus } from "./types";
 
 /*
@@ -307,6 +307,7 @@ export async function updateTournament(id: string, input: TournamentInput): Prom
     if (fixturesExist && (data.format !== t.format || data.legs !== t.legs || data.groupCount !== t.groupCount || data.advancePerGroup !== t.advancePerGroup))
       return fail("Fixtures are already made. Clear them on the Teams tab before changing the format.", { format: "Clear the fixtures first." });
     await repo.updateTournament(id, { ...data, ...(input.logo !== undefined ? { logo: input.logo } : {}) });
+    await syncCalendars(id);
     return { ok: true, data: undefined };
   });
 }
@@ -315,6 +316,7 @@ export async function setTournamentStatus(id: string, status: TournamentStatus):
   return caught(async () => {
     await asOrganizer(id);
     await repo.updateTournament(id, { status, ...(status === "in_progress" || status === "finished" ? { registrationOpen: false } : {}) });
+    await syncCalendars(id);
     return { ok: true, data: undefined };
   });
 }
@@ -369,6 +371,7 @@ export async function setEntry(id: string, entryId: string, patch: { status?: "a
     if (patch.status === "accepted" && t.maxTeams && (await repo.entries(id)).filter((x) => x.status === "accepted" && x.id !== entryId).length >= t.maxTeams)
       return fail(`The tournament is full (${t.maxTeams} teams).`);
     await repo.updateEntry(entryId, patch);
+    await syncCalendars(id);
     return { ok: true, data: undefined };
   });
 }
@@ -379,6 +382,7 @@ export async function removeEntry(id: string, entryId: string): Promise<Result> 
     const playing = (await repo.matches(id)).some((m) => (m.homeId === entryId || m.awayId === entryId) && m.status === "finished");
     if (playing) return fail("This team has played. Clear the fixtures first, or leave them in.");
     await repo.deleteEntry(entryId);
+    await syncCalendars(id);
     return { ok: true, data: undefined };
   });
 }
@@ -386,6 +390,9 @@ export async function removeEntry(id: string, entryId: string): Promise<Result> 
 export async function respondInvite(entryId: string, accept: boolean): Promise<Result> {
   return caught(async () => {
     await repo.respondInvite(entryId, accept);
+    const mine = await repo.entriesForTeams((await repo.teamsIRun()).map((x) => x.id));
+    const tid = mine.find((x) => x.id === entryId)?.tournamentId;
+    if (tid) await syncCalendars(tid);
     return { ok: true, data: undefined };
   });
 }
@@ -393,6 +400,7 @@ export async function respondInvite(entryId: string, accept: boolean): Promise<R
 export async function applyToTournament(id: string, teamId: string): Promise<Result> {
   return caught(async () => {
     await repo.apply(id, teamId);
+    await syncCalendars(id);
     return { ok: true, data: undefined };
   });
 }
@@ -400,6 +408,9 @@ export async function applyToTournament(id: string, teamId: string): Promise<Res
 export async function withdrawEntry(entryId: string): Promise<Result> {
   return caught(async () => {
     await repo.withdraw(entryId);
+    const mine = await repo.entriesForTeams((await repo.teamsIRun()).map((x) => x.id));
+    const tid = mine.find((x) => x.id === entryId)?.tournamentId;
+    if (tid) await syncCalendars(tid);
     return { ok: true, data: undefined };
   });
 }
@@ -457,6 +468,7 @@ export async function generateFixtures(id: string, opts: { random: boolean; repl
     await repo.replaceMatches(id, full);
     await settle(t);
     if (t.status === "draft" || t.status === "registration") await repo.updateTournament(id, { status: "in_progress", registrationOpen: false });
+    await syncCalendars(id);
     return { ok: true, data: { count: full.filter((m) => !(m.homeSource === "BYE" || m.awaySource === "BYE")).length } };
   });
 }
@@ -467,6 +479,7 @@ export async function clearFixtures(id: string): Promise<Result> {
     await repo.replaceMatches(id, []);
     for (const e of await repo.entries(id)) if (e.groupLabel) await repo.updateEntry(e.id, { groupLabel: null });
     if (t.status === "in_progress" || t.status === "finished") await repo.updateTournament(id, { status: "registration" });
+    await syncCalendars(id);
     return { ok: true, data: undefined };
   });
 }
@@ -571,6 +584,7 @@ export async function saveResult(id: string, matchId: string, input: ResultInput
       { id: matchId, status, homeScore: hs, awayScore: as, homePens: hp, awayPens: ap, kickoffAt: kickoff ? kickoff.toISOString() : null, pitch: input.pitch.trim().slice(0, 60) || null },
     ]);
     await settle(t);
+    await syncCalendars(id);
     return { ok: true, data: undefined };
   });
 }
@@ -769,7 +783,7 @@ export async function addRosterPeople(tid: string, entryId: string, inputs: Rost
       if (data.role === "player" && a.t.rosterMax != null && players >= a.t.rosterMax) return fail(`This tournament allows ${a.t.rosterMax} players per team.${added ? ` Added ${added}.` : ""}`);
       if (input.userId && people.some((p) => p.userId === input.userId && p.hostChange !== "removed")) continue;
       await repo.insertRosterPerson({ tournamentId: a.t.id, entryId, role: data.role, name: data.name, jersey: data.jersey, userId: input.userId ?? null });
-      people.push({ id: `new-${added}`, tournamentId: a.t.id, entryId, role: data.role, name: data.name, jersey: data.jersey, userId: input.userId ?? null, hostChange: null, hostChangedAt: null, prevName: null, prevJersey: null, createdAt: "" });
+      people.push({ id: `new-${added}`, tournamentId: a.t.id, entryId, role: data.role, name: data.name, jersey: data.jersey, userId: input.userId ?? null, isCaptain: false, hostChange: null, hostChangedAt: null, prevName: null, prevJersey: null, prevCaptain: null, createdAt: "" });
       if (data.role === "player") players++;
       added++;
     }
@@ -802,6 +816,19 @@ export async function removeRosterPerson(tid: string, entryId: string, personId:
   });
 }
 
+export async function setRosterCaptain(tid: string, entryId: string, personId: string | null): Promise<Result> {
+  return caught(async () => {
+    const a = await rosterAccess(tid, entryId);
+    if (!a.canEdit) return fail(a.lockReason ?? "You can't change this roster.");
+    if (personId) {
+      const p = (await repo.roster(a.t.id)).find((x) => x.id === personId && x.entryId === entryId);
+      if (!p || p.hostChange === "removed" || p.role !== "player") return fail("Pick a player on this roster.");
+    }
+    await repo.setCaptain(entryId, personId);
+    return { ok: true, data: undefined };
+  });
+}
+
 export async function submitRoster(tid: string, entryId: string, confirmed: boolean): Promise<Result> {
   return caught(async () => {
     const a = await rosterAccess(tid, entryId);
@@ -815,4 +842,119 @@ export async function submitRoster(tid: string, entryId: string, confirmed: bool
     await repo.submitRoster(entryId);
     return { ok: true, data: undefined };
   });
+}
+
+// ---------------------------------------------------------------------------
+// team calendars: a team that's in a tournament gets the tournament, and each of its games
+// once the game has a time, on its own calendar. Re-worked from the tournament after every
+// change; never fails the change itself.
+// ---------------------------------------------------------------------------
+
+const CAL_TZ = "America/Toronto";
+const GAME_MINUTES = 60;
+
+function localIso(date: string, time: string) {
+  // date + wall-clock time in Toronto → UTC ISO.
+  const guess = Date.parse(`${date}T${time}:00Z`);
+  const off = (d: number) => {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: CAL_TZ, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(d));
+    const g = (k: string) => Number(parts.find((x) => x.type === k)!.value);
+    return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute")) - d;
+  };
+  return new Date(guess - off(guess - off(guess))).toISOString();
+}
+
+export function calendarFor(t: Tournament, entries: Entry[], matches: Match[], link: string): CalendarEvent[] {
+  const out: CalendarEvent[] = [];
+  const name = (id: string | null) => entries.find((e) => e.id === id)?.name ?? null;
+  const where = [t.venueName, t.venueAddress].filter(Boolean).join(", ") || null;
+  for (const e of entries.filter((x) => x.status === "accepted" && x.teamId)) {
+    const games = matches.filter((m) => (m.homeId === e.id || m.awayId === e.id) && m.homeId && m.awayId && m.homeSource !== "BYE" && m.awaySource !== "BYE");
+    const timed = games.filter((m) => m.kickoffAt).sort((a, b) => a.kickoffAt!.localeCompare(b.kickoffAt!));
+    const first = timed[0]?.kickoffAt;
+    const last = timed[timed.length - 1]?.kickoffAt;
+    const untimed = games.length - timed.length;
+    // The tournament's days, stretched to cover any game timed outside them.
+    const start = Math.min(Date.parse(localIso(t.startsOn, "09:00")), first ? Date.parse(first) : Infinity);
+    const end = Math.max(Date.parse(localIso(t.endsOn, "17:00")), last ? Date.parse(last) + GAME_MINUTES * 60_000 : -Infinity, start + 3_600_000);
+    const span = { start: new Date(start).toISOString(), end: new Date(end).toISOString() };
+    out.push({
+      teamId: e.teamId!,
+      tournamentMatchId: null,
+      type: "tournament",
+      title: t.name,
+      startAt: span.start,
+      endAt: span.end,
+      locationText: where,
+      opponent: null,
+      notes: [
+        `${e.name} is in this tournament.`,
+        games.length ? `${games.length} ${games.length === 1 ? "game" : "games"} so far${untimed ? `, ${untimed} still without a time (they show here once the host sets one)` : ""}.` : "Games show here once the fixtures are made.",
+        `Fixtures, results and the table: ${link}`,
+      ].join(" "),
+      status: "active",
+    });
+    for (const m of timed) {
+      const opp = name(m.homeId === e.id ? m.awayId : m.homeId);
+      out.push({
+        teamId: e.teamId!,
+        tournamentMatchId: m.id,
+        type: "match",
+        title: `${t.name} · ${m.roundName ?? `Round ${m.round}`}`,
+        startAt: m.kickoffAt!,
+        endAt: new Date(Date.parse(m.kickoffAt!) + GAME_MINUTES * 60_000).toISOString(),
+        locationText: [m.pitch, t.venueName].filter(Boolean).join(" · ") || where,
+        opponent: opp,
+        notes: `Tournament game. Results and the table: ${link}`,
+        status: m.status === "postponed" ? "postponed" : m.status === "cancelled" ? "cancelled" : "active",
+      });
+    }
+  }
+  return out;
+}
+
+async function syncCalendars(tid: string) {
+  try {
+    const t = await repo.tournament(tid);
+    if (!t) return;
+    const [entries, matches] = await Promise.all([repo.entries(t.id), repo.matches(t.id)]);
+    const site = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || "https://clbx.ca";
+    await repo.syncCalendar(t.id, calendarFor(t, entries, matches, `${site.replace(/\/$/, "")}/tournaments/${t.id}`));
+  } catch (e) {
+    console.error("[tournaments] team calendars:", (e as Error).message);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// honours: tournaments a team won or finished second in, for its achievements wall
+// ---------------------------------------------------------------------------
+
+export interface Honour {
+  place: "champions" | "runners_up";
+  tournamentId: string;
+  name: string;
+  hostedBy: string | null;
+  year: string;
+  endsOn: string;
+  logoUrl: string | null;
+}
+
+export async function teamHonours(teamId: string): Promise<Honour[]> {
+  try {
+    const mine = (await repo.entriesForTeams([teamId])).filter((e) => e.status === "accepted");
+    const ts = await repo.tournamentsByIds([...new Set(mine.map((e) => e.tournamentId))]);
+    const out: Honour[] = [];
+    for (const t of ts.filter((x) => x.status === "finished")) {
+      const [entries, matches, host] = await Promise.all([repo.entries(t.id), repo.matches(t.id), repo.clubName(t.clubId)]);
+      const es = entries.filter((e) => e.status === "accepted").map((e) => ({ id: e.id, name: e.name, seed: e.seed, groupLabel: e.groupLabel }));
+      const pts = { win: t.pointsWin, draw: t.pointsDraw, loss: t.pointsLoss };
+      const me = mine.find((e) => e.tournamentId === t.id)!;
+      const place = champion(es, matches, t.format, pts) === me.id ? "champions" : runnerUp(es, matches, t.format, pts) === me.id ? "runners_up" : null;
+      if (place) out.push({ place, tournamentId: t.id, name: t.name, hostedBy: host, year: t.endsOn.slice(0, 4), endsOn: t.endsOn, logoUrl: tournamentLogoUrl(t) });
+    }
+    return out.sort((a, b) => b.endsOn.localeCompare(a.endsOn) || (a.place === "champions" ? -1 : 1));
+  } catch (e) {
+    console.error("[tournaments] honours:", (e as Error).message);
+    return [];
+  }
 }

@@ -70,12 +70,14 @@ export interface RosterPerson {
   name: string;
   jersey: number | null;
   userId: string | null;
+  isCaptain: boolean;
   /** Set when the host changed this after the team submitted. */
   hostChange: HostChange | null;
   hostChangedAt: string | null;
   /** What it was before the host's first change. */
   prevName: string | null;
   prevJersey: number | null;
+  prevCaptain: boolean | null;
   createdAt: string;
 }
 

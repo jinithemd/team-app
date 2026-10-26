@@ -5,7 +5,7 @@ import { getRoster } from "@/lib/tournaments/service";
 import type { RosterPerson } from "@/lib/tournaments/types";
 import { Banner, TeamCrest } from "@/components/ui";
 import { fmtKickoff } from "@/components/tournament/bits";
-import { AddPersonForm, PersonActions, PickFromTeam, SubmitRoster } from "./roster-forms";
+import { AddPersonForm, CaptainPicker, PersonActions, PickFromTeam, SubmitRoster } from "./roster-forms";
 
 // A team's tournament roster: players with numbers, a manager and a coach. The team fills it
 // in and submits; after that only the host can change it, and each change is marked here.
@@ -17,11 +17,13 @@ function ChangeMark({ p }: { p: RosterPerson }) {
     p.hostChange === "edited"
       ? [p.prevJersey != null && p.prevJersey !== p.jersey ? `#${p.prevJersey}` : null, p.prevName && p.prevName !== p.name ? p.prevName : null].filter(Boolean).join(" ")
       : "";
+  const captain = p.hostChange === "edited" && p.prevCaptain != null && p.prevCaptain !== p.isCaptain ? (p.isCaptain ? "made captain" : "no longer captain") : "";
   const text = { added: "Added by host", edited: "Changed by host", removed: "Removed by host" }[p.hostChange];
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs">
       <span className="rounded bg-warning-soft px-1.5 py-0.5 font-semibold text-fg">{text}</span>
       {was && <span className="text-muted">was {was}</span>}
+      {captain && <span className="text-muted">{captain}</span>}
       {when && <span className="text-muted">· {when}</span>}
     </span>
   );
@@ -34,6 +36,7 @@ export default async function RosterPage({ params }: { params: Promise<{ id: str
   const { t, entry } = v;
   const staff = (role: "manager" | "coach") => v.people.filter((p) => p.role === role);
   const players = v.people.filter((p) => p.role === "player");
+  const activePlayers = players.filter((p) => p.hostChange !== "removed");
   const rules = (t.rosterRules ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
   const submitted = !!entry.rosterSubmittedAt;
   const hostEditing = v.isHost && submitted;
@@ -51,7 +54,14 @@ export default async function RosterPage({ params }: { params: Promise<{ id: str
           <span className="grid h-9 min-w-16 shrink-0 place-items-center rounded-md bg-sunken px-2 text-xs font-semibold">{label}</span>
         )}
         <span className="min-w-0 flex-1 py-1">
-          <span className={`block font-semibold break-words ${gone ? "line-through" : ""}`}>{p.name}</span>
+          <span className={`block font-semibold break-words ${gone ? "line-through" : ""}`}>
+            {p.name}
+            {p.isCaptain && (
+              <span className="ml-1.5 inline-grid size-5 place-items-center rounded-full bg-team align-middle text-[11px] font-bold text-on-team" title="Captain" aria-label="Captain">
+                C
+              </span>
+            )}
+          </span>
           <ChangeMark p={p} />
         </span>
         {v.canEdit && !gone && <PersonActions id={t.id} entryId={entry.id} person={{ id: p.id, name: p.name, jersey: p.jersey, role: p.role }} warnMark={hostEditing} />}
@@ -140,6 +150,22 @@ export default async function RosterPage({ params }: { params: Promise<{ id: str
           <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted">No players yet.</p>
         ) : (
           <ul className="grid gap-2">{players.map((p) => row(p))}</ul>
+        )}
+        {v.canEdit && activePlayers.length > 0 ? (
+          <CaptainPicker
+            id={t.id}
+            entryId={entry.id}
+            players={activePlayers.map((p) => ({ id: p.id, label: `#${p.jersey} ${p.name}` }))}
+            current={activePlayers.find((p) => p.isCaptain)?.id ?? null}
+            warnMark={hostEditing}
+          />
+        ) : (
+          activePlayers.length > 0 && (
+            <p className="text-sm">
+              <span className="text-muted">Captain: </span>
+              <span className="font-semibold">{activePlayers.find((p) => p.isCaptain)?.name ?? "not chosen"}</span>
+            </p>
+          )
         )}
         {v.canEdit && (t.rosterMax == null || v.players < t.rosterMax) && (
           <>

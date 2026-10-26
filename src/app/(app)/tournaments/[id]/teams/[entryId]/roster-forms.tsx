@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Pencil, Plus, Trash2, Users } from "lucide-react";
-import { addFromTeamAction, addRosterPersonAction, editRosterPersonAction, removeRosterPersonAction, submitRosterAction } from "@/app/tournament-actions";
+import { addFromTeamAction, addRosterPersonAction, editRosterPersonAction, removeRosterPersonAction, setCaptainAction, submitRosterAction } from "@/app/tournament-actions";
 import type { FormState } from "@/app/actions";
 import { Field, Input, buttonClass, inputClass } from "@/components/ui";
 
@@ -211,5 +211,33 @@ export function SubmitRoster({ id, entryId, criteria, players, min, forTeam }: {
         <Msg state={state} />
       </form>
     </section>
+  );
+}
+
+/** Pick the team's captain from the players on the roster. */
+export function CaptainPicker({ id, entryId, players, current, warnMark }: { id: string; entryId: string; players: { id: string; label: string }[]; current: string | null; warnMark: boolean }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(setCaptainAction.bind(null, id, entryId), null);
+  const [value, setValue] = useState(current ?? "");
+  return (
+    <form action={action} className="grid gap-2 rounded-lg border border-border p-3">
+      <label htmlFor="captain" className="text-sm font-semibold">
+        Captain
+      </label>
+      <div className="flex gap-2">
+        <select id="captain" name="captain" value={value} onChange={(e) => setValue(e.target.value)} className={`${inputClass} min-w-0 flex-1`}>
+          <option value="">Not chosen</option>
+          {players.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </select>
+        <button className={buttonClass("secondary", "md", "shrink-0")} disabled={pending || value === (current ?? "")} aria-busy={pending}>
+          {pending ? "Saving…" : "Save"}
+        </button>
+      </div>
+      {warnMark && <p className="text-xs text-muted">A new captain shows on the roster as changed by the host.</p>}
+      <Msg state={state} />
+    </form>
   );
 }

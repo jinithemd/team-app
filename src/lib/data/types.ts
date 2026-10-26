@@ -187,6 +187,9 @@ export interface TeamEvent {
   /** null = the usual: matches, tournaments and socials show to sponsors, trainings don't. */
   sponsorVisible?: boolean | null;
   createdBy: ID | null;
+  /** Put on the calendar by a tournament the team is in (kept in step by the tournament). */
+  tournamentId?: ID | null;
+  tournamentMatchId?: ID | null;
 }
 
 export interface Venue {

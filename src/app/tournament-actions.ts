@@ -247,3 +247,10 @@ export async function submitRosterAction(id: string, entryId: string, _: FormSta
   refresh(id);
   return { ok: true, message: "Roster submitted." };
 }
+
+export async function setCaptainAction(id: string, entryId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await svc.setRosterCaptain(id, entryId, str(f, "captain") || null);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(rosterPath(id, entryId));
+  return { ok: true, message: "Captain saved." };
+}

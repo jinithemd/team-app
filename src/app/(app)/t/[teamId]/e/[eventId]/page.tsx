@@ -58,7 +58,12 @@ export default async function EventPage({
           <TypeTag e={e} />
           <StatusBadge status={e.status} />
           <ScoreBadge score={e.score} />
-          {canEdit && !past && (
+          {e.tournamentId ? (
+            <Link href={`/tournaments/${e.tournamentId}`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
+              <Trophy aria-hidden className="size-4" />
+              Open tournament
+            </Link>
+          ) : canEdit && !past && (
             <Link href={`/t/${teamId}/e/${eventId}/edit`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
               <Pencil aria-hidden className="size-4" />
               Edit
@@ -68,6 +73,7 @@ export default async function EventPage({
         <h2 id="ev-h" className={`text-2xl font-bold break-words ${cancelled ? "text-muted line-through" : ""}`}>
           {title}
         </h2>
+        {e.tournamentId && <p className="text-xs text-muted">Added by the tournament. The host sets the time and place, and changes show here by themselves.</p>}
         {cancelled && e.statusReason && <Banner tone="danger">Cancelled: {e.statusReason}</Banner>}
         {e.status === "postponed" && <Banner tone="warning">Postponed{e.statusReason ? `: ${e.statusReason}` : ". A new time will be posted."}</Banner>}
         <dl className="grid gap-2.5 text-sm">

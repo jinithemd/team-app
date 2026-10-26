@@ -190,8 +190,35 @@ with sync_playwright() as pw:
     expect(p.get_by_text("Champions")).to_be_visible()
     expect(p.get_by_text("Finished")).to_be_visible()
     p.screenshot(path=f"{SHOTS}/t-overview.png", full_page=True)
+    champ = p.get_by_text("Champions", exact=True).first.locator("xpath=..").inner_text()
+
+    # Team calendar and achievements (Priya captains Kingston Strikers).
+    p.goto(f"{BASE}/tournaments/{tid}/fixtures")
+    final_text = p.locator("details", has_text="Knockout").locator("a[href*='/matches/']").first.inner_text()
+    p.goto(f"{BASE}/teams"); p.get_by_role("link", name=re.compile("Kingston Strikers")).first.click(); p.wait_for_url(re.compile(r"/t/[^/]+/"))
+    team_url = re.search(r"(/t/[^/]+)/", p.url).group(1)
+    p.goto(f"{BASE}{team_url}/achievements")
+    print("final:", final_text.replace(chr(10), " "), "| champ:", champ.replace(chr(10), " "))
+    if "Kingston Strikers" in final_text:
+        place = "Champions" if "kingston strikers" in champ.lower() else "Runners-up"
+        wall = p.get_by_role("list", name="Trophies")
+        expect(wall).to_contain_text(place); expect(wall).to_contain_text("Limestone Summer Cup")
+        expect(p.locator("header").get_by_role("link", name=re.compile("champions|runners-up"))).to_be_visible()
+        p.screenshot(path=f"{SHOTS}/t-achievements.png", full_page=True)
+    else:
+        expect(p.get_by_text("No trophies yet.")).to_be_visible()
+
+    p.goto(f"{BASE}{team_url}/schedule")
+    game = p.get_by_role("link").filter(has_text=re.compile(r"Field [12] · Caraco Park")).first
+    expect(game).to_be_visible()
+    expect(p.get_by_role("link").filter(has_text="Limestone Summer Cup").first).to_be_visible()
+    game.click()
+    p.wait_for_url(re.compile(r"/e/"))
+    expect(p.get_by_role("link", name="Open tournament")).to_be_visible()
+    expect(p.get_by_text("Added by the tournament.")).to_be_visible()
 
     # Public page, signed out.
+    p.goto(f"{BASE}/tournaments/{tid}")
     public = p.get_by_role("link", name="Public page").get_attribute("href")
     p.context.clear_cookies()
     p.goto(f"{BASE}{public}")
