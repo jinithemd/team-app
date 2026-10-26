@@ -1,6 +1,6 @@
 import "server-only";
 import type { ActionResult } from "./types";
-import { db, isTeamMember, requireUser } from "./store";
+import { currentUserId, db, isTeamMember, requireUser } from "./store";
 import { clearSession } from "./session";
 import { planAccountDeletion, type DeletePlan } from "../account-delete";
 
@@ -94,8 +94,8 @@ export async function photoImage(userId: string): Promise<string | null> {
 
 /** A team's crest, if you can see the team. */
 export async function crestImage(teamId: string): Promise<string | null> {
-  const user = await requireUser();
+  const uid = await currentUserId();
   const t = db.teams.find((x) => x.id === teamId);
-  if (!t || !(isTeamMember(user.id, t.id) || t.isPublic)) return null;
+  if (!t || !((uid && isTeamMember(uid, t.id)) || t.isPublic)) return null;
   return t.settings.crest;
 }

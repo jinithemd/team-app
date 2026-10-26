@@ -1620,3 +1620,5 @@ begin
 end $$;
 revoke all on function set_my_player_details(uuid, boolean, text, text) from public, anon;
 grant execute on function set_my_player_details(uuid, boolean, text, text) to authenticated;
+
+-- Tournaments: see replica/migrations/2026-10-25-tournaments.sql (applied to the live project).

@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, House, MessageCircle, User, Users } from "lucide-react";
+import { CalendarDays, House, MessageCircle, User, Users, Trophy } from "lucide-react";
 import { APP_NAME } from "@/lib/brand";
 
 const ITEMS = [
   { href: "/", label: "Home", icon: House, match: (p: string) => p === "/" || p.startsWith("/rsvps") },
-  { href: "/teams", label: "Teams", icon: Users, match: (p: string) => p.startsWith("/teams") || p.startsWith("/t/") },
+  // On phones Tournaments lives under Teams (five tabs fit); the desktop sidebar lists it.
+  { href: "/teams", label: "Teams", icon: Users, match: (p: string) => p.startsWith("/teams") || p.startsWith("/t/") || p.startsWith("/tournaments") },
+  { href: "/tournaments", label: "Tournaments", icon: Trophy, match: (p: string) => p.startsWith("/tournaments"), desktopOnly: true },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, match: (p: string) => p.startsWith("/calendar") },
   { href: "/chat", label: "Chat", icon: MessageCircle, match: (p: string) => p.startsWith("/chat") },
   { href: "/account", label: "Account", icon: User, match: (p: string) => p.startsWith("/account") },
@@ -23,7 +25,7 @@ export function PrimaryNav({ pendingCount, chatCount = 0 }: { pendingCount: numb
         className="pb-safe gutter fixed inset-x-0 bottom-0 z-20 border-t border-border bg-bg lg:hidden"
       >
         <ul className="mx-auto grid max-w-xl grid-cols-5">
-          {ITEMS.map(({ href, label, icon: Icon, match }) => {
+          {ITEMS.filter((i) => !("desktopOnly" in i)).map(({ href, label, icon: Icon, match }) => {
             const active = match(path);
             return (
               <li key={href}>
@@ -65,7 +67,7 @@ export function PrimaryNav({ pendingCount, chatCount = 0 }: { pendingCount: numb
           <img src="/clbx-logo.png" alt={APP_NAME} width={1077} height={177} className="h-5 w-auto" />
         </Link>
         {ITEMS.map(({ href, label, icon: Icon, match }) => {
-          const active = match(path);
+          const active = href === "/teams" ? match(path) && !path.startsWith("/tournaments") : match(path);
           return (
             <Link
               key={href}

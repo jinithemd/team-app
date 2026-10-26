@@ -301,3 +301,74 @@ Banner
 1. `python3 contrast.py tokens.json` — 62 pairs, 0 failing AA.
 2. `node --experimental-strip-types team-theme.test.ts` — 16 tricky team colours, light and dark, all pass.
 3. The primitives page (`/design` route) shows every component in every state in light and dark, with a team colour switcher; screenshot it at 390px and 1280px.
+
+## Tournaments
+
+Screens (all phone-first, 390 px, same tokens; no new colours):
+
+| ID | Screen | Who |
+| --- | --- | --- |
+| T1 | Tournaments list: Hosting, Playing in, Invitations | everyone signed in |
+| T2 | Host a tournament (create / edit details) | club owners and admins |
+| T3 | Tournament dashboard: Overview · Fixtures · Table or Bracket · Teams | entrants, organizers, officials |
+| T4 | Teams: invite (search Clbx teams), add a guest team, applications, paid, groups | organizers |
+| T5 | Match: score, status, goals and cards | organizers, match officials |
+| T6 | Officials: add by email | organizers |
+| T7 | Public page /tournament/<slug>: fixtures, results, table, bracket, teams, apply | anyone with the link |
+
+```
+TournamentHeader
+  content   logo (TeamCrest-style tile, 48), name, format · dates · venue, status pill
+            (Draft, Taking teams, Under way, Finished), Share button (public link, copy)
+  tokens    surface bg, text, muted; status pill uses success/warning/accent soft tokens
+  used on   T3, T7
+
+TournamentCard
+  content   logo 40, name, club, dates, format, my role or my team's status
+            ("Organizer", "Invited: Kingston Strikers", "Playing")
+  states    default, invitation (accent border + Accept / Decline inline)
+  a11y      whole card is one link; invitation buttons are separate real buttons
+  used on   T1
+
+FormatPicker
+  options   League (everyone plays everyone twice), Round-robin (once), Knockout,
+            Groups + knockout; radio cards with a one-line explanation
+  extra     groups: number of groups, teams that go through per group; league: legs 1 or 2
+  a11y      radiogroup, arrow keys move, selection announced
+  used on   T2
+
+FixtureRow
+  content   time or "Time to be set", home crest+name, score or "v", away crest+name,
+            status (Live pulse, FT, Pens 4–3, Postponed), pitch
+  states    scheduled, live, finished, postponed, cancelled, TBD slot ("Winner of QF1")
+  a11y      link to T5 for officials; announced as "Home 2, Away 1, full time"
+  used on   T3, T7; grouped by round ("Round 1", "Group A · Round 2", "Semi-finals")
+
+StandingsTable
+  columns   # · Team · P W D L · GF GA GD · Pts (P..GA hidden under 360 px, GD and Pts stay)
+  states    empty ("Table fills in as results come in"), qualifying rows (accent edge for
+            places that go through in groups + knockout)
+  a11y      real <table> with caption, th scope=col, numbers tabular
+  used on   T3, T7 (one per group)
+
+Bracket
+  layout    rounds as columns, scroll sideways on phones (the only place that may), each
+            tie a FixtureRow-mini; winners bold, losers muted
+  states    TBD slots, byes ("Bye" and the team goes straight through), champion banner
+  a11y      each round is a list with a heading; order reads top to bottom, round by round
+  used on   T3, T7
+
+EntryRow (Teams)
+  content   crest 32, name, Clbx team or Guest, status (Invited, Applied, In, Declined),
+            Paid toggle when there's a fee, group letter when grouped
+  actions   Accept / Decline (applications), Remove, Resend invite
+  used on   T4
+
+ScoreEntry
+  content   two big steppers (−/number/+) for home and away, penalties row appears on a
+            knockout draw, status select, Save; goals and cards list with Add (team, player
+            name, minute)
+  states    saving, saved, error ("Penalties needed: knockout games can't end level")
+  a11y      inputs labelled with team names, steppers are buttons with labels
+  used on   T5
+```

@@ -13,3 +13,28 @@ def _wait_for_url(self, url, **kw):
         pass
 
 Page.wait_for_url = _wait_for_url
+
+# A full page load: wait for scripts to hydrate before the test starts tapping, as a person would.
+_orig_goto = Page.goto
+
+def _goto(self, url, **kw):
+    r = _orig_goto(self, url, **kw)
+    try:
+        self.wait_for_load_state("networkidle", timeout=10000)
+    except Exception:
+        pass
+    return r
+
+Page.goto = _goto
+
+_orig_reload = Page.reload
+
+def _reload(self, **kw):
+    r = _orig_reload(self, **kw)
+    try:
+        self.wait_for_load_state("networkidle", timeout=10000)
+    except Exception:
+        pass
+    return r
+
+Page.reload = _reload
