@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient, userClient } from "../supabase/server";
 import type { Repo, TeamRef } from "./repo";
@@ -194,8 +195,14 @@ export const supabaseRepo: Repo = {
     return Object.fromEntries((data ?? []).map((r: Row) => [s(r.entry_id)!, s(r.email)!]));
   },
   async insertTournament(t) {
-    const { data, error } = await (await sb()).from("tournaments").insert(fromT(t)).select("*").single();
+    // No "return the new row" here: the read rule checks the tournaments table, which can't
+    // see the row while it's being inserted, so Postgres would refuse. Insert, then read.
+    const c = await sb();
+    const id = randomUUID();
+    const { error } = await c.from("tournaments").insert({ ...fromT(t), id });
     check(error, "create the tournament");
+    const { data, error: e2 } = await c.from("tournaments").select("*").eq("id", id).single();
+    check(e2, "open the new tournament");
     return toT(data!);
   },
   async updateTournament(id, patch) {
