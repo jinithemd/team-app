@@ -61,8 +61,8 @@ export function PrimaryNav({ pendingCount, chatCount = 0 }: { pendingCount: numb
       </nav>
 
       <nav aria-label="Primary" className="sticky top-0 hidden h-dvh w-62 shrink-0 flex-col gap-1 border-r border-border bg-surface px-3 py-5 lg:flex">
-        <Link href="/" className="mb-4 px-3 font-display text-2xl font-bold uppercase tracking-wide">
-          {APP_NAME}
+        <Link href="/" className="mb-4 inline-flex self-start rounded-md bg-[#06080D] px-3.5 py-2.5">
+          <img src="/clbx-logo.png" alt={APP_NAME} width={1077} height={177} className="h-5 w-auto" />
         </Link>
         {ITEMS.map(({ href, label, icon: Icon, match }) => {
           const active = match(path);

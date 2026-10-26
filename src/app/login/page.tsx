@@ -19,7 +19,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <main className="gutter min-h-dvh bg-surface py-10">
       <div className="mx-auto grid max-w-md grid-cols-1 gap-6">
         <div>
-          <p className="font-display text-display leading-none font-bold uppercase">{APP_NAME}</p>
+          {/* The official wordmark sits on its own dark tile so it reads in light and dark mode. */}
+          <h1 className="m-0 inline-flex rounded-lg bg-[#06080D] px-5 py-4">
+            <img src="/clbx-logo.png" alt={APP_NAME} width={1077} height={177} className="h-8 w-auto" />
+          </h1>
           <p className="mt-2 text-muted">{APP_TAGLINE}</p>
         </div>
         {deleted && <Banner>Your account and personal data have been deleted. Thanks for using {APP_NAME}.</Banner>}
@@ -29,9 +32,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         {LIVE ? (
           <section aria-labelledby="signin-h" className="grid gap-3 rounded-lg border border-border bg-bg p-4">
             <div>
-              <h1 id="signin-h" className="text-lg font-semibold">
+              <h2 id="signin-h" className="text-lg font-semibold">
                 Sign in
-              </h1>
+              </h2>
               <p className="text-sm text-muted">No password. We email you a link that signs you in.</p>
             </div>
             <SignInForm next={next} />
@@ -48,9 +51,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         ) : (
           <section aria-labelledby="demo-h" className="grid gap-3 rounded-lg border border-border bg-bg p-4">
             <div>
-              <h1 id="demo-h" className="text-lg font-semibold">
+              <h2 id="demo-h" className="text-lg font-semibold">
                 Try it as someone on a team
-              </h1>
+              </h2>
               <p className="text-sm text-muted">Sample accounts. Dan owns a club and plays for, captains and manages one of its teams.</p>
             </div>
             <ul className="grid grid-cols-1 gap-2">
