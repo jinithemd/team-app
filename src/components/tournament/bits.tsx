@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Trophy } from "lucide-react";
+import type { ReactNode } from "react";
+import { ChevronDown, Clock, MapPin, Trophy } from "lucide-react";
 import { TeamCrest } from "@/components/ui";
 import type { MatchView, EntryView } from "@/lib/tournaments/service";
 import type { StandingRow } from "@/lib/tournaments/engine";
@@ -63,19 +64,39 @@ export function scoreText(m: MatchView) {
   return `${m.homeScore}–${m.awayScore}`;
 }
 
-function statusText(m: MatchView) {
+function statusText(m: MatchView): string | null {
   if (m.homeSource === "BYE" || m.awaySource === "BYE") return "Goes straight through";
   if (m.status === "live") return "Live";
   if (m.status === "finished") return m.homePens != null && m.awayPens != null ? `Full time · Pens ${m.homePens}–${m.awayPens}` : "Full time";
   if (m.status === "postponed") return "Postponed";
   if (m.status === "cancelled") return "Cancelled";
-  return fmtKickoff(m.kickoffAt) ?? "Time to be set";
+  return null;
 }
 
-export function FixtureRow({ m, href }: { m: MatchView; href?: string }) {
+const timeOnly = (iso: string) => new Date(iso).toLocaleTimeString("en-CA", { hour: "numeric", minute: "2-digit", timeZone: T_TZ });
+const dayKey = (iso: string) => new Date(iso).toLocaleDateString("en-CA", { weekday: "long", month: "long", day: "numeric", timeZone: T_TZ });
+const isBye = (m: MatchView) => m.homeSource === "BYE" || m.awaySource === "BYE";
+
+/** One match: when and where on top, then the teams and score. */
+export function FixtureRow({ m, href, dayShown = false }: { m: MatchView; href?: string; dayShown?: boolean }) {
   const done = m.status === "finished";
+  const status = statusText(m);
+  const when = m.kickoffAt ? (dayShown ? timeOnly(m.kickoffAt) : fmtKickoff(m.kickoffAt)) : null;
   const body = (
     <>
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+        <span className={`inline-flex items-center gap-1 font-semibold ${when ? "text-fg" : "text-muted"}`}>
+          <Clock aria-hidden className="size-3.5" />
+          {when ?? "Time to be set"}
+        </span>
+        {m.pitch && (
+          <span className="inline-flex items-center gap-1 font-semibold text-fg">
+            <MapPin aria-hidden className="size-3.5" />
+            {m.pitch}
+          </span>
+        )}
+        <span className="ml-auto text-muted">{m.roundName}</span>
+      </span>
       <span className="flex items-center gap-2">
         <Side side={m.home} label={m.homeLabel} align="left" bold={done && m.winnerId === m.homeId} muted={done && !!m.winnerId && m.winnerId !== m.homeId} />
         <span className={`min-w-12 shrink-0 rounded-md px-2 py-1 text-center font-display text-lg font-bold tabular ${m.status === "live" ? "bg-danger text-on-danger" : done ? "bg-fg text-bg" : "bg-sunken text-muted"}`}>
@@ -83,43 +104,49 @@ export function FixtureRow({ m, href }: { m: MatchView; href?: string }) {
         </span>
         <Side side={m.away} label={m.awayLabel} align="right" bold={done && m.winnerId === m.awayId} muted={done && !!m.winnerId && m.winnerId !== m.awayId} />
       </span>
-      <span className="flex flex-wrap justify-center gap-x-2 text-xs text-muted">
-        <span className={m.status === "live" ? "font-semibold text-danger" : ""}>{statusText(m)}</span>
-        {m.pitch && <span>· {m.pitch}</span>}
-      </span>
+      {status && <span className={`text-center text-xs ${m.status === "live" ? "font-semibold text-danger" : "text-muted"}`}>{status}</span>}
     </>
   );
-  const label = `${m.homeLabel} ${m.homeScore ?? ""} ${m.awayLabel} ${m.awayScore ?? ""}, ${statusText(m)}`;
+  const label = [`${m.homeLabel} ${m.homeScore ?? ""} ${m.awayLabel} ${m.awayScore ?? ""}`, m.roundName, m.kickoffAt ? fmtKickoff(m.kickoffAt) : "Time to be set", m.pitch, status]
+    .filter(Boolean)
+    .join(", ");
   return href ? (
-    <Link href={href} aria-label={label} className="grid gap-1.5 rounded-lg border border-border p-3 hover:border-border-input focus-visible:outline-2 focus-visible:outline-focus">
+    <Link href={href} aria-label={label} className="grid gap-2 rounded-lg border border-border p-3 hover:border-border-input focus-visible:outline-2 focus-visible:outline-focus">
       {body}
     </Link>
   ) : (
-    <div aria-label={label} className="grid gap-1.5 rounded-lg border border-border p-3">
+    <div aria-label={label} className="grid gap-2 rounded-lg border border-border p-3">
       {body}
     </div>
   );
 }
 
-/** Fixtures grouped by round ("Round 1", "Group A · Round 2", "Semi-finals"). */
-export function FixtureList({ matches, hrefFor, empty }: { matches: MatchView[]; hrefFor?: (m: MatchView) => string | undefined; empty: string }) {
-  if (!matches.length) return <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted">{empty}</p>;
-  const groups: { name: string; items: MatchView[] }[] = [];
-  for (const m of matches) {
-    const name = m.roundName ?? `Round ${m.round}`;
-    const g = groups.find((x) => x.name === name);
-    if (g) g.items.push(m);
-    else groups.push({ name, items: [m] });
+/** Kick-off order; matches without a time go last, in round order. */
+function byTime(a: MatchView, b: MatchView) {
+  if (a.kickoffAt && b.kickoffAt) return a.kickoffAt.localeCompare(b.kickoffAt) || (a.pitch ?? "").localeCompare(b.pitch ?? "");
+  if (a.kickoffAt) return -1;
+  if (b.kickoffAt) return 1;
+  return a.round - b.round || (a.groupLabel ?? "").localeCompare(b.groupLabel ?? "") || a.slot - b.slot;
+}
+
+/** Matches in time order, under a heading for each day. */
+function DayList({ matches, hrefFor }: { matches: MatchView[]; hrefFor?: (m: MatchView) => string | undefined }) {
+  const days: { name: string; items: MatchView[] }[] = [];
+  for (const m of [...matches].sort(byTime)) {
+    const name = m.kickoffAt ? dayKey(m.kickoffAt) : "Time to be set";
+    const d = days.find((x) => x.name === name);
+    if (d) d.items.push(m);
+    else days.push({ name, items: [m] });
   }
   return (
     <div className="grid gap-5">
-      {groups.map((g) => (
-        <section key={g.name} aria-label={g.name} className="grid gap-2">
-          <h3 className="eyebrow">{g.name}</h3>
+      {days.map((d) => (
+        <section key={d.name} aria-label={d.name} className="grid gap-2">
+          <h3 className="eyebrow">{d.name}</h3>
           <ul className="grid gap-2">
-            {g.items.map((m) => (
+            {d.items.map((m) => (
               <li key={m.id}>
-                <FixtureRow m={m} href={hrefFor?.(m)} />
+                <FixtureRow m={m} href={hrefFor?.(m)} dayShown={!!m.kickoffAt} />
               </li>
             ))}
           </ul>
@@ -127,6 +154,50 @@ export function FixtureList({ matches, hrefFor, empty }: { matches: MatchView[];
       ))}
     </div>
   );
+}
+
+function Stage({ title, note, open, children }: { title: string; note: string; open: boolean; children: ReactNode }) {
+  return (
+    <details open={open} className="group rounded-lg border border-border [&[open]>summary]:border-b">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 border-border px-4 py-3 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1">
+          <span className="block font-semibold">{title}</span>
+          <span className="block text-xs text-muted">{note}</span>
+        </span>
+        <ChevronDown aria-hidden className="size-5 shrink-0 text-muted transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="p-3">{children}</div>
+    </details>
+  );
+}
+
+/**
+ * Fixtures in kick-off order, by day, each showing its time and field. With groups and a
+ * knockout: while groups are being played they're open and the knockout is folded away;
+ * once every group game is done, the knockout is open and the group stage folds away.
+ */
+export function FixtureList({ matches, hrefFor, empty, byStage = true }: { matches: MatchView[]; hrefFor?: (m: MatchView) => string | undefined; empty: string; byStage?: boolean }) {
+  if (!matches.length) return <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted">{empty}</p>;
+  if (!byStage) return <DayList matches={matches} hrefFor={hrefFor} />;
+  const group = matches.filter((m) => m.stage === "group");
+  const ko = matches.filter((m) => m.stage === "knockout");
+  if (!group.length || !ko.length) return <DayList matches={matches} hrefFor={hrefFor} />;
+  const played = group.filter((m) => m.status === "finished" || m.status === "cancelled").length;
+  const groupsDone = played === group.length;
+  const koPlayed = ko.filter((m) => !isBye(m) && m.status === "finished").length;
+  const koGames = ko.filter((m) => !isBye(m)).length;
+  const games = (n: number) => `${n} ${n === 1 ? "game" : "games"}`;
+  const groupStage = (
+    <Stage key="g" title="Group stage" note={groupsDone ? `All ${games(group.length)} played · tap to see them` : `${played} of ${games(group.length)} played`} open={!groupsDone}>
+      <DayList matches={group} hrefFor={hrefFor} />
+    </Stage>
+  );
+  const knockout = (
+    <Stage key="k" title="Knockout" note={groupsDone ? `${koPlayed} of ${games(koGames)} played` : "Starts once the group stage is over · tap to see the draw"} open={groupsDone}>
+      <DayList matches={ko} hrefFor={hrefFor} />
+    </Stage>
+  );
+  return <div className="grid gap-3">{groupsDone ? [knockout, groupStage] : [groupStage, knockout]}</div>;
 }
 
 export function StandingsTable({ label, rows, advance, entries }: { label: string | null; rows: StandingRow[]; advance: number; entries: EntryView[] }) {

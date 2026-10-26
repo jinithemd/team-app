@@ -12,8 +12,8 @@ export default async function FixturesPage({ params, searchParams }: { params: P
   const visible = v.matches.filter((m) => !(m.homeSource === "BYE" && m.awaySource === "BYE"));
   return (
     <>
-      {sp.made && <Banner>{sp.made} fixtures made. Tap any one to set its time and pitch, and to enter the score.</Banner>}
-      {manage && visible.length > 0 && <p className="text-sm text-muted">Tap a match to set the time and pitch or enter the result.</p>}
+      {sp.made && <Banner>{sp.made} fixtures made. Tap any one to set its time and field, and to enter the score.</Banner>}
+      {manage && visible.length > 0 && <p className="text-sm text-muted">Tap a match to set the time and field or enter the result.</p>}
       <FixtureList
         matches={visible}
         hrefFor={manage ? (m) => `/tournaments/${v.t.id}/matches/${m.id}` : undefined}

@@ -29,7 +29,7 @@ def no_sideways(p, where):
 
 with sync_playwright() as pw:
     b = pw.chromium.launch()
-    ctx = b.new_context(viewport={"width": 390, "height": 844})
+    ctx = b.new_context(viewport={"width": 390, "height": 844}, timezone_id="America/Toronto")
     ctx.route("https://photon.komoot.io/**", lambda r: r.abort())
     ctx.route(re.compile(r"https://.*(openstreetmap|cartocdn|arcgisonline).*"), lambda r: r.abort())
     p = ctx.new_page()
@@ -116,7 +116,11 @@ with sync_playwright() as pw:
     expect(p.get_by_label("Use our seeding")).to_be_checked()
     p.get_by_role("button", name="Make fixtures").click()
     p.wait_for_url(re.compile(r"/fixtures\?made="))
-    expect(p.get_by_text("Group A · Round 1")).to_be_visible()
+    # Groups open, knockout folded away until the group stage is over.
+    expect(p.get_by_text("Group A · Round 1").first).to_be_visible()
+    expect(p.get_by_text("0 of 2 games played")).to_be_visible()
+    expect(p.get_by_text("Starts once the group stage is over")).to_be_visible()
+    expect(p.get_by_text("Final", exact=True)).to_be_hidden()
     p.screenshot(path=f"{SHOTS}/t-fixtures.png", full_page=True)
     no_sideways(p, "fixtures")
     p.goto(f"{BASE}/tournaments/{tid}/manage")
@@ -129,8 +133,11 @@ with sync_playwright() as pw:
     group_links = p.locator("a[href*='/matches/']").all()
     hrefs = [l.get_attribute("href") for l in group_links]
     assert len(hrefs) >= 3, hrefs
-    for h in hrefs[:2]:
+    # Each gets a time and field; the later-listed game kicks off first.
+    slots = [("2026-11-07T10:30", "Field 2"), ("2026-11-07T09:00", "Field 1")]
+    for h, (when, field) in zip(hrefs[:2], slots):
         p.goto(f"{BASE}{h}"); p.wait_for_load_state("networkidle")
+        p.fill("#kickoff", when); p.fill("#pitch", field)
         p.get_by_role("button", name=re.compile("^One more for")).first.click()
         p.get_by_role("button", name=re.compile("^One more for")).first.click()
         p.select_option("#status", "finished")
@@ -142,8 +149,19 @@ with sync_playwright() as pw:
     p.goto(f"{BASE}/tournaments/{tid}/table")
     expect(p.get_by_role("table").first).to_be_visible()
     p.screenshot(path=f"{SHOTS}/t-table.png", full_page=True)
+    # Group stage over: the knockout is open, the group stage folded away until tapped,
+    # and group games are in kick-off order with their time and field.
     p.goto(f"{BASE}/tournaments/{tid}/fixtures")
-    final = p.locator("section[aria-label='Final'] a").first
+    expect(p.get_by_text("All 2 games played · tap to see them")).to_be_visible()
+    expect(p.get_by_text("Field 1")).to_be_hidden()
+    p.get_by_text("Group stage", exact=True).click()
+    games = p.locator("details", has_text="Group stage").locator("a[href*='/matches/']")
+    expect(games.nth(0)).to_contain_text("9:00"); expect(games.nth(0)).to_contain_text("Field 1")
+    expect(games.nth(1)).to_contain_text("10:30"); expect(games.nth(1)).to_contain_text("Field 2")
+    expect(p.get_by_text("Saturday, November 7")).to_be_visible()
+    p.screenshot(path=f"{SHOTS}/t-fixtures-ko.png", full_page=True)
+    no_sideways(p, "fixtures after groups")
+    final = p.locator("details", has_text="Knockout").locator("a[href*='/matches/']").first
     final.click()
     p.wait_for_url(re.compile(r"/matches/")); p.wait_for_load_state("networkidle")
     expect(p.get_by_text("Scores open once both teams are known.")).to_have_count(0)
@@ -175,7 +193,7 @@ with sync_playwright() as pw:
     expect(p.get_by_role("heading", name="Limestone Summer Cup")).to_be_visible()
     expect(p.get_by_text("Champions")).to_be_visible()
     expect(p.get_by_role("heading", name="Teams")).to_be_visible()
-    expect(p.get_by_text("Cataraqui Cobras").first).to_be_visible()
+    expect(p.locator("#teams").get_by_text("Cataraqui Cobras")).to_be_visible()
     expect(p.get_by_text("Set 1: Kingston Strikers, Portsmouth Pirates won't be in the same group.")).to_be_visible()
     grp = lambda n: p.locator("#teams li", has_text=n).inner_text()
     assert "Group A" in grp("Kingston Strikers") and "Group B" in grp("Portsmouth Pirates"), (grp("Kingston Strikers"), grp("Portsmouth Pirates"))

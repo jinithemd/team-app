@@ -71,7 +71,7 @@ export default async function TournamentOverview({ params }: { params: Promise<{
           <h2 id="live-h" className="eyebrow text-danger">
             Live now
           </h2>
-          <FixtureList matches={live} hrefFor={hrefFor} empty="" />
+          <FixtureList matches={live} hrefFor={hrefFor} empty="" byStage={false} />
         </section>
       )}
       {upcoming.length > 0 && (
@@ -79,7 +79,7 @@ export default async function TournamentOverview({ params }: { params: Promise<{
           <h2 id="next-h" className="eyebrow">
             Coming up
           </h2>
-          <FixtureList matches={upcoming} hrefFor={hrefFor} empty="" />
+          <FixtureList matches={upcoming} hrefFor={hrefFor} empty="" byStage={false} />
         </section>
       )}
       {recent.length > 0 && (
@@ -87,7 +87,7 @@ export default async function TournamentOverview({ params }: { params: Promise<{
           <h2 id="res-h" className="eyebrow">
             Latest results
           </h2>
-          <FixtureList matches={recent} hrefFor={hrefFor} empty="" />
+          <FixtureList matches={recent} hrefFor={hrefFor} empty="" byStage={false} />
         </section>
       )}
 

@@ -102,8 +102,8 @@ export function ResultForm({
         <Field id="kickoff" label="Kick-off" error={fe.kickoffAt}>
           <Input id="kickoff" type="datetime-local" value={local} onChange={(e) => setLocal(e.target.value)} error={fe.kickoffAt} />
         </Field>
-        <Field id="pitch" label="Pitch" hint="Optional">
-          <Input id="pitch" name="pitch" maxLength={60} defaultValue={initial.pitch} placeholder="Pitch 2" />
+        <Field id="pitch" label="Field" hint="Optional">
+          <Input id="pitch" name="pitch" maxLength={60} defaultValue={initial.pitch} placeholder="Field 2" />
         </Field>
       </div>
       <input type="hidden" name="kickoffAt" value={iso} />
