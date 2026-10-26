@@ -1,5 +1,5 @@
 import "server-only";
-import type { Entry, Match, MatchEvent, Official, OfficialRole, RosterPerson, Tournament } from "./types";
+import type { Award, Entry, Match, MatchEvent, Official, OfficialRole, RosterPerson, Tournament } from "./types";
 
 /*
  * Storage for tournaments. Two implementations with the same shape: the sample build keeps
@@ -80,6 +80,13 @@ export interface Repo {
   /** Make the tournament's events on team calendars exactly these (adds, updates, removes). */
   syncCalendar(tid: string, wanted: CalendarEvent[]): Promise<void>;
   banner(tid: string): Promise<string | null>;
+  awards(tid: string): Promise<Award[]>;
+  insertAward(a: Omit<Award, "id">): Promise<void>;
+  deleteAward(id: string): Promise<void>;
+  /** Roster people by id, for showing award winners and players of the match to anyone who can see the tournament. */
+  rosterPeople(tid: string, ids: string[]): Promise<RosterPerson[]>;
+  /** Everything a Clbx player won: their roster rows, and where they were player of the match or won an award. */
+  honoursFor(userId: string): Promise<{ roster: RosterPerson[]; motm: Match[]; awards: Award[] }>;
   setBanner(tid: string, image: string | null): Promise<void>;
   /** One captain per roster (null: none). */
   setCaptain(entryId: string, personId: string | null): Promise<void>;

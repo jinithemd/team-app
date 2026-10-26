@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ChevronDown, Clock, MapPin, Trophy } from "lucide-react";
+import { ChevronDown, Clock, MapPin, Star, Trophy } from "lucide-react";
 import { TeamCrest } from "@/components/ui";
 import type { MatchView, EntryView } from "@/lib/tournaments/service";
 import type { StandingRow } from "@/lib/tournaments/engine";
@@ -105,6 +105,13 @@ export function FixtureRow({ m, href, dayShown = false }: { m: MatchView; href?:
         <Side side={m.away} label={m.awayLabel} align="right" bold={done && m.winnerId === m.awayId} muted={done && !!m.winnerId && m.winnerId !== m.awayId} />
       </span>
       {status && <span className={`text-center text-xs ${m.status === "live" ? "font-semibold text-danger" : "text-muted"}`}>{status}</span>}
+      {m.motm && (
+        <span className="flex items-center justify-center gap-1 text-xs">
+          <Star aria-hidden className="size-3.5 text-ev-tournament" />
+          <span className="text-muted">Player of the match:</span>
+          <span className="font-semibold">{m.motm.name}</span>
+        </span>
+      )}
     </>
   );
   const label = [`${m.homeLabel} ${m.homeScore ?? ""} ${m.awayLabel} ${m.awayScore ?? ""}`, m.roundName, m.kickoffAt ? fmtKickoff(m.kickoffAt) : "Time to be set", m.pitch, status]
@@ -392,5 +399,49 @@ export function FeeSummary({ entries, fee, payTo }: { entries: EntryView[]; fee:
         {col("Not paid", unpaid, "text-fg", "–")}
       </div>
     </section>
+  );
+}
+
+/** The tournament's awards and the top scorers from the match reports. */
+export function AwardsBoard({ awards, topScorers }: { awards: import("@/lib/tournaments/service").AwardView[]; topScorers: { name: string; team: string; goals: number }[] }) {
+  if (!awards.length && !topScorers.length) return null;
+  return (
+    <div className="grid gap-4">
+      {awards.length > 0 && (
+        <ul className="grid gap-2 sm:grid-cols-2" aria-label="Awards">
+          {awards.map((a) => (
+            <li key={a.id} className="flex items-center gap-3 rounded-lg border-2 border-ev-tournament bg-ev-tournament-soft p-3">
+              <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-ev-tournament text-bg">
+                <Trophy className="size-5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-bold tracking-[.06em] text-ev-tournament uppercase">{a.title}</span>
+                <span className="block font-semibold break-words">
+                  {a.jersey != null ? `#${a.jersey} ` : ""}
+                  {a.winner}
+                </span>
+                {(a.team || a.note) && <span className="block text-xs text-muted">{[a.team, a.note].filter(Boolean).join(" · ")}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {topScorers.length > 0 && (
+        <div className="grid gap-1.5">
+          <h3 className="eyebrow">Top scorers</h3>
+          <ol className="grid gap-1 text-sm">
+            {topScorers.slice(0, 5).map((s, i) => (
+              <li key={`${s.team}-${s.name}`} className="flex items-center gap-2">
+                <span className="w-5 text-muted tabular">{i + 1}</span>
+                <span className="min-w-0 flex-1 break-words">
+                  <span className="font-semibold">{s.name}</span> <span className="text-muted">· {s.team}</span>
+                </span>
+                <span className="font-bold tabular">{s.goals}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+    </div>
   );
 }

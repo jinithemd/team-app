@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { clubRoleFor, currentUserId, db, isTeamMember, isTeamStaff, teamById } from "../data/store";
 import type { Repo, TeamRef } from "./repo";
 import type { TeamEvent } from "../data/types";
-import type { Entry, Match, MatchEvent, Official, OfficialRole, RosterPerson, Tournament } from "./types";
+import type { Award, Entry, Match, MatchEvent, Official, OfficialRole, RosterPerson, Tournament } from "./types";
 
 // Sample build: tournaments kept in memory next to the sample store (gone on restart).
 
@@ -15,6 +15,7 @@ interface Mem {
   events: MatchEvent[];
   officials: { tournamentId: string; userId: string; role: OfficialRole }[];
   roster?: RosterPerson[];
+  awards?: Award[];
 }
 const g = globalThis as unknown as { __clbxTournaments?: Mem };
 const mem = (g.__clbxTournaments ??= { tournaments: [], entries: [], contacts: {}, matches: [], events: [], officials: [] });
@@ -266,6 +267,27 @@ export const memoryRepo: Repo = {
       }
     }
     db.events = db.events.filter((e) => e.tournamentId !== tid || keep.has(key(e.teamId, e.tournamentMatchId)));
+  },
+  async awards(tid) {
+    return (mem.awards ??= []).filter((a) => a.tournamentId === tid).sort((a, b) => a.sort - b.sort).map((a) => ({ ...a }));
+  },
+  async insertAward(a) {
+    (mem.awards ??= []).push({ ...a, id: randomUUID() });
+  },
+  async deleteAward(id) {
+    mem.awards = (mem.awards ??= []).filter((a) => a.id !== id);
+  },
+  async rosterPeople(tid, ids) {
+    return rosterList().filter((p) => p.tournamentId === tid && ids.includes(p.id)).map((p) => ({ ...p }));
+  },
+  async honoursFor(userId) {
+    const roster = rosterList().filter((p) => p.userId === userId && p.hostChange !== "removed");
+    const ids = new Set(roster.map((r) => r.id));
+    return {
+      roster: roster.map((p) => ({ ...p })),
+      motm: mem.matches.filter((m) => m.motmRosterId && ids.has(m.motmRosterId)).map((m) => ({ ...m })),
+      awards: (mem.awards ??= []).filter((a) => a.rosterId && ids.has(a.rosterId)).map((a) => ({ ...a })),
+    };
   },
   async banner(tid) {
     return banners.get(tid) ?? null;

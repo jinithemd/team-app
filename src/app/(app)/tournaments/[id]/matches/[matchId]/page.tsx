@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { getTournament } from "@/lib/tournaments/service";
+import { ArrowLeft, Star } from "lucide-react";
+import { getTournament, motmChoices } from "@/lib/tournaments/service";
 import { EVENT_LABEL } from "@/lib/tournaments/types";
 import { FixtureRow } from "@/components/tournament/bits";
-import { EventForm, RemoveEvent, ResultForm } from "./match-forms";
+import { EventForm, MotmPicker, RemoveEvent, ResultForm } from "./match-forms";
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string; matchId: string }> }) {
   const { id, matchId } = await params;
@@ -15,6 +15,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const canEdit = v.role !== "viewer";
   const teamName = (entryId: string) => v.entries.find((e) => e.id === entryId)?.name ?? "";
   const ready = !!m.homeId && !!m.awayId;
+  const choices = canEdit && ready ? await motmChoices(id, m.id) : null;
   return (
     <>
       <Link href={`/tournaments/${id}/fixtures`} className="inline-flex min-h-9 items-center gap-1 justify-self-start text-sm font-semibold text-team-ink">
@@ -42,6 +43,27 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             pitch: m.pitch ?? "",
           }}
         />
+      )}
+
+      {(m.motm || choices) && (
+        <section aria-labelledby="motm-h" className="grid gap-2 rounded-lg border border-border p-4">
+          <h2 id="motm-h" className="flex items-center gap-2 text-lg font-semibold">
+            <Star aria-hidden className="size-5 text-ev-tournament" />
+            Player of the match
+          </h2>
+          {m.motm ? (
+            <p className="text-sm">
+              <span className="font-semibold">
+                {m.motm.jersey != null ? `#${m.motm.jersey} ` : ""}
+                {m.motm.name}
+              </span>{" "}
+              <span className="text-muted">({m.motm.team})</span>
+            </p>
+          ) : (
+            !choices && <p className="text-sm text-muted">Not chosen.</p>
+          )}
+          {choices && <MotmPicker id={id} matchId={m.id} current={m.motmRosterId} teams={choices} />}
+        </section>
       )}
 
       <section aria-labelledby="ev-h" className="grid gap-2">

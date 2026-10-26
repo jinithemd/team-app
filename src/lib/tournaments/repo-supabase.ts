@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient, userClient } from "../supabase/server";
 import type { CalendarEvent, Repo, TeamRef } from "./repo";
-import type { Entry, Match, MatchEvent, OfficialRole, RosterPerson, Tournament } from "./types";
+import type { Award, Entry, Match, MatchEvent, OfficialRole, RosterPerson, Tournament } from "./types";
 
 /*
  * Live build: tournaments in Supabase, read and written as the signed-in person (or as a
@@ -54,12 +54,13 @@ const toM = (r: Row): Match => ({
   id: s(r.id)!, tournamentId: s(r.tournament_id)!, stage: r.stage as Match["stage"], groupLabel: s(r.group_label), round: Number(r.round), slot: Number(r.slot), roundName: s(r.round_name),
   homeId: s(r.home_id), awayId: s(r.away_id), homeSource: s(r.home_source), awaySource: s(r.away_source), kickoffAt: s(r.kickoff_at), pitch: s(r.pitch),
   status: r.status as Match["status"], homeScore: n(r.home_score), awayScore: n(r.away_score), homePens: n(r.home_pens), awayPens: n(r.away_pens), winnerId: s(r.winner_id),
+  motmRosterId: s(r.motm_roster_id),
 });
 const fromM = (m: Partial<Match>): Row => {
   const map: Record<string, string> = {
     id: "id", tournamentId: "tournament_id", stage: "stage", groupLabel: "group_label", round: "round", slot: "slot", roundName: "round_name", homeId: "home_id", awayId: "away_id",
     homeSource: "home_source", awaySource: "away_source", kickoffAt: "kickoff_at", pitch: "pitch", status: "status", homeScore: "home_score", awayScore: "away_score",
-    homePens: "home_pens", awayPens: "away_pens", winnerId: "winner_id",
+    homePens: "home_pens", awayPens: "away_pens", winnerId: "winner_id", motmRosterId: "motm_roster_id",
   };
   const out: Row = {};
   for (const [k, v] of Object.entries(m)) if (map[k]) out[map[k]] = v;
@@ -356,6 +357,38 @@ export const supabaseRepo: Repo = {
       const del = await a.from("events").delete().in("id", gone);
       if (del.error) console.error("[tournaments] calendar delete:", del.error.message);
     }
+  },
+  async awards(tid) {
+    const { data, error } = await (await reader()).c.from("tournament_awards").select("*").eq("tournament_id", tid).order("sort").order("created_at");
+    check(error, "load the awards");
+    return (data ?? []).map((r: Row) => ({ id: s(r.id)!, tournamentId: s(r.tournament_id)!, title: s(r.title)!, entryId: s(r.entry_id), rosterId: s(r.roster_id), note: s(r.note), sort: Number(r.sort ?? 0) }));
+  },
+  async insertAward(a) {
+    const { error } = await (await sb()).from("tournament_awards").insert({ tournament_id: a.tournamentId, title: a.title, entry_id: a.entryId, roster_id: a.rosterId, note: a.note, sort: a.sort });
+    check(error, "save the award");
+  },
+  async deleteAward(id) {
+    const { error } = await (await sb()).from("tournament_awards").delete().eq("id", id);
+    check(error, "remove the award");
+  },
+  async rosterPeople(tid, ids) {
+    if (!ids.length) return [];
+    // Only names and numbers of winners: the server key is fine here (visitors on the public page).
+    const { data } = await (adminClient() as unknown as SupabaseClient).from("tournament_roster").select("*").eq("tournament_id", tid).in("id", ids);
+    return (data ?? []).map(toR);
+  },
+  async honoursFor(userId) {
+    const a = adminClient() as unknown as SupabaseClient;
+    const { data: rows } = await a.from("tournament_roster").select("*").eq("user_id", userId).or("host_change.is.null,host_change.neq.removed");
+    const roster = (rows ?? []).map(toR);
+    const ids = roster.map((r) => r.id);
+    if (!ids.length) return { roster, motm: [], awards: [] };
+    const [m, w] = await Promise.all([a.from("tournament_matches").select("*").in("motm_roster_id", ids), a.from("tournament_awards").select("*").in("roster_id", ids)]);
+    return {
+      roster,
+      motm: (m.data ?? []).map(toM),
+      awards: (w.data ?? []).map((r: Row) => ({ id: s(r.id)!, tournamentId: s(r.tournament_id)!, title: s(r.title)!, entryId: s(r.entry_id), rosterId: s(r.roster_id), note: s(r.note), sort: Number(r.sort ?? 0) })),
+    };
   },
   async banner(tid) {
     const { c } = await reader();

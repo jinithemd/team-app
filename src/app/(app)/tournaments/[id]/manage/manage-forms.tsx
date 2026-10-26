@@ -1,10 +1,10 @@
 "use client";
 
 import { useActionState, useState, useTransition } from "react";
-import { addOfficialAction, deleteTournamentAction, removeOfficialAction, setStatusAction } from "@/app/tournament-actions";
+import { addAwardAction, addOfficialAction, deleteTournamentAction, removeAwardAction, removeOfficialAction, setStatusAction } from "@/app/tournament-actions";
 import type { FormState } from "@/app/actions";
 import { Field, Input, buttonClass, inputClass } from "@/components/ui";
-import type { Official, TournamentStatus } from "@/lib/tournaments/types";
+import { AWARD_PRESETS, type Official, type TournamentStatus } from "@/lib/tournaments/types";
 
 export function StatusControls({ id, status, hasFixtures }: { id: string; status: TournamentStatus; hasFixtures: boolean }) {
   const [pending, start] = useTransition();
@@ -110,6 +110,131 @@ export function DeleteTournament({ id, name }: { id: string; name: string }) {
         Delete tournament
       </button>
       {msg && <p role="alert" className="text-sm text-danger">{msg}</p>}
+    </section>
+  );
+}
+
+type AwardTeam = { entryId: string; team: string; players: { id: string; name: string; jersey: number | null }[] };
+
+/** The host gives out awards: pick one (or name your own), the team, and the player. */
+export function AwardsManager({
+  id,
+  teams,
+  awards,
+  topScorer,
+}: {
+  id: string;
+  teams: AwardTeam[];
+  awards: { id: string; title: string; winner: string; team: string | null }[];
+  topScorer: { name: string; team: string; goals: number } | null;
+}) {
+  const [state, action, pending] = useActionState<FormState, FormData>(addAwardAction.bind(null, id), null);
+  const [title, setTitle] = useState<string>(AWARD_PRESETS[0]);
+  const [entryId, setEntryId] = useState(teams[0]?.entryId ?? "");
+  const [rosterId, setRosterId] = useState("");
+  const [removing, start] = useTransition();
+  const fe = state?.fieldErrors ?? {};
+  const players = teams.find((t) => t.entryId === entryId)?.players ?? [];
+  const teamAward = title === "Fair play";
+  return (
+    <section aria-labelledby="aw-h" className="grid gap-3 rounded-lg border border-border p-4">
+      <div className="grid gap-1">
+        <h2 id="aw-h" className="text-lg font-semibold">
+          Awards
+        </h2>
+        <p className="text-sm text-muted">Best player, top scorer, best goalkeeper, or any award you like. Winners linked to their Clbx account get a badge on their profile.</p>
+      </div>
+      {awards.length > 0 && (
+        <ul className="grid gap-1.5">
+          {awards.map((a) => (
+            <li key={a.id} className="flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+              <span className="min-w-0 flex-1 break-words">
+                <span className="font-semibold">{a.title}</span> · {a.winner}
+                {a.team && <span className="text-muted"> ({a.team})</span>}
+              </span>
+              <button
+                type="button"
+                disabled={removing}
+                onClick={() => start(async () => void (await removeAwardAction(id, a.id)))}
+                className="shrink-0 text-sm font-semibold text-danger"
+                aria-label={`Remove ${a.title}`}
+              >
+                Remove
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {teams.length === 0 ? (
+        <p className="text-sm text-muted">Awards open once teams are in.</p>
+      ) : (
+        <form action={action} className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field id="aw-title" label="Award" error={fe.title}>
+              <select id="aw-title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass}>
+                {AWARD_PRESETS.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+                <option value="__other">Other…</option>
+              </select>
+            </Field>
+            {title === "__other" && (
+              <Field id="aw-custom" label="Award name" error={fe.title}>
+                <Input id="aw-custom" name="custom" maxLength={60} placeholder="e.g. Golden boot" error={fe.title} />
+              </Field>
+            )}
+            <Field id="aw-team" label="Team" error={fe.entryId}>
+              <select
+                id="aw-team"
+                name="entryId"
+                value={entryId}
+                onChange={(e) => {
+                  setEntryId(e.target.value);
+                  setRosterId("");
+                }}
+                className={inputClass}
+              >
+                {teams.map((t) => (
+                  <option key={t.entryId} value={t.entryId}>
+                    {t.team}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id="aw-player" label={teamAward ? "Player (optional for a team award)" : "Player"} error={fe.rosterId} hint={players.length ? undefined : "This team has no roster yet: the award goes to the team."}>
+              <select id="aw-player" name="rosterId" value={rosterId} onChange={(e) => setRosterId(e.target.value)} className={inputClass} disabled={!players.length}>
+                <option value="">{teamAward || !players.length ? "The whole team" : "Pick a player"}</option>
+                {players.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.jersey != null ? `#${p.jersey} ` : ""}
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field id="aw-note" label="Note (optional)">
+              <Input id="aw-note" name="note" maxLength={120} placeholder={title === "Top scorer" && topScorer ? `${topScorer.goals} goals` : "e.g. 7 goals"} />
+            </Field>
+          </div>
+          {title === "Top scorer" && topScorer && (
+            <p className="text-xs text-muted">
+              From the match reports: {topScorer.name} ({topScorer.team}) leads with {topScorer.goals} {topScorer.goals === 1 ? "goal" : "goals"}.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <button className={buttonClass("primary")} disabled={pending || (!teamAward && players.length > 0 && !rosterId)} aria-busy={pending}>
+              {pending ? "Saving…" : "Give award"}
+            </button>
+            {state && (state.error || state.message) && (
+              <p role={state.error ? "alert" : "status"} className={`text-sm ${state.error ? "text-danger" : "text-success"}`}>
+                {state.error ?? state.message}
+              </p>
+            )}
+          </div>
+        </form>
+      )}
     </section>
   );
 }

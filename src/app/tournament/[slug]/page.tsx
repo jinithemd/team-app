@@ -7,7 +7,7 @@ import { getTournament } from "@/lib/tournaments/service";
 import { FORMAT_LABEL } from "@/lib/tournaments/engine";
 import { APP_NAME } from "@/lib/brand";
 import { TeamCrest } from "@/components/ui";
-import { Bracket, ChampionBanner, FixtureList, StandingsTable, StatusPill, TournamentLogo, fmtDates, money, SeededTeams } from "@/components/tournament/bits";
+import { AwardsBoard, Bracket, ChampionBanner, FixtureList, StandingsTable, StatusPill, TournamentLogo, fmtDates, money, SeededTeams } from "@/components/tournament/bits";
 import { ShareLink } from "@/components/tournament/share-link";
 import { ApplyForm } from "@/components/tournament/entry-actions";
 
@@ -86,6 +86,14 @@ export default async function PublicTournament({ params }: { params: Promise<{ s
 
       <div className="gutter mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-8 py-6">
         <ChampionBanner entry={v.entries.find((e) => e.id === v.championId)} />
+        {(v.awards.length > 0 || v.topScorers.length > 0) && (
+          <section aria-labelledby="awards-h" className="grid gap-3">
+            <h2 id="awards-h" className="text-lg font-semibold">
+              Awards
+            </h2>
+            <AwardsBoard awards={v.awards} topScorers={v.topScorers} />
+          </section>
+        )}
 
         {v.canApplyWith.length > 0 && <ApplyForm id={t.id} teams={v.canApplyWith} />}
         {!v.signedIn && t.registrationOpen && ["draft", "registration"].includes(t.status) && (

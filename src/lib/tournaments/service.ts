@@ -6,7 +6,7 @@ import { memoryRepo } from "./repo-memory";
 import { supabaseRepo } from "./repo-supabase";
 import type { CalendarEvent, Repo } from "./repo";
 import { champion, runnerUp, describeSource, generateFixtures as engineFixtures, resolveTournament, standings, type EngineEntry, type Format, type StandingRow } from "./engine";
-import type { Entry, EventKind, Match, MatchEvent, Official, OfficialRole, RosterPerson, RosterRole, Tournament, TournamentStatus } from "./types";
+import type { Award, Entry, EventKind, Match, MatchEvent, Official, OfficialRole, RosterPerson, RosterRole, Tournament, TournamentStatus } from "./types";
 
 /*
  * Every tournament rule lives here: who may do what, validation, fixture generation and
@@ -76,6 +76,15 @@ export interface MatchView extends Match {
   homeLabel: string;
   awayLabel: string;
   events: MatchEvent[];
+  /** Player of the match, if one was chosen. */
+  motm: { name: string; jersey: number | null; team: string } | null;
+}
+
+export interface AwardView extends Award {
+  winner: string;
+  team: string | null;
+  crestUrl: string | null;
+  jersey: number | null;
 }
 
 export interface TournamentView {
@@ -92,6 +101,9 @@ export interface TournamentView {
   /** Teams I run that could still enter (public page and dashboard). */
   canApplyWith: { id: string; name: string }[];
   signedIn: boolean;
+  awards: AwardView[];
+  /** Goals from the match reports, most first (own goals don't count). */
+  topScorers: { name: string; team: string; goals: number }[];
 }
 
 export async function getTournament(key: string): Promise<TournamentView | null> {
@@ -126,6 +138,14 @@ export async function getTournament(key: string): Promise<TournamentView | null>
     const e = id ? byId.get(id) : undefined;
     return e ? { name: e.name, crestUrl: e.crestUrl, teamId: e.teamId } : null;
   };
+  const awards = await repo.awards(t.id).catch(() => [] as Award[]);
+  const winners = new Map(
+    (await repo.rosterPeople(t.id, [...new Set([...matches.map((m) => m.motmRosterId), ...awards.map((x) => x.rosterId)].filter((x): x is string => !!x))]).catch(() => [] as RosterPerson[])).map((p) => [p.id, p]),
+  );
+  const motmOf = (m: Match) => {
+    const p = m.motmRosterId ? winners.get(m.motmRosterId) : undefined;
+    return p ? { name: p.name, jersey: p.jersey, team: byId.get(p.entryId)?.name ?? "" } : null;
+  };
   const mv: MatchView[] = matches
     .sort((a, b) => a.round - b.round || (a.groupLabel ?? "").localeCompare(b.groupLabel ?? "") || a.slot - b.slot)
     .map((m) => ({
@@ -135,7 +155,21 @@ export async function getTournament(key: string): Promise<TournamentView | null>
       homeLabel: side(m.homeId)?.name ?? describeSource(m.homeSource, matches),
       awayLabel: side(m.awayId)?.name ?? describeSource(m.awaySource, matches),
       events: events.filter((x) => x.matchId === m.id),
+      motm: motmOf(m),
     }));
+  const awardViews: AwardView[] = awards.map((x) => {
+    const p = x.rosterId ? winners.get(x.rosterId) : undefined;
+    const e = byId.get(p?.entryId ?? x.entryId ?? "");
+    return { ...x, winner: p?.name ?? e?.name ?? "", team: p ? e?.name ?? null : null, crestUrl: e?.crestUrl ?? null, jersey: p?.jersey ?? null };
+  });
+  const goals = new Map<string, { name: string; team: string; goals: number }>();
+  for (const ev of events.filter((x) => (x.kind === "goal" || x.kind === "penalty_goal") && x.player?.trim())) {
+    const team = byId.get(ev.entryId)?.name ?? "";
+    const k = `${ev.entryId}:${ev.player!.trim().toLowerCase()}`;
+    const g = goals.get(k) ?? { name: ev.player!.trim(), team, goals: 0 };
+    g.goals++;
+    goals.set(k, g);
+  }
   const pts = { win: t.pointsWin, draw: t.pointsDraw, loss: t.pointsLoss };
   const accepted = entries.filter((e) => e.status === "accepted");
   const engineEntries: EngineEntry[] = accepted.map((e) => ({ id: e.id, name: e.name, seed: e.seed, groupLabel: e.groupLabel }));
@@ -159,6 +193,8 @@ export async function getTournament(key: string): Promise<TournamentView | null>
     officials,
     canApplyWith: t.registrationOpen && t.isPublic && ["draft", "registration"].includes(t.status) ? myTeams.filter((x) => !entered.has(x.id)).map((x) => ({ id: x.id, name: x.name })) : [],
     signedIn: !!uid,
+    awards: awardViews,
+    topScorers: [...goals.values()].sort((a, b) => b.goals - a.goals || a.name.localeCompare(b.name)).slice(0, 10),
   };
 }
 
@@ -490,6 +526,7 @@ export async function generateFixtures(id: string, opts: { random: boolean; repl
       homePens: null,
       awayPens: null,
       winnerId: null,
+      motmRosterId: null,
       roundName: m.roundName,
       // Keep a date hint in the round name only; times are set per match.
       ...(days > 1 && rounds > 1 ? {} : {}),
@@ -997,5 +1034,103 @@ export async function tournamentBadges(ids: (string | null | undefined)[]): Prom
     return Object.fromEntries(ts.map((t) => [t.id, { name: t.name, logoUrl: tournamentLogoUrl(t), bannerUrl: tournamentBannerUrl(t) }]));
   } catch {
     return {};
+  }
+}
+
+// ---------------------------------------------------------------------------
+// player of the match and awards
+// ---------------------------------------------------------------------------
+
+/** Players on both teams' rosters, to pick a player of the match. */
+export async function motmChoices(tid: string, matchId: string) {
+  const t = await repo.tournament(tid);
+  if (!t || !(await repo.isOfficial(t))) return null;
+  const m = (await repo.matches(t.id)).find((x) => x.id === matchId);
+  if (!m?.homeId || !m.awayId) return null;
+  const entries = await repo.entries(t.id);
+  const people = (await repo.roster(t.id)).filter((p) => (p.entryId === m.homeId || p.entryId === m.awayId) && p.role === "player" && p.hostChange !== "removed");
+  return [m.homeId, m.awayId].map((eid) => ({
+    entryId: eid,
+    team: entries.find((e) => e.id === eid)?.name ?? "",
+    players: people.filter((p) => p.entryId === eid).sort((a, b) => (a.jersey ?? 999) - (b.jersey ?? 999)).map((p) => ({ id: p.id, name: p.name, jersey: p.jersey })),
+  }));
+}
+
+export async function setMatchMotm(tid: string, matchId: string, rosterId: string | null): Promise<Result> {
+  return caught(async () => {
+    const t = await asOfficial(tid);
+    const m = (await repo.matches(t.id)).find((x) => x.id === matchId);
+    if (!m) return fail("That game isn't in this tournament.");
+    if (rosterId) {
+      const p = (await repo.roster(t.id)).find((x) => x.id === rosterId);
+      if (!p || p.role !== "player" || p.hostChange === "removed" || (p.entryId !== m.homeId && p.entryId !== m.awayId)) return fail("Pick a player from one of the two teams.");
+    }
+    await repo.updateMatches([{ id: m.id, motmRosterId: rosterId }]);
+    return { ok: true, data: undefined };
+  });
+}
+
+/** Everyone the host could give an award to: each team, and the players on its roster. */
+export async function awardChoices(tid: string) {
+  const t = await repo.tournament(tid);
+  if (!t || !(await repo.isOrganizer(t))) return null;
+  const [entries, people] = await Promise.all([repo.entries(t.id), repo.roster(t.id)]);
+  return entries
+    .filter((e) => e.status === "accepted")
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map((e) => ({
+      entryId: e.id,
+      team: e.name,
+      players: people.filter((p) => p.entryId === e.id && p.role === "player" && p.hostChange !== "removed").sort((a, b) => (a.jersey ?? 999) - (b.jersey ?? 999)).map((p) => ({ id: p.id, name: p.name, jersey: p.jersey })),
+    }));
+}
+
+export async function addAward(tid: string, input: { title: string; entryId: string; rosterId: string; note: string }): Promise<Result> {
+  return caught(async () => {
+    const t = await asOrganizer(tid);
+    const title = input.title.trim().replace(/\s+/g, " ");
+    const fe: Record<string, string> = {};
+    if (!title) fe.title = "Name the award, e.g. Best player.";
+    else if (title.length > 60) fe.title = "Keep it under 60 characters.";
+    const entries = await repo.entries(t.id);
+    const entry = entries.find((e) => e.id === input.entryId && e.status === "accepted");
+    if (!entry) fe.entryId = "Pick the team.";
+    let rosterId: string | null = null;
+    if (entry && input.rosterId) {
+      const p = (await repo.roster(t.id)).find((x) => x.id === input.rosterId);
+      if (!p || p.entryId !== entry.id || p.hostChange === "removed") fe.rosterId = "Pick a player from that team.";
+      else rosterId = p.id;
+    }
+    if (Object.keys(fe).length) return fail(Object.values(fe)[0], fe);
+    const existing = await repo.awards(t.id);
+    await repo.insertAward({ tournamentId: t.id, title, entryId: entry!.id, rosterId, note: input.note.trim().slice(0, 120) || null, sort: existing.length });
+    return { ok: true, data: undefined };
+  });
+}
+
+export async function removeAward(tid: string, awardId: string): Promise<Result> {
+  return caught(async () => {
+    const t = await asOrganizer(tid);
+    if (!(await repo.awards(t.id)).some((a) => a.id === awardId)) return fail("That award isn't in this tournament.");
+    await repo.deleteAward(awardId);
+    return { ok: true, data: undefined };
+  });
+}
+
+/** A Clbx player's tournament honours, for the badges on their profile. */
+export async function playerHonours(userId: string): Promise<{ motm: { tournament: string; tournamentId: string; game: string }[]; awards: { title: string; tournament: string; tournamentId: string; year: string }[] }> {
+  try {
+    const h = await repo.honoursFor(userId);
+    const ids = [...new Set([...h.motm.map((m) => m.tournamentId), ...h.awards.map((a) => a.tournamentId)])];
+    const ts = new Map((await repo.tournamentsByIds(ids)).map((t) => [t.id, t]));
+    return {
+      motm: h.motm.filter((m) => ts.has(m.tournamentId)).map((m) => ({ tournament: ts.get(m.tournamentId)!.name, tournamentId: m.tournamentId, game: m.roundName ?? `Round ${m.round}` })),
+      awards: h.awards
+        .filter((a) => ts.has(a.tournamentId))
+        .map((a) => ({ title: a.title, tournament: ts.get(a.tournamentId)!.name, tournamentId: a.tournamentId, year: ts.get(a.tournamentId)!.endsOn.slice(0, 4) })),
+    };
+  } catch (e) {
+    console.error("[tournaments] player honours:", (e as Error).message);
+    return { motm: [], awards: [] };
   }
 }

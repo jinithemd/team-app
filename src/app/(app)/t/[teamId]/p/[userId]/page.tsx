@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, MapPin, Pencil } from "lucide-react";
+import { ArrowLeft, MapPin, Pencil, Star, Trophy } from "lucide-react";
 import { getPlayerProfile, getTeam } from "@/lib/data";
 import { Avatar } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
 import { formatDateBlock } from "@/lib/time";
 import { MemberStatusButtons } from "./status-buttons";
+import { playerHonours } from "@/lib/tournaments/service";
 
 export const metadata: Metadata = { title: "Player" };
 
@@ -21,7 +22,7 @@ const fmt = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", m
 
 export default async function PlayerPage({ params }: { params: Promise<{ teamId: string; userId: string }> }) {
   const { teamId, userId } = await params;
-  const [team, p] = await Promise.all([getTeam(teamId), getPlayerProfile(teamId, userId)]);
+  const [team, p, honours] = await Promise.all([getTeam(teamId), getPlayerProfile(teamId, userId), playerHonours(userId)]);
   if (!team || !p) notFound();
   const name = `${p.person.firstName} ${p.person.lastName}`;
   const labels = hatLabels({ isPlayer: p.row.isPlayer, roles: p.row.roles, clubRole: null, isCreator: false }, p.row.jersey);
@@ -53,6 +54,18 @@ export default async function PlayerPage({ params }: { params: Promise<{ teamId:
           {p.row.position && <p className="text-sm text-muted">{p.row.position}</p>}
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <HatBadges labels={labels} />
+            {honours.motm.length > 0 && (
+              <span className="inline-flex items-center gap-1 rounded-pill bg-ev-tournament-soft px-2 py-0.5 text-[11px] font-bold tracking-[.04em] text-ev-tournament uppercase">
+                <Star aria-hidden className="size-3" />
+                Player of the match{honours.motm.length > 1 ? ` ×${honours.motm.length}` : ""}
+              </span>
+            )}
+            {honours.awards.map((a, i) => (
+              <span key={i} className="inline-flex items-center gap-1 rounded-pill bg-ev-tournament-soft px-2 py-0.5 text-[11px] font-bold tracking-[.04em] text-ev-tournament uppercase">
+                <Trophy aria-hidden className="size-3" />
+                {a.title}
+              </span>
+            ))}
             {p.row.status === "inactive" && <span className="rounded-pill bg-sunken px-2 py-0.5 text-[11px] font-bold text-muted uppercase">Inactive</span>}
             {p.unavailable && (
               <span className="rounded-pill bg-warning-soft px-2 py-0.5 text-[11px] font-bold tracking-[.04em] text-warning uppercase">
@@ -62,6 +75,36 @@ export default async function PlayerPage({ params }: { params: Promise<{ teamId:
           </div>
         </div>
       </section>
+
+      {(honours.motm.length > 0 || honours.awards.length > 0) && (
+        <section aria-labelledby="hon-h" className="grid gap-2">
+          <h3 id="hon-h" className="eyebrow">
+            Tournament honours
+          </h3>
+          <ul className="grid gap-1.5">
+            {honours.awards.map((a, i) => (
+              <li key={`a${i}`}>
+                <Link href={`/tournaments/${a.tournamentId}`} className="flex items-center gap-2.5 rounded-md border-2 border-ev-tournament bg-ev-tournament-soft px-3 py-2 text-sm">
+                  <Trophy aria-hidden className="size-4 shrink-0 text-ev-tournament" />
+                  <span className="min-w-0">
+                    <span className="font-semibold">{a.title}</span> <span className="text-muted">· {a.tournament} {a.year}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+            {honours.motm.map((m, i) => (
+              <li key={`m${i}`}>
+                <Link href={`/tournaments/${m.tournamentId}`} className="flex items-center gap-2.5 rounded-md border border-border px-3 py-2 text-sm">
+                  <Star aria-hidden className="size-4 shrink-0 text-ev-tournament" />
+                  <span className="min-w-0">
+                    <span className="font-semibold">Player of the match</span> <span className="text-muted">· {m.tournament}, {m.game}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {p.row.isPlayer && (
         <section aria-labelledby="stats-h" className="grid gap-2">

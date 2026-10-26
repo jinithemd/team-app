@@ -88,7 +88,22 @@ export interface Match extends EngineMatch {
   kickoffAt: string | null;
   pitch: string | null;
   status: MatchStatus;
+  /** Player of the match (optional): a roster person from either team. */
+  motmRosterId: string | null;
 }
+
+/** An award the host gives out: to a player on a roster, or to a whole team. */
+export interface Award {
+  id: string;
+  tournamentId: string;
+  title: string;
+  entryId: string | null;
+  rosterId: string | null;
+  note: string | null;
+  sort: number;
+}
+
+export const AWARD_PRESETS = ["Best player", "Top scorer", "Best goalkeeper", "Best defender", "Best young player", "Fair play"] as const;
 
 export interface MatchEvent {
   id: string;

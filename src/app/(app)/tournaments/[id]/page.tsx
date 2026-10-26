@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTournament } from "@/lib/tournaments/service";
 import { Banner, buttonClass } from "@/components/ui";
-import { ChampionBanner, FixtureList, fmtKickoff, money } from "@/components/tournament/bits";
+import { AwardsBoard, ChampionBanner, FixtureList, fmtKickoff, money } from "@/components/tournament/bits";
 import { ApplyForm, WithdrawButton } from "@/components/tournament/entry-actions";
 
 export default async function TournamentOverview({ params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +20,14 @@ export default async function TournamentOverview({ params }: { params: Promise<{
   return (
     <>
       <ChampionBanner entry={v.entries.find((e) => e.id === v.championId)} />
+      {(v.awards.length > 0 || v.topScorers.length > 0) && (
+        <section aria-labelledby="awards-h" className="grid gap-3">
+          <h2 id="awards-h" className="text-lg font-semibold">
+            Awards
+          </h2>
+          <AwardsBoard awards={v.awards} topScorers={v.topScorers} />
+        </section>
+      )}
 
       {v.role === "organizer" && !v.matches.length && (
         <Banner>

@@ -256,3 +256,27 @@ export async function setCaptainAction(id: string, entryId: string, _: FormState
   revalidatePath(rosterPath(id, entryId));
   return { ok: true, message: "Captain saved." };
 }
+
+// ---------- player of the match and awards ----------
+
+export async function setMotmAction(id: string, matchId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await svc.setMatchMotm(id, matchId, str(f, "motm") || null);
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: true, message: str(f, "motm") ? "Player of the match saved." : "Player of the match cleared." };
+}
+
+export async function addAwardAction(id: string, _: FormState, f: FormData): Promise<FormState> {
+  const title = str(f, "title") === "__other" ? str(f, "custom") : str(f, "title");
+  const res = await svc.addAward(id, { title, entryId: str(f, "entryId"), rosterId: str(f, "rosterId"), note: str(f, "note") });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  refresh(id);
+  return { ok: true, message: `Awarded: ${title.trim()}.` };
+}
+
+export async function removeAwardAction(id: string, awardId: string): Promise<FormState> {
+  const res = await svc.removeAward(id, awardId);
+  if (!res.ok) return { error: res.error };
+  refresh(id);
+  return { ok: true };
+}

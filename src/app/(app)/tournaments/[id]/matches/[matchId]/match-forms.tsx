@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { Minus, Plus, X } from "lucide-react";
-import { addEventAction, removeEventAction, saveResultAction } from "@/app/tournament-actions";
+import { addEventAction, removeEventAction, saveResultAction, setMotmAction } from "@/app/tournament-actions";
 import type { FormState } from "@/app/actions";
 import { Field, Input, buttonClass, inputClass } from "@/components/ui";
 
@@ -176,5 +176,53 @@ export function RemoveEvent({ id, eventId }: { id: string; eventId: string }) {
     <button type="button" aria-label="Remove" disabled={pending} onClick={() => start(async () => void (await removeEventAction(id, eventId)))} className="grid size-8 place-items-center rounded-md text-muted hover:text-danger">
       <X aria-hidden className="size-4" />
     </button>
+  );
+}
+
+/** Officials pick the player of the match (optional) from either team's roster. */
+export function MotmPicker({
+  id,
+  matchId,
+  current,
+  teams,
+}: {
+  id: string;
+  matchId: string;
+  current: string | null;
+  teams: { entryId: string; team: string; players: { id: string; name: string; jersey: number | null }[] }[];
+}) {
+  const [state, action, pending] = useActionState<FormState, FormData>(setMotmAction.bind(null, id, matchId), null);
+  const [value, setValue] = useState(current ?? "");
+  const any = teams.some((t) => t.players.length);
+  if (!any) return <p className="text-sm text-muted">Pick a player of the match once the teams have added their rosters.</p>;
+  return (
+    <form action={action} className="grid gap-2">
+      <label htmlFor="motm" className="text-sm font-semibold">
+        Choose the player of the match (optional)
+      </label>
+      <div className="flex gap-2">
+        <select id="motm" name="motm" value={value} onChange={(e) => setValue(e.target.value)} className={`${inputClass} min-w-0 flex-1`}>
+          <option value="">No one</option>
+          {teams.map((t) => (
+            <optgroup key={t.entryId} label={t.team}>
+              {t.players.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.jersey != null ? `#${p.jersey} ` : ""}
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <button className={buttonClass("primary", "md", "shrink-0")} disabled={pending || value === (current ?? "")} aria-busy={pending}>
+          {pending ? "Saving…" : "Save"}
+        </button>
+      </div>
+      {state && (state.error || state.message) && (
+        <p role={state.error ? "alert" : "status"} className={`text-sm ${state.error ? "text-danger" : "text-success"}`}>
+          {state.error ?? state.message}
+        </p>
+      )}
+    </form>
   );
 }
