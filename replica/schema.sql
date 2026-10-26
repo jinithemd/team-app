@@ -1596,3 +1596,27 @@ begin
     execute stmt;
   end loop;
 end $$;
+
+-- A player sets their own number, positions and whether they play. roster_write needs the
+-- roster permission, so this narrow door lets anyone on the team change just those three
+-- fields on their own row (roles and permissions stay behind guard_roster_perms).
+create or replace function set_my_player_details(t uuid, p_is_player boolean, p_jersey text, p_position text)
+returns void language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if nullif(trim(p_jersey), '') !~ '^\d{1,3}$' then
+    raise exception 'Use up to 3 digits for the number' using errcode = 'check_violation';
+  end if;
+  if length(p_position) > 80 then
+    raise exception 'Too many positions' using errcode = 'check_violation';
+  end if;
+  update roster_members
+     set is_player = p_is_player,
+         jersey = case when p_is_player then nullif(trim(p_jersey), '') end,
+         position = case when p_is_player then nullif(trim(p_position), '') end
+   where team_id = t and user_id = auth.uid() and status in ('active', 'inactive');
+  if not found then
+    raise exception 'You''re not on this team' using errcode = 'insufficient_privilege';
+  end if;
+end $$;
+revoke all on function set_my_player_details(uuid, boolean, text, text) from public, anon;
+grant execute on function set_my_player_details(uuid, boolean, text, text) to authenticated;

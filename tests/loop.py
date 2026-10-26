@@ -91,7 +91,7 @@ with sync_playwright() as p:
     expect(c.get_by_role("radio", name="Yes, I play")).to_have_attribute("aria-checked", "true"); step("Your part step opens, 'I play' preselected")
 
     # player + captain + manager
-    c.fill("#jersey", "9"); c.fill("#position", "Forward")
+    c.fill("#jersey", "9"); c.get_by_role("button", name="Striker", exact=True).click()
     c.locator("label", has_text="Manager").click()
     prev = c.get_by_role("region", name="How you'll show on the roster")
     for hat in ["Player #9", "Captain", "Manager", "Club owner"]:

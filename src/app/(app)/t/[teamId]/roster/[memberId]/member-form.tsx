@@ -1,5 +1,6 @@
 "use client";
 
+import { PositionPicker } from "@/components/position-picker";
 import { useActionState, useState } from "react";
 import { Check } from "lucide-react";
 import { updateMemberAction, type FormState } from "@/app/actions";
@@ -18,11 +19,13 @@ export function MemberForm({
   teamId,
   memberId,
   isCreator,
+  sport,
   initial,
 }: {
   teamId: string;
   memberId: string;
   isCreator: boolean;
+  sport: string;
   initial: { isPlayer: boolean; jersey: string; position: string; roles: TeamRole[]; permissions: TeamPermission[] };
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(updateMemberAction.bind(null, teamId, memberId), null);
@@ -63,13 +66,13 @@ export function MemberForm({
           ))}
         </div>
         {plays && (
-          <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
-            <Field id="jersey" label="Number" error={fe.jersey}>
-              <Input id="jersey" name="jersey" inputMode="numeric" maxLength={3} defaultValue={initial.jersey} error={fe.jersey} />
-            </Field>
-            <Field id="position" label="Position">
-              <Input id="position" name="position" maxLength={30} defaultValue={initial.position} placeholder="Optional" />
-            </Field>
+          <div className="grid gap-4">
+            <div className="max-w-24">
+              <Field id="jersey" label="Number" error={fe.jersey}>
+                <Input id="jersey" name="jersey" inputMode="numeric" maxLength={3} defaultValue={initial.jersey} error={fe.jersey} />
+              </Field>
+            </div>
+            <PositionPicker sport={sport} initial={initial.position} />
           </div>
         )}
       </fieldset>

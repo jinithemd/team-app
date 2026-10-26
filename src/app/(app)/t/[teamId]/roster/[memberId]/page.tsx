@@ -37,6 +37,7 @@ export default async function MemberPage({ params }: { params: Promise<{ teamId:
         teamId={teamId}
         memberId={m.id}
         isCreator={m.isCreator}
+        sport={team.sport}
         initial={{ isPlayer: m.isPlayer, jersey: m.jersey ?? "", position: m.position ?? "", roles: m.roles, permissions: m.permissions }}
       />
     </div>

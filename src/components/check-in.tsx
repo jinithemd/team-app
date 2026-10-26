@@ -49,7 +49,19 @@ export function CheckInCard({
         </div>
       </section>
     );
-  if (!venue?.pinned || state === "closed") return null;
+  if (state === "closed") return null;
+  if (!venue?.pinned)
+    return (
+      <section aria-labelledby="ci-h" className="grid gap-1 rounded-lg border border-border bg-surface p-4">
+        <h2 id="ci-h" className="font-semibold">
+          Check-in isn&apos;t available for this event
+        </h2>
+        <p className="text-sm text-muted">
+          {venue ? `${venue.name} doesn't have a map pin yet` : "This event doesn't have a place with a map pin"}, so the app can&apos;t tell when
+          you&apos;ve arrived. Your captain can mark you present instead.
+        </p>
+      </section>
+    );
 
   function go() {
     setMsg(null);

@@ -5,6 +5,7 @@ import { Check } from "lucide-react";
 import { setMyPartAction, type FormState } from "@/app/actions";
 import { Avatar, Field, Input, buttonClass } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
+import { PositionPicker } from "@/components/position-picker";
 import { TEAM_ROLES, ROLE_LABEL, hatLabels, type ClubRole, type TeamRole } from "@/lib/data/types";
 
 export function YourPartForm({
@@ -14,6 +15,7 @@ export function YourPartForm({
   name,
   clubRole,
   canChangeRoles,
+  sport,
   initial,
 }: {
   teamId: string;
@@ -22,6 +24,7 @@ export function YourPartForm({
   name: string;
   clubRole: ClubRole | null;
   canChangeRoles: boolean;
+  sport: string;
   initial: { isPlayer: boolean; jersey: string; position: string; roles: TeamRole[] };
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(setMyPartAction.bind(null, teamId, next), null);
@@ -58,13 +61,13 @@ export function YourPartForm({
           ))}
         </div>
         {plays && (
-          <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-3">
-            <Field id="jersey" label="Number" error={fe.jersey}>
-              <Input id="jersey" name="jersey" inputMode="numeric" maxLength={3} value={jersey} onChange={(e) => setJersey(e.target.value)} error={fe.jersey} />
-            </Field>
-            <Field id="position" label="Position">
-              <Input id="position" name="position" maxLength={30} value={position} onChange={(e) => setPosition(e.target.value)} placeholder="Optional" />
-            </Field>
+          <div className="grid gap-4">
+            <div className="max-w-24">
+              <Field id="jersey" label="Number" error={fe.jersey}>
+                <Input id="jersey" name="jersey" inputMode="numeric" maxLength={3} value={jersey} onChange={(e) => setJersey(e.target.value)} error={fe.jersey} />
+              </Field>
+            </div>
+            <PositionPicker sport={sport} initial={initial.position} onChange={setPosition} />
           </div>
         )}
       </fieldset>

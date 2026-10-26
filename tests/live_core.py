@@ -85,7 +85,7 @@ with sync_playwright() as pw:
     c.fill("#name", "Riverside FC"); submit(c, lambda: c.click("text=Create club"), r"/teams/new\?club=")
     expect(c.get_by_text("Riverside FC is set up and you're its owner")).to_be_visible(); step("club saved; Jin is owner")
     c.fill("#name", "Riverside First Team"); submit(c, lambda: c.click("text=Create team"), r"/you\?new=1")
-    c.fill("#jersey", "9"); c.fill("#position", "Forward"); c.locator("label", has_text="Manager").click()
+    c.fill("#jersey", "9"); c.get_by_role("button", name="Striker", exact=True).click(); c.locator("label", has_text="Manager").click()
     submit(c, lambda: c.click("text=Next: add players"), r"/roster\?created=1")
     me = c.locator("li", has_text="(you)")
     for hat in ["Captain", "Manager", "Club owner"]: expect(me.get_by_text(hat, exact=True)).to_be_visible()

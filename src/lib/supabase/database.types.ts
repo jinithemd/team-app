@@ -2344,6 +2344,10 @@ export type Database = {
         Args: { p_key: string; p_kind: string; p_payload: Json; p_team: string }
         Returns: undefined
       }
+      set_my_player_details: {
+        Args: { p_is_player: boolean; p_jersey: string; p_position: string; t: string }
+        Returns: undefined
+      }
       tier_rank: { Args: { t: string }; Returns: number }
     }
     Enums: {

@@ -34,6 +34,7 @@ export default async function YourPartPage({ params, searchParams }: { params: P
         name={user.firstName}
         clubRole={team.hats.clubRole}
         canChangeRoles={team.canManagePermissions}
+        sport={team.sport}
         initial={{
           // A brand-new team defaults to "I play and captain it": the usual case for an adult team.
           isPlayer: isNew ? true : team.me.isPlayer,

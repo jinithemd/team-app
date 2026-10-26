@@ -132,6 +132,15 @@ export default async function EventPage({
 
       {checkIn && <CheckInCard eventId={e.id} tz={e.tz} {...checkIn} />}
 
+      {canEdit && team.settings.geoCheckinEnabled && !past && !cancelled && e.venue?.lat == null && (
+        <Banner tone="warning">
+          Players can&apos;t check in to this one: {e.venue ? `${e.venue.name} has no map pin` : "it has no place with a map pin"}.{" "}
+          <Link href={e.venue ? `/t/${teamId}/venues?edit=${e.venue.id}#venue-form` : `/t/${teamId}/e/${e.id}/edit`} className="font-semibold text-team-ink underline">
+            {e.venue ? "Pin it on the map" : "Add a place"}
+          </Link>
+        </Banner>
+      )}
+
       {ep.manager && !team.isStaff && (
         <Banner>You&apos;re running this one. The tools you were given are below.</Banner>
       )}

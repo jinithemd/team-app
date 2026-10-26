@@ -105,3 +105,63 @@ export async function deleteAccount(confirmEmail: string): Promise<ActionResult>
   await sb.auth.signOut().catch(() => {});
   return { ok: true, data: undefined };
 }
+
+// ---------------------------------------------------------------------------
+// "Your part on the team" (Supabase). A player may change their own number, positions
+// and whether they play through set_my_player_details(); only someone who manages
+// permissions can change roles, which goes through the shared logic.
+// ---------------------------------------------------------------------------
+
+export async function setMyPart(
+  teamId: string,
+  input: { isPlayer: boolean; jersey?: string; position?: string; roles: string[] },
+): Promise<ActionResult<import("../types").RosterMember>> {
+  const { onLive } = await import("./run");
+  const shared = await import("../fake");
+  const { TEAM_ROLES } = await import("../types");
+  const { sb, user } = await signedInUser();
+  const { data: row } = await sb
+    .from("roster_members")
+    .select("id, roles, status")
+    .eq("team_id", teamId)
+    .eq("user_id", user.id)
+    .in("status", ["active", "inactive"])
+    .maybeSingle();
+  if (!row) return { ok: false, error: "You're not on this team." };
+  const roles = TEAM_ROLES.filter((r) => input.roles.includes(r));
+  const current = TEAM_ROLES.filter((r) => (row.roles ?? []).includes(r));
+  if (roles.join() !== current.join()) return onLive(shared.setMyPart)(teamId, input);
+
+  const jersey = input.isPlayer ? input.jersey?.trim() || null : null;
+  const position = input.isPlayer ? input.position?.trim() || null : null;
+  if (!input.isPlayer && !roles.length) return { ok: false, error: "Check the highlighted fields.", fieldErrors: { roles: "Pick at least one: you play, or a role on the team." } };
+  if (jersey && !/^\d{1,3}$/.test(jersey)) return { ok: false, error: "Check the highlighted fields.", fieldErrors: { jersey: "Use up to 3 digits." } };
+  if (jersey) {
+    const { data: same } = await sb.from("roster_members").select("id").eq("team_id", teamId).eq("jersey", jersey).eq("is_player", true).neq("status", "removed").neq("id", row.id).limit(1);
+    if (same?.length) return { ok: false, error: "Check the highlighted fields.", fieldErrors: { jersey: `Someone already wears ${jersey}.` } };
+  }
+  if (position && position.length > 80) return { ok: false, error: "Pick fewer positions." };
+  const { error } = await sb.rpc("set_my_player_details", { t: teamId, p_is_player: input.isPlayer, p_jersey: jersey ?? "", p_position: position ?? "" });
+  if (error) {
+    console.error("[setMyPart]", error.message);
+    return { ok: false, error: "Couldn't save that. Try again in a minute." };
+  }
+  const { data: r } = await sb.from("roster_members").select("*").eq("id", row.id).single();
+  if (!r) return { ok: false, error: "Saved, but couldn't read it back. Refresh the page." };
+  return {
+    ok: true,
+    data: {
+      id: r.id,
+      teamId: r.team_id,
+      userId: r.user_id,
+      invitedEmail: r.invited_email,
+      invitedName: null,
+      isPlayer: r.is_player,
+      roles: r.roles as import("../types").RosterMember["roles"],
+      jersey: r.jersey,
+      position: r.position,
+      permissions: r.permissions as import("../types").RosterMember["permissions"],
+      status: r.status as import("../types").RosterMember["status"],
+    },
+  };
+}
