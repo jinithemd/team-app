@@ -30,6 +30,14 @@
   --color-live: var(--live);
   --color-on-live: var(--on-live);
   --color-overlay: var(--overlay);
+  --color-ev-training: var(--ev-training);
+  --color-ev-training-soft: var(--ev-training-soft);
+  --color-ev-match: var(--ev-match);
+  --color-ev-match-soft: var(--ev-match-soft);
+  --color-ev-league: var(--ev-league);
+  --color-ev-league-soft: var(--ev-league-soft);
+  --color-ev-tournament: var(--ev-tournament);
+  --color-ev-tournament-soft: var(--ev-tournament-soft);
   --color-team: var(--team);
   --color-on-team: var(--on-team);
   --color-team-ink: var(--team-ink);

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { EventWithMine } from "@/lib/data/types";
 import { DEFAULT_TZ, utcToZoned } from "@/lib/time";
-import { EventCard } from "./event-bits";
+import { EventCard, KIND_DOT, eventKind } from "./event-bits";
 
 /**
  * Month grid with a dot per event; days with events link to the list below the grid.
@@ -51,7 +51,7 @@ export function MonthView({ events, teamId, month }: { events: EventWithMine[]; 
                     <span className={`tabular text-sm ${isToday ? "font-bold" : ""}`}>{day}</span>
                     <span aria-hidden className="flex h-1.5 justify-center gap-0.5">
                       {evs.slice(0, 3).map((e) => (
-                        <span key={e.id} className={`size-1.5 rounded-pill ${e.status === "cancelled" ? "bg-border-input" : "bg-team-ink"}`} />
+                        <span key={e.id} className={`size-1.5 rounded-pill ${e.status === "cancelled" ? "bg-border-input" : (() => { const k = eventKind(e); return k ? KIND_DOT[k] : "bg-team-ink"; })()}`} />
                       ))}
                     </span>
                   </>

@@ -29,15 +29,43 @@ export function StatusBadge({ status }: { status: TeamEvent["status"] | "live" |
   );
 }
 
-export function TypeTag({ e }: { e: Pick<TeamEvent, "type" | "homeAway" | "competition"> }) {
+/*
+ * Every event has a colour by kind, so a list is easy to scan: training, matches, league
+ * matches and tournaments (the tournament itself and its games). Socials and others stay neutral.
+ */
+export type EventKind = "training" | "match" | "league" | "tournament";
+type KindSource = Pick<TeamEvent, "type" | "competition"> & { tournamentId?: string | null };
+export function eventKind(e: KindSource): EventKind | null {
+  if (e.tournamentId || e.type === "tournament") return "tournament";
+  if (e.type === "match") return e.competition === "league" ? "league" : "match";
+  if (e.type === "training") return "training";
+  return null;
+}
+export const KIND_LABEL: Record<EventKind, string> = { training: "Training", match: "Match", league: "League", tournament: "Tournament" };
+// Whole class names, so Tailwind sees them.
+export const KIND_STRIPE: Record<EventKind, string> = { training: "border-l-ev-training", match: "border-l-ev-match", league: "border-l-ev-league", tournament: "border-l-ev-tournament" };
+export const KIND_CHIP: Record<EventKind, string> = {
+  training: "bg-ev-training-soft text-ev-training",
+  match: "bg-ev-match-soft text-ev-match",
+  league: "bg-ev-league-soft text-ev-league",
+  tournament: "bg-ev-tournament-soft text-ev-tournament",
+};
+export const KIND_DOT: Record<EventKind, string> = { training: "bg-ev-training", match: "bg-ev-match", league: "bg-ev-league", tournament: "bg-ev-tournament" };
+
+export function TypeTag({ e, title }: { e: KindSource & Pick<TeamEvent, "homeAway">; title?: string }) {
+  const k = eventKind(e);
+  // No "Training" chip on an event already called Training: the stripe shows the colour.
+  const kind = k && title?.trim().toLowerCase() === KIND_LABEL[k].toLowerCase() ? null : k;
   const labels: string[] = [];
   if (e.type === "match") labels.push(e.homeAway === "away" ? "Away" : e.homeAway === "neutral" ? "Neutral" : "Home");
-  if (e.competition && e.competition !== "league") labels.push(e.competition === "cup" ? "Cup" : "Friendly");
-  if (e.type === "tournament") labels.push("Tournament");
+  if (e.competition && e.competition !== "league" && kind !== "tournament") labels.push(e.competition === "cup" ? "Cup" : "Friendly");
   if (e.type === "social") labels.push("Social");
-  if (!labels.length) return null;
+  if (!labels.length && !kind) return null;
   return (
     <>
+      {kind && (
+        <span className={`rounded-pill px-2 py-0.5 text-[11px] font-bold tracking-[.06em] uppercase ${KIND_CHIP[kind]}`}>{KIND_LABEL[kind]}</span>
+      )}
       {labels.map((l) => (
         <span key={l} className="rounded-pill bg-sunken px-2 py-0.5 text-[11px] font-bold tracking-[.06em] text-muted uppercase">
           {l}
@@ -115,12 +143,13 @@ export function EventCard({ e, showTeam = false, tournament }: { e: EventWithMin
   const today = isToday(e.startAt, e.tz);
   const past = Date.parse(e.endAt) < Date.now();
   const mineLabel = e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : e.mine.unavailable ? "you're marked unavailable" : "no answer yet") : "";
+  const kind = eventKind(e);
   return (
     <Link
       href={`/t/${e.teamId}/e/${e.id}`}
       data-team={showTeam ? e.teamId : undefined}
-      aria-label={`${title}, ${d.dow} ${d.month} ${d.day}, ${formatTimeRange(e.startAt, e.endAt, e.tz)}${cancelled ? ", cancelled" : ""}${mineLabel ? ", " + mineLabel : ""}`}
-      className={`grid ${badge ? "grid-cols-[52px_minmax(0,1fr)_auto]" : "grid-cols-[52px_minmax(0,1fr)]"} gap-3 rounded-lg border p-3.5 shadow-card transition-colors hover:border-border-input focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
+      aria-label={`${title}${kind ? `, ${KIND_LABEL[kind]}` : ""}, ${d.dow} ${d.month} ${d.day}, ${formatTimeRange(e.startAt, e.endAt, e.tz)}${cancelled ? ", cancelled" : ""}${mineLabel ? ", " + mineLabel : ""}`}
+      className={`grid ${badge ? "grid-cols-[52px_minmax(0,1fr)_auto]" : "grid-cols-[52px_minmax(0,1fr)]"} gap-3 rounded-lg border border-l-4 p-3.5 shadow-card transition-colors ${kind ? KIND_STRIPE[kind] : ""} hover:border-border-input focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
         today && !cancelled ? "border-transparent bg-team-soft" : "border-border bg-bg"
       } ${past ? "opacity-75" : ""}`}
     >
@@ -134,7 +163,7 @@ export function EventCard({ e, showTeam = false, tournament }: { e: EventWithMin
           <h3 className={`min-w-0 text-base leading-[22px] font-semibold break-words ${cancelled ? "text-muted line-through" : ""}`}>
             {title}
           </h3>
-          <TypeTag e={e} />
+          <TypeTag e={e} title={title} />
           <StatusBadge status={e.status} />
           <ScoreBadge score={e.score} />
         </div>
@@ -206,6 +235,20 @@ export function Counts({ counts }: { counts: { going: number; maybe: number; not
       {items.map(([k, label, cls]) => (
         <li key={k} className={`rounded-pill px-3 py-1.5 text-sm font-semibold tabular ${cls}`}>
           {counts[k]} {label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** What the colours mean, above a list or calendar. */
+export function KindLegend() {
+  return (
+    <ul aria-label="Event colours" className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+      {(Object.keys(KIND_LABEL) as EventKind[]).map((k) => (
+        <li key={k} className="inline-flex items-center gap-1.5">
+          <span aria-hidden className={`size-2.5 rounded-pill ${KIND_DOT[k]}`} />
+          {KIND_LABEL[k]}
         </li>
       ))}
     </ul>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { CalendarDays } from "lucide-react";
 import { listMyTeams, listUpcomingForMe } from "@/lib/data";
-import { ScheduleList } from "@/components/event-bits";
+import { KindLegend, ScheduleList } from "@/components/event-bits";
 import { tournamentBadges } from "@/lib/tournaments/service";
 import { EmptyState, PageHeader } from "@/components/ui";
 
@@ -39,7 +39,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         </nav>
       )}
       {filtered.length ? (
-        <ScheduleList events={filtered} showTeam={teams.length > 1} tournaments={tBadges} />
+        <>
+          <KindLegend />
+          <ScheduleList events={filtered} showTeam={teams.length > 1} tournaments={tBadges} />
+        </>
       ) : (
         <EmptyState icon={<CalendarDays />} title="Nothing coming up" hint="Games, trainings and events from all your teams show up here." />
       )}

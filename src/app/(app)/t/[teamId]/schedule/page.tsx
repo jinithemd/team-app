@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CalendarPlus, Plus } from "lucide-react";
 import { getTeam, listEvents, listPastEvents, listTeamSponsors, myPerms } from "@/lib/data";
 import { SponsorStrip } from "@/components/sponsor-badge";
-import { EventCard, ScheduleList } from "@/components/event-bits";
+import { EventCard, KindLegend, ScheduleList } from "@/components/event-bits";
 import { tournamentBadges } from "@/lib/tournaments/service";
 import { Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { MonthView } from "@/components/month-view";
@@ -65,10 +65,11 @@ export default async function SchedulePage({
             )
           }
         />
-      ) : view === "list" ? (
-        <ScheduleList events={events} tournaments={tBadges} />
       ) : (
-        <MonthView events={events} teamId={teamId} />
+        <>
+          <KindLegend />
+          {view === "list" ? <ScheduleList events={events} tournaments={tBadges} /> : <MonthView events={events} teamId={teamId} />}
+        </>
       )}
 
       {view === "list" && past.length > 0 && (
