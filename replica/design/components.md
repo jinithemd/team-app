@@ -372,3 +372,16 @@ ScoreEntry
   a11y      inputs labelled with team names, steppers are buttons with labels
   used on   T5
 ```
+
+## Home header (S02, 2026-10-26)
+
+```
+Home header
+  layout    avatar 64px (links to Account) + name in display type + one status line; no big greeting headline
+  status    1) pending answers: warning-soft pill "N events need your answer", links to the Needs your answer section
+            2) else the next event: "Next: <title> · today 5:30 pm" (links to the event)
+            3) else "Nothing on your schedule yet"
+  extras    "Add your photo" link while the person has no photo
+  tokens    avatar bg team / initials on-team; pill bg warning-soft, icon warning, text fg; name font display 2xl
+  a11y      visually hidden h1 "Home"; avatar link labelled "Your account and photo"
+```

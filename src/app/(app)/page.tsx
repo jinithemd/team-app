@@ -9,6 +9,9 @@ import { ButtonLink, EmptyState, SectionTitle } from "@/components/ui";
 import { hatLabels } from "@/lib/data/types";
 import { TeamCrest } from "@/components/ui";
 import { crestUrl } from "@/lib/images";
+import { photoUrl } from "@/lib/data/store";
+import { Avatar } from "@/components/ui";
+import { formatTime, isToday } from "@/lib/time";
 import { tournamentBadges } from "@/lib/tournaments/service";
 
 export const metadata: Metadata = { title: "Home" };
@@ -24,15 +27,35 @@ export default async function HomePage() {
   const staffTeams = teams.filter((t) => t.isStaff);
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl gap-7 py-6">
-      <header>
-        <p className="text-sm text-muted">Hi {user!.firstName}</p>
-        <h1 className="text-xl font-bold">
-          {pending.length
-            ? `${pending.length} ${pending.length === 1 ? "event needs" : "events need"} your answer`
-            : upcoming.length
-              ? "You're all caught up"
-              : "Welcome"}
-        </h1>
+      {/* Who's signed in and the one thing worth knowing right now: what needs an answer, or what's next. */}
+      <header className="flex items-center gap-3.5">
+        <h1 className="sr-only">Home</h1>
+        <Link href="/account" aria-label="Your account and photo" className="shrink-0 rounded-pill focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">
+          <Avatar name={`${user.firstName} ${user.lastName}`} size={64} src={photoUrl(user)} />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-display text-2xl leading-tight font-bold uppercase">Hi {user.firstName}</p>
+          {pending.length > 0 ? (
+            <a href="#pending-h" className="mt-1 inline-flex min-h-8 items-center gap-1.5 rounded-pill bg-warning-soft px-3 text-sm font-semibold text-fg">
+              <AlertCircle aria-hidden className="size-4 text-warning" />
+              {pending.length} {pending.length === 1 ? "event needs" : "events need"} your answer
+            </a>
+          ) : upcoming[0] ? (
+            <Link href={`/t/${upcoming[0].teamId}/e/${upcoming[0].id}`} className="mt-0.5 block truncate text-sm text-muted">
+              Next: <span className="font-semibold text-fg">{upcoming[0].title || (upcoming[0].opponent ? `vs ${upcoming[0].opponent}` : "Event")}</span> ·{" "}
+              {isToday(upcoming[0].startAt, upcoming[0].tz)
+                ? `today ${formatTime(upcoming[0].startAt, upcoming[0].tz)}`
+                : new Intl.DateTimeFormat("en-CA", { timeZone: upcoming[0].tz, weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(upcoming[0].startAt))}
+            </Link>
+          ) : (
+            <p className="mt-0.5 text-sm text-muted">Nothing on your schedule yet</p>
+          )}
+          {!user.photoMaybe && (
+            <Link href="/account" className="mt-0.5 block text-xs font-semibold text-team-ink">
+              Add your photo
+            </Link>
+          )}
+        </div>
       </header>
 
       {sponsorships.length > 0 && (
