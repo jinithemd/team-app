@@ -71,6 +71,9 @@ with sync_playwright() as pw:
     # Two from the team, numbers filled in from their team profile (or typed).
     p.get_by_text("Add from your team").click()
     picks = p.locator("input[name='pick']")
+    box = p.locator("input[name^='jersey_']").first.bounding_box()
+    assert box["width"] < 80, f"number box too wide: {box['width']}"
+    p.locator("details", has_text="Add from your team").screenshot(path=f"{SHOTS}/roster-pick.png")
     assert picks.count() >= 2, picks.count()
     for i in range(2):
         picks.nth(i).check()

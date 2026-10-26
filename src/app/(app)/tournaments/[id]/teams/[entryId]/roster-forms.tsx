@@ -97,7 +97,9 @@ export function PickFromTeam({ id, entryId, players, room }: { id: string; entry
                 <label className="sr-only" htmlFor={`pick-j-${uid}`}>
                   Number for {p.name}
                 </label>
-                <input id={`pick-j-${uid}`} name={`jersey_${uid}`} defaultValue={p.jersey ?? ""} placeholder="#" inputMode="numeric" maxLength={3} className={`${inputClass} h-10 w-16 px-2 text-center`} />
+                <span className="w-16 shrink-0">
+                  <input id={`pick-j-${uid}`} name={`jersey_${uid}`} defaultValue={p.jersey ?? ""} placeholder="#" inputMode="numeric" maxLength={3} className={`${inputClass} h-10 px-2 text-center`} />
+                </span>
               </li>
             );
           })}

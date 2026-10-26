@@ -249,11 +249,12 @@ export function SeedingEditor({ id, rows, groups, groupCount, clubName }: { id: 
                 <label className="flex items-center gap-1.5 text-xs text-muted">
                   <span className="sr-only">Keep {r.name} apart, set</span>
                   <span aria-hidden>Apart</span>
+                  <span className="w-16 shrink-0">
                   <select
                     name={`apart_${r.id}`}
                     value={r.apartSet ?? ""}
                     onChange={(e) => setApart(r.id, e.target.value ? Number(e.target.value) : null)}
-                    className={`${inputClass} h-10 w-16 px-2 py-0 text-sm`}
+                    className={`${inputClass} h-10 px-2 py-0 text-sm`}
                   >
                     <option value="">—</option>
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
@@ -262,6 +263,7 @@ export function SeedingEditor({ id, rows, groups, groupCount, clubName }: { id: 
                       </option>
                     ))}
                   </select>
+                  </span>
                 </label>
               )}
               <span className="flex gap-1">
