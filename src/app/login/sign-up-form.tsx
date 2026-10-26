@@ -13,7 +13,7 @@ export function CheckEmail({ email, next }: { email: string; next?: string }) {
       <div role="status" className="grid gap-1">
         <p className="font-semibold">Check your email</p>
         <p className="text-sm">
-          We sent a sign-in email to <span className="font-semibold break-all">{email}</span>. Tap the button in it on any phone or computer, or type the 6-digit code here.
+          We sent a sign-in email to <span className="font-semibold break-all">{email}</span>. Tap the button in it on any phone or computer, or type the code from it here.
         </p>
       </div>
       <form action={action} className="grid gap-2" noValidate>
@@ -24,9 +24,9 @@ export function CheckEmail({ email, next }: { email: string; next?: string }) {
             inputMode="numeric"
             autoComplete="one-time-code"
             pattern="[0-9]*"
-            maxLength={6}
-            placeholder="123456"
-            className="text-center font-display text-2xl tracking-[0.4em]"
+            maxLength={12}
+            placeholder="Code"
+            className="text-center font-display text-2xl tracking-[0.2em]"
             error={state?.fieldErrors?.code}
           />
         </Field>

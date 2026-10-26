@@ -17,7 +17,7 @@ export type LinkResult = { ok: true; email: string } | { ok: false; error: strin
  * Sign-in emails are made here and sent through Resend, not by Supabase's own mailer.
  * The link carries a token hash that the server swaps for a session (/auth/callback), so it
  * works in any browser or app, on any device: the old link needed the browser that asked for
- * it, and failed when opened from a mail app. The email also has a 6-digit code to type in
+ * it, and failed when opened from a mail app. The email also has a code (6-10 digits) to type in
  * on the page that asked for it.
  */
 async function throttle(email: string): Promise<boolean> {
@@ -98,11 +98,11 @@ export async function sendSignInLink(input: { email: string; firstName?: string;
   return { ok: true, email };
 }
 
-/** The 6-digit code from the email, typed on the page that asked for it. */
+/** The code from the email (6-10 digits, as the project is set), typed on the page that asked for it. */
 export async function verifySignInCode(emailRaw: string, codeRaw: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const email = norm(emailRaw);
   const token = codeRaw.replace(/\D/g, "");
-  if (!EMAIL_RE.test(email) || token.length !== 6) return { ok: false, error: "Enter the 6-digit code from the email." };
+  if (!EMAIL_RE.test(email) || token.length < 6 || token.length > 10) return { ok: false, error: "Enter the code from the email." };
   const sb = await userClient();
   for (const type of ["email", "magiclink"] as const) {
     const { error } = await sb.auth.verifyOtp({ email, token, type });
