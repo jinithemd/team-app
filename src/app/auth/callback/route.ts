@@ -11,11 +11,23 @@ export async function GET(req: NextRequest) {
   const tokenHash = url.searchParams.get("token_hash");
   const type = url.searchParams.get("type") as EmailOtpType | null;
   const sb = await userClient();
-  const { error } = code
-    ? await sb.auth.exchangeCodeForSession(code)
-    : tokenHash && type
-      ? await sb.auth.verifyOtp({ token_hash: tokenHash, type })
-      : { error: new Error("missing code") };
-  if (error) return NextResponse.redirect(new URL(`/login?expired=1&next=${encodeURIComponent(next)}`, url.origin));
+  let error: { message: string } | null = new Error("missing code");
+  if (tokenHash) {
+    // Our own sign-in emails: works in any browser. Try the link's type, then the general one.
+    for (const t of [...new Set([type, "email", "magiclink", "signup"].filter(Boolean))] as EmailOtpType[]) {
+      ({ error } = await sb.auth.verifyOtp({ token_hash: tokenHash, type: t }));
+      if (!error) break;
+    }
+  } else if (code) {
+    // Google sign-in (and older email links, which need the browser that asked for them).
+    ({ error } = await sb.auth.exchangeCodeForSession(code));
+  }
+  if (error) {
+    console.error("[auth] callback:", error.message);
+    // Already signed in (a second tap on the same link, or a mail app opening it twice): carry on.
+    const { data } = await sb.auth.getUser();
+    if (data.user) return NextResponse.redirect(new URL(next, url.origin));
+    return NextResponse.redirect(new URL(`/login?expired=1&next=${encodeURIComponent(next)}`, url.origin));
+  }
   return NextResponse.redirect(new URL(next, url.origin));
 }

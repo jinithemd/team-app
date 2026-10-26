@@ -1,19 +1,40 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { signInLinkAction, signUpAction, type FormState } from "../actions";
+import { signInLinkAction, signUpAction, verifyCodeAction, type FormState } from "../actions";
 import { Field, Input, buttonClass } from "@/components/ui";
 import { MIN_AGE } from "@/lib/brand";
 
-/** After an email link is sent (live build). */
-export function CheckEmail({ email }: { email: string }) {
+/** After a sign-in email is sent (live build): tap the link, or type the code here. */
+export function CheckEmail({ email, next }: { email: string; next?: string }) {
+  const [state, action, pending] = useActionState<FormState, FormData>(verifyCodeAction.bind(null, email, next ?? "/"), null);
   return (
-    <div role="status" className="grid gap-1 rounded-md bg-surface p-3.5">
-      <p className="font-semibold">Check your email</p>
-      <p className="text-sm">
-        We sent a sign-in link to <span className="font-semibold break-all">{email}</span>. Open it on this device. It works once, within an hour.
-      </p>
-      <p className="text-xs text-muted">Nothing there? Check spam, or wait a minute and try again.</p>
+    <div className="grid gap-3 rounded-md bg-surface p-3.5">
+      <div role="status" className="grid gap-1">
+        <p className="font-semibold">Check your email</p>
+        <p className="text-sm">
+          We sent a sign-in email to <span className="font-semibold break-all">{email}</span>. Tap the button in it on any phone or computer, or type the 6-digit code here.
+        </p>
+      </div>
+      <form action={action} className="grid gap-2" noValidate>
+        <Field id="signin-code" label="Code from the email" error={state?.fieldErrors?.code}>
+          <Input
+            id="signin-code"
+            name="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="[0-9]*"
+            maxLength={6}
+            placeholder="123456"
+            className="text-center font-display text-2xl tracking-[0.4em]"
+            error={state?.fieldErrors?.code}
+          />
+        </Field>
+        <button className={buttonClass("primary", "lg", "w-full")} disabled={pending} aria-busy={pending}>
+          {pending ? "Checking…" : "Sign in with the code"}
+        </button>
+      </form>
+      <p className="text-xs text-muted">Nothing there? Check spam, or wait a minute and try again. The link and code work once, within an hour.</p>
     </div>
   );
 }
@@ -22,7 +43,7 @@ export function CheckEmail({ email }: { email: string }) {
 export function SignInForm({ next }: { next?: string }) {
   const [state, action, pending] = useActionState<FormState, FormData>(signInLinkAction, null);
   const fe = state?.fieldErrors ?? {};
-  if (state?.ok && state.message) return <CheckEmail email={state.message} />;
+  if (state?.ok && state.message) return <CheckEmail email={state.message} next={next} />;
   return (
     <form action={action} className="grid gap-3" noValidate>
       {next && <input type="hidden" name="next" value={next} />}
@@ -46,7 +67,7 @@ export function SignUpForm({ next }: { next?: string }) {
   // Checked here first so a missed tick doesn't submit (and clear) what they typed. The server checks again.
   const [agreeError, setAgreeError] = useState<string>();
   const fe: Record<string, string> = { ...(state?.fieldErrors ?? {}), ...(agreeError ? { agree: agreeError } : {}) };
-  if (state?.ok && state.message) return <CheckEmail email={state.message} />;
+  if (state?.ok && state.message) return <CheckEmail email={state.message} next={next} />;
   return (
     <form
       action={action}

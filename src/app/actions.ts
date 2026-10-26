@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import * as data from "@/lib/data";
 import type { ActionResult, RsvpResponse } from "@/lib/data/types";
 import { LIVE } from "@/lib/mode";
-import { googleSignInUrl, safeNext, sendSignInLink } from "@/lib/auth";
+import { googleSignInUrl, safeNext, sendSignInLink, verifySignInCode } from "@/lib/auth";
 
 // Thin server-action wrappers. Permission checks live in the data layer (and in RLS later).
 
@@ -40,6 +40,14 @@ export async function signUpAction(_: FormState, f: FormData): Promise<FormState
 export async function signInLinkAction(_: FormState, f: FormData): Promise<FormState> {
   const r = await sendSignInLink({ email: str(f, "email"), next: str(f, "next"), create: false });
   return r.ok ? { ok: true, message: r.email } : { error: r.error, fieldErrors: r.fieldErrors };
+}
+
+/** Live build: the 6-digit code from the sign-in email. */
+export async function verifyCodeAction(email: string, next: string, _: FormState, f: FormData): Promise<FormState> {
+  const r = await verifySignInCode(email, str(f, "code"));
+  if (!r.ok) return { error: r.error, fieldErrors: { code: r.error } };
+  revalidatePath("/", "layout");
+  redirect(safeNext(next));
 }
 
 export async function googleSignInAction(f: FormData) {

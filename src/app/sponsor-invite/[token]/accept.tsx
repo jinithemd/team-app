@@ -7,7 +7,7 @@ import { CheckEmail } from "@/app/login/sign-up-form";
 
 export function AcceptSponsor({ token, email, hasAccount }: { token: string; email: string; hasAccount: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(acceptSponsorInviteAction.bind(null, token), null);
-  if (state?.ok && state.message) return <CheckEmail email={state.message} />;
+  if (state?.ok && state.message) return <CheckEmail email={state.message} next={`/sponsor-invite/${token}`} />;
   return (
     <form action={action} className="grid gap-4 rounded-lg border border-border bg-bg p-4" noValidate>
       <p className="text-sm">

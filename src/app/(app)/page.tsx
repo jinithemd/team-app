@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AlertCircle, CalendarPlus, ChevronRight, Plus, Users } from "lucide-react";
 import { getSessionUser, listMyAvailability, listMyTeams, listPendingRsvps, listUpcomingForMe, mySponsorships } from "@/lib/data";
 import { SponsorMark, TierBadge } from "@/components/sponsor-badge";
@@ -12,7 +13,10 @@ import { crestUrl } from "@/lib/images";
 export const metadata: Metadata = { title: "Home" };
 
 export default async function HomePage() {
-  const [user, teams, upcoming, pending, avail, sponsorships] = await Promise.all([getSessionUser(), listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability(), mySponsorships()]);
+  // Signed out (or the session ran out): straight to sign-in, before anything that needs an account.
+  const user = await getSessionUser();
+  if (!user) redirect("/login");
+  const [teams, upcoming, pending, avail, sponsorships] = await Promise.all([listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability(), mySponsorships()]);
   const out = avail.periods[0];
   const fmtDay = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(d + "T12:00:00Z"));
   const staffTeams = teams.filter((t) => t.isStaff);

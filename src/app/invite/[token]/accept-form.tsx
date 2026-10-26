@@ -7,7 +7,7 @@ import { CheckEmail } from "@/app/login/sign-up-form";
 
 export function AcceptForm({ token, email, hasAccount, signedInAsOther }: { token: string; email: string; hasAccount: boolean; signedInAsOther: boolean }) {
   const [state, action, pending] = useActionState<FormState, FormData>(acceptInviteAction.bind(null, token), null);
-  if (state?.ok && state.message) return <CheckEmail email={state.message} />;
+  if (state?.ok && state.message) return <CheckEmail email={state.message} next={`/invite/${token}`} />;
   return (
     <form action={action} className="grid gap-4 rounded-lg border border-border bg-bg p-4" noValidate>
       <p className="text-sm">
