@@ -1,8 +1,0 @@
-{
-  "/login/page": "app/login/page.js",
-  "/tournament/[slug]/page": "app/tournament/[slug]/page.js",
-  "/(app)/page": "app/(app)/page.js",
-  "/(app)/tournaments/new/page": "app/(app)/tournaments/new/page.js",
-  "/(app)/tournaments/[id]/teams/page": "app/(app)/tournaments/[id]/teams/page.js",
-  "/(app)/tournaments/[id]/page": "app/(app)/tournaments/[id]/page.js"
-}
