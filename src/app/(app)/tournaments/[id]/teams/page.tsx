@@ -3,7 +3,7 @@ import { Search } from "lucide-react";
 import { searchTeams } from "@/lib/data";
 import { getTournament } from "@/lib/tournaments/service";
 import { Banner, TeamCrest, buttonClass, inputClass } from "@/components/ui";
-import { SeededTeams, money } from "@/components/tournament/bits";
+import { FeeSummary, SeededTeams, money } from "@/components/tournament/bits";
 import { EntryControls, FixtureMaker, GuestForm, InviteButton, SeedingEditor } from "./manage-teams";
 
 const STATUS: Record<string, string> = {
@@ -86,6 +86,8 @@ export default async function TeamsTab({ params, searchParams }: { params: Promi
         </section>
       )}
 
+      {t.feeCents > 0 && accepted > 0 && <FeeSummary entries={acceptedList} fee={money(t.feeCents, t.currency)} payTo={t.payTo} />}
+
       <section aria-labelledby="list-h" className="grid gap-2">
         <h2 id="list-h" className="flex items-baseline justify-between gap-2 text-lg font-semibold">
           Teams
@@ -94,7 +96,7 @@ export default async function TeamsTab({ params, searchParams }: { params: Promi
           </span>
         </h2>
         {shown.length === 0 && <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted">No teams yet.</p>}
-        {!org && shown.length > 0 && <SeededTeams entries={acceptedList} groups={groups} />}
+        {!org && shown.length > 0 && <SeededTeams entries={acceptedList} groups={groups} showPaid={t.feeCents > 0} />}
         {org && (
           <ul className="grid gap-2">
             {shown.map((e) => (
@@ -160,7 +162,7 @@ export default async function TeamsTab({ params, searchParams }: { params: Promi
             Seeding
           </h2>
           <p className="text-sm text-muted">Locked because fixtures are made. Clear the fixtures to change it.</p>
-          <SeededTeams entries={acceptedList} groups={groups} />
+          <SeededTeams entries={acceptedList} groups={groups} showPaid={t.feeCents > 0} />
         </section>
       )}
 

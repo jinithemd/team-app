@@ -302,7 +302,7 @@ export function ChampionBanner({ entry }: { entry: EntryView | undefined }) {
 }
 
 /** Accepted teams in seed order, with seeds, groups and keep-apart sets, for everyone to see. */
-export function SeededTeams({ entries, groups }: { entries: EntryView[]; groups: boolean }) {
+export function SeededTeams({ entries, groups, showPaid = false }: { entries: EntryView[]; groups: boolean; showPaid?: boolean }) {
   const list = [...entries].sort((a, b) => (a.seed ?? 1e9) - (b.seed ?? 1e9) || a.createdAt.localeCompare(b.createdAt));
   const seeded = list.some((e) => e.seed != null);
   const sets = [...new Set(list.map((e) => e.apartSet).filter((x): x is number => x != null))].sort((a, b) => a - b);
@@ -324,7 +324,10 @@ export function SeededTeams({ entries, groups }: { entries: EntryView[]; groups:
                 <span className="block text-xs text-muted">{[e.hostClub ? "Host club" : null, groups && e.apartSet != null ? `Kept apart · set ${e.apartSet}` : null].filter(Boolean).join(" · ")}</span>
               )}
             </span>
-            {e.groupLabel && <span className="text-xs font-semibold text-muted">Group {e.groupLabel}</span>}
+            <span className="grid shrink-0 justify-items-end gap-0.5 text-xs font-semibold">
+              {e.groupLabel && <span className="text-muted">Group {e.groupLabel}</span>}
+              {showPaid && <span className={e.paid ? "text-success" : "text-muted"}>{e.paid ? "Paid" : "Not paid"}</span>}
+            </span>
           </li>
         ))}
       </ol>
@@ -339,5 +342,55 @@ export function SeededTeams({ entries, groups }: { entries: EntryView[]; groups:
         </div>
       )}
     </div>
+  );
+}
+
+/** Who has paid the entry fee and who hasn't (fees are paid outside the app; the host ticks them off). */
+export function FeeSummary({ entries, fee, payTo }: { entries: EntryView[]; fee: string; payTo?: string | null }) {
+  const paid = entries.filter((e) => e.paid).sort((a, b) => a.name.localeCompare(b.name));
+  const unpaid = entries.filter((e) => !e.paid).sort((a, b) => a.name.localeCompare(b.name));
+  const col = (title: string, list: EntryView[], tone: string, mark: string) => (
+    <div className="grid content-start gap-1.5">
+      <h3 className={`text-sm font-semibold ${tone}`}>
+        {title} ({list.length})
+      </h3>
+      {list.length === 0 ? (
+        <p className="text-sm text-muted">None</p>
+      ) : (
+        <ul className="grid gap-1.5">
+          {list.map((e) => (
+            <li key={e.id} className="flex items-center gap-2 text-sm">
+              <span aria-hidden className={`grid size-5 shrink-0 place-items-center rounded-full text-xs font-bold ${tone === "text-success" ? "bg-success text-on-success" : "bg-sunken text-muted"}`}>
+                {mark}
+              </span>
+              <span className="min-w-0 break-words">{e.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+  const pct = entries.length ? Math.round((paid.length / entries.length) * 100) : 0;
+  return (
+    <section id="fees" aria-labelledby="fee-h" className="grid gap-3 rounded-lg border border-border p-4">
+      <div className="grid gap-1">
+        <h2 id="fee-h" className="flex items-baseline justify-between gap-2 text-lg font-semibold">
+          Entry fees
+          <span className="text-sm font-normal text-muted">
+            {paid.length} of {entries.length} paid
+          </span>
+        </h2>
+        <p className="text-xs text-muted">
+          {fee} per team, paid to the host outside the app{payTo ? ` (${payTo})` : ""}. The host marks each team once it&apos;s paid.
+        </p>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-label="Teams paid" aria-valuemin={0} aria-valuemax={entries.length} aria-valuenow={paid.length}>
+        <div className="h-full rounded-full bg-success" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        {col("Paid", paid, "text-success", "✓")}
+        {col("Not paid", unpaid, "text-fg", "–")}
+      </div>
+    </section>
   );
 }
