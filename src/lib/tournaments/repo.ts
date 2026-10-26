@@ -1,5 +1,5 @@
 import "server-only";
-import type { Entry, Match, MatchEvent, Official, OfficialRole, Tournament } from "./types";
+import type { Entry, Match, MatchEvent, Official, OfficialRole, RosterPerson, Tournament } from "./types";
 
 /*
  * Storage for tournaments. Two implementations with the same shape: the sample build keeps
@@ -54,4 +54,15 @@ export interface Repo {
   respondInvite(entryId: string, accept: boolean): Promise<void>;
   apply(tid: string, teamId: string): Promise<void>;
   withdraw(entryId: string): Promise<void>;
+
+  /** Organizers, officials and members of teams in it: who may see the rosters. */
+  isParticipant(t: Tournament): Promise<boolean>;
+  roster(tid: string): Promise<RosterPerson[]>;
+  insertRosterPerson(p: Pick<RosterPerson, "tournamentId" | "entryId" | "role" | "name" | "jersey" | "userId">): Promise<void>;
+  updateRosterPerson(id: string, patch: Pick<RosterPerson, "name" | "jersey">): Promise<void>;
+  /** Before submission it's deleted; after, it stays on the roster marked "removed". */
+  deleteRosterPerson(id: string): Promise<void>;
+  submitRoster(entryId: string): Promise<void>;
+  /** Players on a Clbx team, to pick from. */
+  teamPlayers(teamId: string): Promise<{ userId: string | null; name: string; jersey: number | null }[]>;
 }

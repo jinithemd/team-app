@@ -2,7 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { clubRoleFor, currentUserId, db, isTeamMember, isTeamStaff, teamById } from "../data/store";
 import type { Repo, TeamRef } from "./repo";
-import type { Entry, Match, MatchEvent, Official, OfficialRole, Tournament } from "./types";
+import type { Entry, Match, MatchEvent, Official, OfficialRole, RosterPerson, Tournament } from "./types";
 
 // Sample build: tournaments kept in memory next to the sample store (gone on restart).
 
@@ -13,6 +13,7 @@ interface Mem {
   matches: Match[];
   events: MatchEvent[];
   officials: { tournamentId: string; userId: string; role: OfficialRole }[];
+  roster?: RosterPerson[];
 }
 const g = globalThis as unknown as { __clbxTournaments?: Mem };
 const mem = (g.__clbxTournaments ??= { tournaments: [], entries: [], contacts: {}, matches: [], events: [], officials: [] });
@@ -188,7 +189,7 @@ export const memoryRepo: Repo = {
       if (["declined", "withdrawn"].includes(existing.status)) existing.status = "applied";
       return;
     }
-    mem.entries.push({ id: randomUUID(), tournamentId: tid, teamId, name: teamById(teamId)!.name, status: "applied", paid: false, groupLabel: null, seed: null, apartSet: null, createdAt: now() });
+    mem.entries.push({ id: randomUUID(), tournamentId: tid, teamId, name: teamById(teamId)!.name, status: "applied", paid: false, groupLabel: null, seed: null, apartSet: null, rosterSubmittedAt: null, createdAt: now() });
   },
   async withdraw(entryId) {
     const uid = await me();
@@ -196,4 +197,62 @@ export const memoryRepo: Repo = {
     if (!e?.teamId || !uid || !isTeamStaff(uid, e.teamId)) throw new Error("Only the team's captains and managers can do this.");
     e.status = "withdrawn";
   },
+
+  async isParticipant(t) {
+    const uid = await me();
+    return officialOf(uid, t) || mem.entries.some((e) => e.tournamentId === t.id && e.status === "accepted" && e.teamId && uid && isTeamMember(uid, e.teamId));
+  },
+  async roster(tid) {
+    return rosterList().filter((p) => p.tournamentId === tid).map((p) => ({ ...p }));
+  },
+  // The same marks the database trigger sets in the live build.
+  async insertRosterPerson(p) {
+    const e = mem.entries.find((x) => x.id === p.entryId)!;
+    const t = mem.tournaments.find((x) => x.id === e.tournamentId)!;
+    const active = rosterList().filter((x) => x.entryId === p.entryId && x.hostChange !== "removed");
+    if (p.role === "player" && t.rosterMax != null && active.filter((x) => x.role === "player").length >= t.rosterMax) throw new Error(`This tournament allows ${t.rosterMax} players per team.`);
+    const sub = !!e.rosterSubmittedAt;
+    rosterList().push({ ...p, id: randomUUID(), hostChange: sub ? "added" : null, hostChangedAt: sub ? now() : null, prevName: null, prevJersey: null, createdAt: now() });
+  },
+  async updateRosterPerson(id, patch) {
+    const r = rosterList().find((x) => x.id === id)!;
+    const e = mem.entries.find((x) => x.id === r.entryId)!;
+    if (r.name === patch.name && r.jersey === patch.jersey) return;
+    if (e.rosterSubmittedAt) {
+      if (r.hostChange === "removed") throw new Error("This person was removed from the roster.");
+      if (!r.hostChange) Object.assign(r, { prevName: r.name, prevJersey: r.jersey });
+      r.hostChange = r.hostChange === "added" ? "added" : "edited";
+      r.hostChangedAt = now();
+    }
+    Object.assign(r, patch);
+  },
+  async deleteRosterPerson(id) {
+    const r = rosterList().find((x) => x.id === id);
+    if (!r) return;
+    const e = mem.entries.find((x) => x.id === r.entryId)!;
+    if (!e.rosterSubmittedAt) {
+      mem.roster = rosterList().filter((x) => x.id !== id);
+      return;
+    }
+    if (r.hostChange === "removed") return;
+    Object.assign(r, { prevName: r.prevName ?? r.name, prevJersey: r.prevJersey ?? r.jersey, hostChange: "removed", hostChangedAt: now() });
+  },
+  async submitRoster(entryId) {
+    const e = mem.entries.find((x) => x.id === entryId)!;
+    if (e.rosterSubmittedAt) throw new Error("This roster is already submitted.");
+    e.rosterSubmittedAt = now();
+  },
+  async teamPlayers(teamId) {
+    return db.roster
+      .filter((r) => r.teamId === teamId && r.isPlayer && r.status === "active" && r.userId)
+      .map((r) => {
+        const p = db.profiles.find((x) => x.id === r.userId);
+        const j = r.jersey?.trim();
+        return { userId: r.userId, name: p ? `${p.firstName} ${p.lastName}` : "Player", jersey: j && /^\d{1,3}$/.test(j) ? Number(j) : null };
+      });
+  },
 };
+
+function rosterList(): RosterPerson[] {
+  return (mem.roster ??= []);
+}

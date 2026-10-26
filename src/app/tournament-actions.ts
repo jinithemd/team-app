@@ -39,6 +39,10 @@ function input(f: FormData): svc.TournamentInput {
     pointsLoss: str(f, "pointsLoss"),
     isPublic: str(f, "isPublic") === "on",
     registrationOpen: str(f, "registrationOpen") === "on",
+    rosterMax: str(f, "rosterMax"),
+    rosterMin: str(f, "rosterMin"),
+    rosterRules: str(f, "rosterRules"),
+    rosterDeadline: str(f, "rosterDeadline"),
   };
 }
 
@@ -196,4 +200,50 @@ export async function clubFromTeamAction(teamId: string): Promise<FormState> {
   if (!res.ok) return { error: res.error };
   revalidatePath("/", "layout");
   redirect("/tournaments/new?club=1");
+}
+
+// ---------- rosters ----------
+
+const rosterPath = (id: string, entryId: string) => `/tournaments/${id}/teams/${entryId}`;
+
+export async function addRosterPersonAction(id: string, entryId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await svc.addRosterPeople(id, entryId, [{ role: str(f, "role") || "player", name: str(f, "name"), jersey: str(f, "jersey") }]);
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(rosterPath(id, entryId));
+  refresh(id);
+  return { ok: true, message: `Added ${str(f, "name").trim()}.` };
+}
+
+export async function addFromTeamAction(id: string, entryId: string, _: FormState, f: FormData): Promise<FormState> {
+  const picks = f.getAll("pick").map(String);
+  if (!picks.length) return { error: "Tick the players to add." };
+  const people = picks.map((uid) => ({ role: "player", userId: uid, name: str(f, `name_${uid}`), jersey: str(f, `jersey_${uid}`) }));
+  const res = await svc.addRosterPeople(id, entryId, people);
+  revalidatePath(rosterPath(id, entryId));
+  refresh(id);
+  if (!res.ok) return { error: res.error };
+  return { ok: true, message: `Added ${res.data.added} player${res.data.added === 1 ? "" : "s"}.` };
+}
+
+export async function editRosterPersonAction(id: string, entryId: string, personId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await svc.editRosterPerson(id, entryId, personId, { name: str(f, "name"), jersey: str(f, "jersey") });
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(rosterPath(id, entryId));
+  return { ok: true, message: "Saved." };
+}
+
+export async function removeRosterPersonAction(id: string, entryId: string, personId: string): Promise<FormState> {
+  const res = await svc.removeRosterPerson(id, entryId, personId);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(rosterPath(id, entryId));
+  refresh(id);
+  return { ok: true };
+}
+
+export async function submitRosterAction(id: string, entryId: string, _: FormState, f: FormData): Promise<FormState> {
+  const res = await svc.submitRoster(id, entryId, str(f, "confirm") === "on");
+  if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  revalidatePath(rosterPath(id, entryId));
+  refresh(id);
+  return { ok: true, message: "Roster submitted." };
 }

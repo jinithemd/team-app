@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
-import { Search } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, ClipboardList, Search } from "lucide-react";
 import { searchTeams } from "@/lib/data";
-import { getTournament } from "@/lib/tournaments/service";
+import { getTournament, rosterStatuses } from "@/lib/tournaments/service";
 import { Banner, TeamCrest, buttonClass, inputClass } from "@/components/ui";
 import { FeeSummary, SeededTeams, money } from "@/components/tournament/bits";
 import { EntryControls, FixtureMaker, GuestForm, InviteButton, SeedingEditor } from "./manage-teams";
@@ -35,6 +36,9 @@ export default async function TeamsTab({ params, searchParams }: { params: Promi
   const groups = t.format === "groups_knockout";
   const seedSorted = [...acceptedList].sort((a, b) => (a.seed ?? 1e9) - (b.seed ?? 1e9) || a.createdAt.localeCompare(b.createdAt));
   const locked = v.matches.length > 0;
+  const rosters = await rosterStatuses(t.id);
+  const rosterRows = [...acceptedList].sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name));
+  const submittedCount = rosters ? acceptedList.filter((e) => rosters[e.id]?.submittedAt).length : 0;
 
   return (
     <>
@@ -87,6 +91,51 @@ export default async function TeamsTab({ params, searchParams }: { params: Promi
       )}
 
       {t.feeCents > 0 && accepted > 0 && <FeeSummary entries={acceptedList} fee={money(t.feeCents, t.currency)} payTo={t.payTo} />}
+
+      {rosters && accepted > 0 && (
+        <section id="rosters" aria-labelledby="ros-h" className="grid gap-2">
+          <h2 id="ros-h" className="flex items-baseline justify-between gap-2 text-lg font-semibold">
+            Rosters
+            <span className="text-sm font-normal text-muted">
+              {submittedCount} of {accepted} submitted
+            </span>
+          </h2>
+          {t.rosterMax && <p className="text-xs text-muted">Up to {t.rosterMax} players per team, plus a manager and a coach.</p>}
+          <ul className="grid gap-2">
+            {rosterRows.map((e) => {
+              const r = rosters[e.id];
+              return (
+                <li key={e.id}>
+                  <Link href={`/tournaments/${t.id}/teams/${e.id}`} className="flex items-center gap-3 rounded-lg border border-border p-3 hover:border-border-input">
+                    <TeamCrest teamId={e.teamId ?? "guest"} name={e.name} crestUrl={e.crestUrl} size={32} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold break-words">
+                        {e.name}
+                        {e.mine && <span className="ml-1.5 text-xs font-normal text-muted">Your team</span>}
+                      </span>
+                      <span className="flex flex-wrap gap-x-2 text-xs">
+                        <span className={r?.submittedAt ? "font-semibold text-success" : "text-muted"}>{r?.submittedAt ? "Submitted" : "Not submitted"}</span>
+                        <span className="text-muted">
+                          · {r?.players ?? 0} {r?.players === 1 ? "player" : "players"}
+                        </span>
+                        {!!r?.hostChanges && <span className="rounded bg-warning-soft px-1.5 font-semibold text-fg">Changed by host ({r.hostChanges})</span>}
+                      </span>
+                    </span>
+                    {e.mine && !r?.submittedAt ? (
+                      <span className={buttonClass("primary", "sm", "shrink-0")}>
+                        <ClipboardList aria-hidden />
+                        Fill in
+                      </span>
+                    ) : (
+                      <ChevronRight aria-hidden className="size-5 shrink-0 text-muted" />
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <section aria-labelledby="list-h" className="grid gap-2">
         <h2 id="list-h" className="flex items-baseline justify-between gap-2 text-lg font-semibold">

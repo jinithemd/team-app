@@ -6,7 +6,7 @@ import { memoryRepo } from "./repo-memory";
 import { supabaseRepo } from "./repo-supabase";
 import type { Repo } from "./repo";
 import { champion, describeSource, generateFixtures as engineFixtures, resolveTournament, standings, type EngineEntry, type Format, type StandingRow } from "./engine";
-import type { Entry, EventKind, Match, MatchEvent, Official, OfficialRole, Tournament, TournamentStatus } from "./types";
+import type { Entry, EventKind, Match, MatchEvent, Official, OfficialRole, RosterPerson, RosterRole, Tournament, TournamentStatus } from "./types";
 
 /*
  * Every tournament rule lives here: who may do what, validation, fixture generation and
@@ -190,6 +190,11 @@ export interface TournamentInput {
   pointsLoss: string;
   isPublic: boolean;
   registrationOpen: boolean;
+  rosterMax: string;
+  rosterMin: string;
+  rosterRules: string;
+  /** ISO time, or empty. */
+  rosterDeadline: string;
 }
 
 const FORMATS: Format[] = ["league", "round_robin", "knockout", "groups_knockout"];
@@ -221,6 +226,12 @@ function clean(input: TournamentInput) {
   const lng = input.venueLng.trim() ? Number(input.venueLng) : null;
   if (input.logo && (!LOGO.test(input.logo) || input.logo.length > 400_000)) fe.logo = "Use a PNG, JPG, WebP or SVG under 300 KB.";
   if (input.rules.length > 5000) fe.rules = "Keep the rules under 5,000 characters.";
+  const rosterMax = input.rosterMax.trim() ? int(input.rosterMax, 0, 1, 80, "rosterMax", "1 to 80 players.") : null;
+  const rosterMin = input.rosterMin.trim() ? int(input.rosterMin, 0, 1, 80, "rosterMin", "1 to 80 players.") : null;
+  if (rosterMax != null && rosterMin != null && rosterMin > rosterMax) fe.rosterMin = "Can't be more than the most players allowed.";
+  if (input.rosterRules.length > 3000) fe.rosterRules = "Keep the criteria under 3,000 characters.";
+  const dl = input.rosterDeadline.trim() ? new Date(input.rosterDeadline) : null;
+  if (dl && Number.isNaN(dl.getTime())) fe.rosterDeadline = "Pick a date and time.";
   return {
     fe,
     data: {
@@ -244,6 +255,10 @@ function clean(input: TournamentInput) {
       pointsLoss,
       isPublic: input.isPublic,
       registrationOpen: input.registrationOpen,
+      rosterMax,
+      rosterMin,
+      rosterRules: input.rosterRules.trim() || null,
+      rosterDeadline: dl && !Number.isNaN(dl.getTime()) ? dl.toISOString() : null,
     },
   };
 }
@@ -325,7 +340,7 @@ export async function inviteTeam(id: string, teamId: string, teamName: string): 
     if (existing) await repo.updateEntry(existing.id, { status: "invited" });
     else {
       if (t.maxTeams && entries.filter((e) => e.status === "accepted").length >= t.maxTeams) return fail(`The tournament is full (${t.maxTeams} teams).`);
-      await repo.insertEntry({ tournamentId: id, teamId, name: teamName.slice(0, 80), status: "invited", paid: false, groupLabel: null, seed: null, apartSet: null });
+      await repo.insertEntry({ tournamentId: id, teamId, name: teamName.slice(0, 80), status: "invited", paid: false, groupLabel: null, seed: null, apartSet: null, rosterSubmittedAt: null });
     }
     return { ok: true, data: undefined };
   });
@@ -341,7 +356,7 @@ export async function addGuestTeam(id: string, name: string, email: string): Pro
     if (Object.keys(fe).length) return fail("Check the highlighted fields.", fe);
     const entries = await repo.entries(id);
     if (entries.some((e) => !e.teamId && e.name.toLowerCase() === n.toLowerCase() && e.status !== "withdrawn")) return fail(`${n} is already on the list.`, { guestName: "Already added." });
-    await repo.insertEntry({ tournamentId: id, teamId: null, name: n.slice(0, 80), status: "accepted", paid: false, groupLabel: null, seed: null, apartSet: null }, email.trim().toLowerCase() || null);
+    await repo.insertEntry({ tournamentId: id, teamId: null, name: n.slice(0, 80), status: "accepted", paid: false, groupLabel: null, seed: null, apartSet: null, rosterSubmittedAt: null }, email.trim().toLowerCase() || null);
     return { ok: true, data: undefined };
   });
 }
@@ -603,6 +618,201 @@ export async function removeOfficial(id: string, userId: string): Promise<Result
   return caught(async () => {
     await asOrganizer(id);
     await repo.removeOfficial(id, userId);
+    return { ok: true, data: undefined };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// rosters: the host sets limits and criteria; each team lists players (with numbers),
+// a manager and a coach, then submits. After that only the host can change it, and every
+// host change is marked on the roster for everyone to see.
+// ---------------------------------------------------------------------------
+
+export interface RosterView {
+  t: Tournament;
+  entry: Entry & { crestUrl: string | null };
+  people: RosterPerson[];
+  isHost: boolean;
+  isTeamStaff: boolean;
+  /** The team itself can still change it. */
+  teamCanEdit: boolean;
+  /** Whoever is looking can change it (team while open, host any time). */
+  canEdit: boolean;
+  /** Why the team can't change it any more, if it can't. */
+  lockReason: string | null;
+  /** When the team's roster closes: the host's deadline or the team's first kick-off. */
+  closesAt: string | null;
+  players: number;
+  hostChanges: number;
+  /** Players on the Clbx team who aren't on the roster yet, to add with one tap. */
+  pickable: { userId: string | null; name: string; jersey: number | null }[];
+}
+
+function rosterWindow(t: Tournament, e: Entry, matches: Match[]) {
+  const mine = matches.filter((m) => (m.homeId === e.id || m.awayId === e.id) && m.homeSource !== "BYE" && m.awaySource !== "BYE");
+  const kicks = mine.map((m) => m.kickoffAt).filter((x): x is string => !!x).sort();
+  const started = mine.some((m) => m.status === "live" || m.status === "finished") || (kicks[0] != null && Date.parse(kicks[0]) <= Date.now());
+  const closesAt = [t.rosterDeadline, kicks[0] ?? null].filter((x): x is string => !!x).sort()[0] ?? null;
+  let lockReason: string | null = null;
+  if (e.rosterSubmittedAt) lockReason = "Submitted. Only the host can change it now.";
+  else if (t.status === "finished") lockReason = "The tournament is over.";
+  else if (started) lockReason = "Your first game has started, so the roster is closed. Ask the host for changes.";
+  else if (t.rosterDeadline && Date.parse(t.rosterDeadline) <= Date.now()) lockReason = "The roster deadline has passed. Ask the host for changes.";
+  return { closesAt, lockReason };
+}
+
+async function rosterAccess(tid: string, entryId: string) {
+  const t = await repo.tournament(tid);
+  if (!t) throw new Error("Tournament not found.");
+  const [entries, matches, isHost, myTeams] = await Promise.all([repo.entries(t.id), repo.matches(t.id), repo.isOrganizer(t), repo.teamsIRun()]);
+  const e = entries.find((x) => x.id === entryId);
+  if (!e || e.status !== "accepted") throw new Error("That team isn't in this tournament.");
+  const isTeamStaff = !!e.teamId && myTeams.some((x) => x.id === e.teamId);
+  const { closesAt, lockReason } = rosterWindow(t, e, matches);
+  const teamCanEdit = isTeamStaff && !lockReason;
+  return { t, e, isHost, isTeamStaff, teamCanEdit, canEdit: isHost || teamCanEdit, closesAt, lockReason };
+}
+
+export async function getRoster(tid: string, entryId: string): Promise<RosterView | null> {
+  const t = await repo.tournament(tid);
+  if (!t) return null;
+  let a;
+  try {
+    a = await rosterAccess(t.id, entryId);
+  } catch {
+    return null;
+  }
+  if (!a.isHost && !a.isTeamStaff && !(await repo.isParticipant(t))) return null;
+  const people = (await repo.roster(t.id)).filter((p) => p.entryId === entryId);
+  const active = people.filter((p) => p.hostChange !== "removed");
+  const refs = a.e.teamId ? await repo.teamRefs([a.e.teamId]) : new Map();
+  let pickable: RosterView["pickable"] = [];
+  if (a.canEdit && a.e.teamId && a.isTeamStaff) {
+    const on = new Set(active.map((p) => p.userId).filter(Boolean));
+    pickable = (await repo.teamPlayers(a.e.teamId)).filter((p) => !p.userId || !on.has(p.userId)).sort((x, y) => x.name.localeCompare(y.name));
+  }
+  const order: Record<RosterRole, number> = { manager: 0, coach: 1, player: 2 };
+  return {
+    t,
+    entry: { ...a.e, crestUrl: a.e.teamId ? crestUrl(a.e.teamId, refs.get(a.e.teamId)?.crest) : null },
+    people: people.sort((x, y) => order[x.role] - order[y.role] || (x.jersey ?? 1e4) - (y.jersey ?? 1e4) || x.name.localeCompare(y.name)),
+    isHost: a.isHost,
+    isTeamStaff: a.isTeamStaff,
+    teamCanEdit: a.teamCanEdit,
+    canEdit: a.canEdit,
+    lockReason: a.lockReason,
+    closesAt: a.closesAt,
+    players: active.filter((p) => p.role === "player").length,
+    hostChanges: people.filter((p) => p.hostChange).length,
+    pickable,
+  };
+}
+
+/** Roster status of every team, for the Teams tab. null when you can't see rosters. */
+export async function rosterStatuses(tid: string): Promise<Record<string, { submittedAt: string | null; players: number; hostChanges: number }> | null> {
+  const t = await repo.tournament(tid);
+  if (!t || !(await repo.isParticipant(t))) return null;
+  const [entries, people] = await Promise.all([repo.entries(t.id), repo.roster(t.id)]);
+  const out: Record<string, { submittedAt: string | null; players: number; hostChanges: number }> = {};
+  for (const e of entries.filter((x) => x.status === "accepted")) {
+    const mine = people.filter((p) => p.entryId === e.id);
+    out[e.id] = {
+      submittedAt: e.rosterSubmittedAt,
+      players: mine.filter((p) => p.role === "player" && p.hostChange !== "removed").length,
+      hostChanges: mine.filter((p) => p.hostChange).length,
+    };
+  }
+  return out;
+}
+
+export interface RosterInput {
+  role: string;
+  name: string;
+  jersey: string;
+  userId?: string | null;
+}
+
+function cleanPerson(input: RosterInput, others: RosterPerson[], selfId: string | null) {
+  const fe: Record<string, string> = {};
+  const role = (["player", "manager", "coach"] as const).find((r) => r === input.role);
+  if (!role) fe.role = "Pick player, manager or coach.";
+  const name = input.name.trim().replace(/\s+/g, " ");
+  if (!name) fe.name = "Enter their name.";
+  else if (name.length > 80) fe.name = "Keep the name under 80 characters.";
+  let jersey: number | null = null;
+  if (role === "player") {
+    const j = input.jersey.trim();
+    if (!/^\d{1,3}$/.test(j)) fe.jersey = "Enter their jersey number.";
+    else {
+      jersey = Number(j);
+      const clash = others.find((p) => p.id !== selfId && p.role === "player" && p.hostChange !== "removed" && p.jersey === jersey);
+      if (clash) fe.jersey = `#${jersey} is already ${clash.name}'s number.`;
+    }
+  }
+  if (role === "manager" || role === "coach") {
+    const taken = others.find((p) => p.id !== selfId && p.role === role && p.hostChange !== "removed");
+    if (taken) fe.role = `${taken.name} is already the ${role}. Remove them first, or change their name.`;
+  }
+  return { fe, data: role ? { role, name, jersey } : null };
+}
+
+export async function addRosterPeople(tid: string, entryId: string, inputs: RosterInput[]): Promise<Result<{ added: number }>> {
+  return caught(async () => {
+    const a = await rosterAccess(tid, entryId);
+    if (!a.canEdit) return fail(a.lockReason ?? "Only the team's captains and managers, or the host, can change this roster.");
+    const people = (await repo.roster(a.t.id)).filter((p) => p.entryId === entryId);
+    let players = people.filter((p) => p.role === "player" && p.hostChange !== "removed").length;
+    let added = 0;
+    for (const input of inputs) {
+      const { fe, data } = cleanPerson(input, people, null);
+      if (Object.keys(fe).length || !data) return inputs.length > 1 ? fail(`${input.name.trim() || "A player"}: ${Object.values(fe)[0]}`) : fail(Object.values(fe)[0], fe);
+      if (data.role === "player" && a.t.rosterMax != null && players >= a.t.rosterMax) return fail(`This tournament allows ${a.t.rosterMax} players per team.${added ? ` Added ${added}.` : ""}`);
+      if (input.userId && people.some((p) => p.userId === input.userId && p.hostChange !== "removed")) continue;
+      await repo.insertRosterPerson({ tournamentId: a.t.id, entryId, role: data.role, name: data.name, jersey: data.jersey, userId: input.userId ?? null });
+      people.push({ id: `new-${added}`, tournamentId: a.t.id, entryId, role: data.role, name: data.name, jersey: data.jersey, userId: input.userId ?? null, hostChange: null, hostChangedAt: null, prevName: null, prevJersey: null, createdAt: "" });
+      if (data.role === "player") players++;
+      added++;
+    }
+    return { ok: true, data: { added } };
+  });
+}
+
+export async function editRosterPerson(tid: string, entryId: string, personId: string, input: { name: string; jersey: string }): Promise<Result> {
+  return caught(async () => {
+    const a = await rosterAccess(tid, entryId);
+    if (!a.canEdit) return fail(a.lockReason ?? "You can't change this roster.");
+    const people = (await repo.roster(a.t.id)).filter((p) => p.entryId === entryId);
+    const p = people.find((x) => x.id === personId);
+    if (!p || p.hostChange === "removed") return fail("They aren't on this roster.");
+    const { fe, data } = cleanPerson({ role: p.role, name: input.name, jersey: input.jersey }, people, p.id);
+    if (Object.keys(fe).length || !data) return fail(Object.values(fe)[0], fe);
+    await repo.updateRosterPerson(p.id, { name: data.name, jersey: data.jersey });
+    return { ok: true, data: undefined };
+  });
+}
+
+export async function removeRosterPerson(tid: string, entryId: string, personId: string): Promise<Result> {
+  return caught(async () => {
+    const a = await rosterAccess(tid, entryId);
+    if (!a.canEdit) return fail(a.lockReason ?? "You can't change this roster.");
+    const p = (await repo.roster(a.t.id)).find((x) => x.id === personId && x.entryId === entryId);
+    if (!p || p.hostChange === "removed") return fail("They aren't on this roster.");
+    await repo.deleteRosterPerson(p.id);
+    return { ok: true, data: undefined };
+  });
+}
+
+export async function submitRoster(tid: string, entryId: string, confirmed: boolean): Promise<Result> {
+  return caught(async () => {
+    const a = await rosterAccess(tid, entryId);
+    if (a.e.rosterSubmittedAt) return fail("This roster is already submitted.");
+    if (!a.canEdit) return fail(a.lockReason ?? "Only the team's captains and managers, or the host, can submit this roster.");
+    if (a.t.rosterRules && !confirmed) return fail("Tick the box to confirm your roster meets the tournament's criteria.", { confirm: "Required." });
+    const players = (await repo.roster(a.t.id)).filter((p) => p.entryId === entryId && p.role === "player" && p.hostChange !== "removed").length;
+    const min = Math.max(1, a.t.rosterMin ?? 1);
+    if (players < min) return fail(`Add at least ${min} player${min === 1 ? "" : "s"} before submitting.`);
+    if (a.t.rosterMax != null && players > a.t.rosterMax) return fail(`This tournament allows ${a.t.rosterMax} players per team.`);
+    await repo.submitRoster(entryId);
     return { ok: true, data: undefined };
   });
 }

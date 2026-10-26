@@ -12,6 +12,13 @@ import type { Tournament } from "@/lib/tournaments/types";
 
 const FORMATS: Format[] = ["groups_knockout", "knockout", "league", "round_robin"];
 
+const toLocalInput = (iso: string | null | undefined) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
 /** Host a tournament, or edit one (T2). */
 export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: string; name: string }[]; t?: Tournament; logoUrl?: string | null; locked?: boolean }) {
   const editing = !!t;
@@ -25,6 +32,8 @@ export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: str
   const [venueAddress, setVenueAddress] = useState(t?.venueAddress ?? "");
   const [fee, setFee] = useState(t ? (t.feeCents ? String(t.feeCents / 100) : "") : "");
   const today = new Date().toISOString().slice(0, 10);
+  const [deadline, setDeadline] = useState(toLocalInput(t?.rosterDeadline));
+  const deadlineIso = deadline && !Number.isNaN(new Date(deadline).getTime()) ? new Date(deadline).toISOString() : "";
 
   return (
     <form action={action} className="grid gap-6" noValidate>
@@ -129,6 +138,36 @@ export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: str
       <Field id="rules" label="Rules" error={fe.rules} hint="Match length, squad sizes, tie-breakers, what to bring. Shown on the tournament page.">
         <textarea id="rules" name="rules" rows={5} maxLength={5000} defaultValue={t?.rules ?? ""} className={`${inputClass} py-2.5`} />
       </Field>
+
+      <fieldset className="grid gap-3 rounded-md border border-border p-3">
+        <legend className="px-1 text-sm font-semibold">Team rosters</legend>
+        <p className="text-xs text-muted">
+          Each team lists its players with jersey numbers, plus a manager and a coach, then submits. After that only you can change a roster, and every change you make is marked on it.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field id="rosterMax" label="Most players per team" error={fe.rosterMax} hint="Leave blank for no limit">
+            <Input id="rosterMax" name="rosterMax" type="number" min={1} max={80} defaultValue={t?.rosterMax ?? ""} placeholder="e.g. 18" error={fe.rosterMax} />
+          </Field>
+          <Field id="rosterMin" label="Fewest players" error={fe.rosterMin} hint="Optional">
+            <Input id="rosterMin" name="rosterMin" type="number" min={1} max={80} defaultValue={t?.rosterMin ?? ""} placeholder="e.g. 11" error={fe.rosterMin} />
+          </Field>
+        </div>
+        <Field id="rosterDeadlineLocal" label="Roster deadline" error={fe.rosterDeadline} hint="Optional. Either way, a team's roster closes when its first game kicks off.">
+          <Input id="rosterDeadlineLocal" type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} error={fe.rosterDeadline} />
+        </Field>
+        <input type="hidden" name="rosterDeadline" value={deadlineIso} />
+        <Field id="rosterRules" label="Player criteria" error={fe.rosterRules} hint="Anything players must meet, one per line. Teams confirm it when they submit.">
+          <textarea
+            id="rosterRules"
+            name="rosterRules"
+            rows={4}
+            maxLength={3000}
+            defaultValue={t?.rosterRules ?? ""}
+            placeholder={"e.g. Players must be 18 or older\nNo semi-pro players\nEach player on one team only"}
+            className={`${inputClass} py-2.5`}
+          />
+        </Field>
+      </fieldset>
 
       <fieldset className="grid gap-3">
         <legend className="mb-1 text-sm font-semibold">Registration</legend>

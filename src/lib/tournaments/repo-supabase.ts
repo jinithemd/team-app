@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { adminClient, userClient } from "../supabase/server";
 import type { Repo, TeamRef } from "./repo";
-import type { Entry, Match, MatchEvent, OfficialRole, Tournament } from "./types";
+import type { Entry, Match, MatchEvent, OfficialRole, RosterPerson, Tournament } from "./types";
 
 /*
  * Live build: tournaments in Supabase, read and written as the signed-in person (or as a
@@ -25,7 +25,8 @@ const toT = (r: Row): Tournament => ({
   startsOn: s(r.starts_on)!, endsOn: s(r.ends_on)!, venueName: s(r.venue_name), venueAddress: s(r.venue_address), venueLat: n(r.venue_lat), venueLng: n(r.venue_lng),
   rules: s(r.rules), feeCents: Number(r.fee_cents ?? 0), currency: s(r.currency) ?? "CAD", payTo: s(r.pay_to),
   pointsWin: Number(r.points_win), pointsDraw: Number(r.points_draw), pointsLoss: Number(r.points_loss), maxTeams: n(r.max_teams),
-  status: r.status as Tournament["status"], isPublic: !!r.is_public, registrationOpen: !!r.registration_open, createdBy: s(r.created_by), updatedAt: s(r.updated_at)!,
+  status: r.status as Tournament["status"], isPublic: !!r.is_public, registrationOpen: !!r.registration_open,
+  rosterMax: n(r.roster_max), rosterMin: n(r.roster_min), rosterRules: s(r.roster_rules), rosterDeadline: s(r.roster_deadline), createdBy: s(r.created_by), updatedAt: s(r.updated_at)!,
 });
 const fromT = (t: Partial<Tournament>): Row => {
   const map: Record<string, string> = {
@@ -33,6 +34,7 @@ const fromT = (t: Partial<Tournament>): Row => {
     startsOn: "starts_on", endsOn: "ends_on", venueName: "venue_name", venueAddress: "venue_address", venueLat: "venue_lat", venueLng: "venue_lng", rules: "rules",
     feeCents: "fee_cents", currency: "currency", payTo: "pay_to", pointsWin: "points_win", pointsDraw: "points_draw", pointsLoss: "points_loss", maxTeams: "max_teams",
     status: "status", isPublic: "is_public", registrationOpen: "registration_open", createdBy: "created_by",
+    rosterMax: "roster_max", rosterMin: "roster_min", rosterRules: "roster_rules", rosterDeadline: "roster_deadline",
   };
   const out: Row = {};
   for (const [k, v] of Object.entries(t)) if (map[k]) out[map[k]] = v;
@@ -40,10 +42,10 @@ const fromT = (t: Partial<Tournament>): Row => {
 };
 const toE = (r: Row): Entry => ({
   id: s(r.id)!, tournamentId: s(r.tournament_id)!, teamId: s(r.team_id), name: s(r.name)!, status: r.status as Entry["status"], paid: !!r.paid,
-  groupLabel: s(r.group_label), seed: n(r.seed), apartSet: n(r.apart_set), createdAt: s(r.created_at)!,
+  groupLabel: s(r.group_label), seed: n(r.seed), apartSet: n(r.apart_set), rosterSubmittedAt: s(r.roster_submitted_at), createdAt: s(r.created_at)!,
 });
 const fromE = (e: Partial<Entry>): Row => {
-  const map: Record<string, string> = { tournamentId: "tournament_id", teamId: "team_id", name: "name", status: "status", paid: "paid", groupLabel: "group_label", seed: "seed", apartSet: "apart_set" };
+  const map: Record<string, string> = { tournamentId: "tournament_id", teamId: "team_id", name: "name", status: "status", paid: "paid", groupLabel: "group_label", seed: "seed", apartSet: "apart_set", rosterSubmittedAt: "roster_submitted_at" };
   const out: Row = {};
   for (const [k, v] of Object.entries(e)) if (map[k]) out[map[k]] = v;
   return out;
@@ -279,4 +281,51 @@ export const supabaseRepo: Repo = {
     const { error } = await (await sb()).rpc("withdraw_from_tournament", { p_entry: entryId });
     check(error, "withdraw");
   },
+
+  async isParticipant(t) {
+    const { data, error } = await (await sb()).rpc("is_tournament_participant", { t: t.id });
+    check(error, "check your access");
+    return !!data;
+  },
+  async roster(tid) {
+    const { data, error } = await (await sb()).from("tournament_roster").select("*").eq("tournament_id", tid).order("created_at");
+    check(error, "load the rosters");
+    return (data ?? []).map(toR);
+  },
+  async insertRosterPerson(p) {
+    const { error } = await (await sb()).from("tournament_roster").insert({ tournament_id: p.tournamentId, entry_id: p.entryId, role: p.role, name: p.name, jersey: p.jersey, user_id: p.userId });
+    check(error, "add them to the roster");
+  },
+  async updateRosterPerson(id, patch) {
+    const { error } = await (await sb()).from("tournament_roster").update({ name: patch.name, jersey: patch.jersey }).eq("id", id);
+    check(error, "save the change");
+  },
+  async deleteRosterPerson(id) {
+    const { error } = await (await sb()).from("tournament_roster").delete().eq("id", id);
+    check(error, "remove them");
+  },
+  async submitRoster(entryId) {
+    const { error } = await (await sb()).rpc("submit_tournament_roster", { p_entry: entryId });
+    check(error, "submit the roster");
+  },
+  async teamPlayers(teamId) {
+    const c = await sb();
+    const { data, error } = await c.from("roster_members").select("user_id, jersey, invited_name, is_player, status").eq("team_id", teamId).eq("is_player", true).eq("status", "active");
+    check(error, "load your team's players");
+    const ids = (data ?? []).map((r: Row) => s(r.user_id)).filter((x): x is string => !!x);
+    const names = new Map<string, string>();
+    if (ids.length) {
+      const { data: ps } = await c.from("profiles").select("id, first_name, last_name").in("id", ids);
+      for (const p of ps ?? []) names.set(s(p.id)!, `${s(p.first_name) ?? ""} ${s(p.last_name) ?? ""}`.trim());
+    }
+    return (data ?? []).map((r: Row) => {
+      const j = s(r.jersey)?.trim();
+      return { userId: s(r.user_id), name: names.get(s(r.user_id) ?? "") || "Player", jersey: j && /^\d{1,3}$/.test(j) ? Number(j) : null };
+    });
+  },
 };
+
+const toR = (r: Row): RosterPerson => ({
+  id: s(r.id)!, tournamentId: s(r.tournament_id)!, entryId: s(r.entry_id)!, role: r.role as RosterPerson["role"], name: s(r.name)!, jersey: n(r.jersey), userId: s(r.user_id),
+  hostChange: (s(r.host_change) as RosterPerson["hostChange"]) ?? null, hostChangedAt: s(r.host_changed_at), prevName: s(r.prev_name), prevJersey: n(r.prev_jersey), createdAt: s(r.created_at)!,
+});

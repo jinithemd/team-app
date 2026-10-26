@@ -32,6 +32,12 @@ export interface Tournament {
   status: TournamentStatus;
   isPublic: boolean;
   registrationOpen: boolean;
+  /** Roster limits and criteria set by the host. */
+  rosterMax: number | null;
+  rosterMin: number | null;
+  rosterRules: string | null;
+  /** Teams can't change their roster after this (and never after their first kick-off). */
+  rosterDeadline: string | null;
   createdBy: string | null;
   updatedAt: string;
 }
@@ -47,6 +53,29 @@ export interface Entry {
   seed: number | null;
   /** Teams with the same set number are never drawn in the same group (e.g. one club's teams). */
   apartSet: number | null;
+  /** Once set, only the host can change the roster, and each change is marked. */
+  rosterSubmittedAt: string | null;
+  createdAt: string;
+}
+
+export type RosterRole = "player" | "manager" | "coach";
+export type HostChange = "added" | "edited" | "removed";
+
+/** One person on a team's tournament roster. */
+export interface RosterPerson {
+  id: string;
+  tournamentId: string;
+  entryId: string;
+  role: RosterRole;
+  name: string;
+  jersey: number | null;
+  userId: string | null;
+  /** Set when the host changed this after the team submitted. */
+  hostChange: HostChange | null;
+  hostChangedAt: string | null;
+  /** What it was before the host's first change. */
+  prevName: string | null;
+  prevJersey: number | null;
   createdAt: string;
 }
 

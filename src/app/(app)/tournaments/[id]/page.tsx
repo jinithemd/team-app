@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTournament } from "@/lib/tournaments/service";
-import { Banner } from "@/components/ui";
-import { ChampionBanner, FixtureList, money } from "@/components/tournament/bits";
+import { Banner, buttonClass } from "@/components/ui";
+import { ChampionBanner, FixtureList, fmtKickoff, money } from "@/components/tournament/bits";
 import { ApplyForm, WithdrawButton } from "@/components/tournament/entry-actions";
 
 export default async function TournamentOverview({ params }: { params: Promise<{ id: string }> }) {
@@ -57,7 +57,14 @@ export default async function TournamentOverview({ params }: { params: Promise<{
                     {t.feeCents > 0 && e.status === "accepted" ? (e.paid ? " · fee paid" : ` · fee ${money(t.feeCents, t.currency)} not paid yet`) : ""}
                   </span>
                 </span>
-                {["accepted", "applied", "invited"].includes(e.status) && !v.matches.length && <WithdrawButton id={t.id} entryId={e.id} />}
+                <span className="flex flex-wrap items-center gap-2">
+                  {e.status === "accepted" && (
+                    <Link href={`/tournaments/${t.id}/teams/${e.id}`} className={buttonClass(e.rosterSubmittedAt ? "secondary" : "primary", "sm")}>
+                      {e.rosterSubmittedAt ? "Roster submitted" : "Add your roster"}
+                    </Link>
+                  )}
+                  {["accepted", "applied", "invited"].includes(e.status) && !v.matches.length && <WithdrawButton id={t.id} entryId={e.id} />}
+                </span>
               </li>
             ))}
           </ul>
@@ -107,6 +114,17 @@ export default async function TournamentOverview({ params }: { params: Promise<{
             <>
               <dt className="text-muted">How to pay</dt>
               <dd className="break-words">{t.payTo}</dd>
+            </>
+          )}
+          <dt className="text-muted">Rosters</dt>
+          <dd>
+            {[t.rosterMax ? `Up to ${t.rosterMax} players` : "Any number of players", t.rosterMin ? `at least ${t.rosterMin}` : null, "plus a manager and a coach"].filter(Boolean).join(", ")}
+            {t.rosterDeadline ? `. Due ${fmtKickoff(t.rosterDeadline)}` : ". Due before each team's first game"}
+          </dd>
+          {t.rosterRules && (
+            <>
+              <dt className="text-muted">Player criteria</dt>
+              <dd className="break-words whitespace-pre-line">{t.rosterRules}</dd>
             </>
           )}
           <dt className="text-muted">Points</dt>
