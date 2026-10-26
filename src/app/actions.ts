@@ -606,3 +606,11 @@ export async function setLinkApprovalAction(teamId: string, needsApproval: boole
   revalidatePath(`/t/${teamId}/roster/add`);
   return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
 }
+
+/** Profile photo: a square JPEG data URL made in the browser, or "" to remove it. */
+export async function setMyPhotoAction(dataUrl: string): Promise<FormState> {
+  const res = await data.setMyPhoto(dataUrl || null);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  return { ok: true, message: dataUrl ? "Photo saved." : "Photo removed." };
+}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getSessionUser, getTeam } from "@/lib/data";
+import { getSessionUser, getTeam, photoImage } from "@/lib/data";
+import { photoUrl } from "@/lib/data/store";
 import { YourPartForm } from "./your-part-form";
 
 export const metadata: Metadata = { title: "Your part on the team" };
@@ -35,6 +36,7 @@ export default async function YourPartPage({ params, searchParams }: { params: P
         clubRole={team.hats.clubRole}
         canChangeRoles={team.canManagePermissions}
         sport={team.sport}
+        photo={(await photoImage(user.id)) ? photoUrl({ ...user, photoMaybe: true }) : null}
         initial={{
           // A brand-new team defaults to "I play and captain it": the usual case for an adult team.
           isPlayer: isNew ? true : team.me.isPlayer,

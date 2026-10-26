@@ -15,6 +15,13 @@ export interface Profile {
   phone?: string;
   theme: "system" | "light" | "dark";
   useTeamColors: boolean;
+  /** Changes whenever the profile (and so maybe the photo) changes: busts the image cache. */
+  photoV?: string | null;
+  /**
+   * Live build: we don't load photos with profiles, so we only know one *might* exist and let
+   * the image fall back to initials if it doesn't. Sample build: true only with a photo.
+   */
+  photoMaybe?: boolean;
 }
 
 /** A name to show for someone on a roster: an account, or an invite not yet accepted. */
@@ -22,6 +29,8 @@ export interface Person {
   id: ID; // the account id, or the roster row id while the invite is pending
   firstName: string;
   lastName: string;
+  /** Profile photo URL (/api/img/photo/...), or none. Initials show if it doesn't load. */
+  photo?: string | null;
 }
 
 export interface Club {
@@ -504,7 +513,7 @@ export interface RosterRow extends RosterMember {
 }
 
 export interface EventWithMine extends TeamEvent {
-  team: Pick<Team, "id" | "name" | "color" | "colorSecondary">;
+  team: Pick<Team, "id" | "name" | "color" | "colorSecondary"> & { crestUrl: string | null };
   venue: Venue | null;
   /** My answer, when I play on this team. null when I'm only staff there. */
   mine: { response: RsvpResponse | null; note: string | null; unavailable: UnavailableKind | null } | null;

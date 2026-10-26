@@ -165,3 +165,35 @@ export async function setMyPart(
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Profile photos and team crests (Supabase). Read with the person's own access rules, so
+// you only get photos of people you share a team with and crests of teams you can see.
+// ---------------------------------------------------------------------------
+
+const PHOTO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+
+export async function setMyPhoto(dataUrl: string | null): Promise<ActionResult> {
+  const { sb, user } = await signedInUser();
+  if (dataUrl && (!PHOTO_RE.test(dataUrl) || dataUrl.length > 400_000)) return { ok: false, error: "Use a JPG, PNG or WebP photo." };
+  const { error } = await sb.from("profiles").update({ avatar_path: dataUrl }).eq("id", user.id);
+  if (error) {
+    console.error("[setMyPhoto]", error.message);
+    return { ok: false, error: "Couldn't save your photo. Try again in a minute." };
+  }
+  return { ok: true, data: undefined };
+}
+
+export async function photoImage(userId: string): Promise<string | null> {
+  const { userClient } = await import("../../supabase/server");
+  const sb = await userClient();
+  const { data } = await sb.from("profiles").select("avatar_path").eq("id", userId).maybeSingle();
+  return data?.avatar_path ?? null;
+}
+
+export async function crestImage(teamId: string): Promise<string | null> {
+  const { userClient } = await import("../../supabase/server");
+  const sb = await userClient();
+  const { data } = await sb.from("teams").select("logo_path").eq("id", teamId).maybeSingle();
+  return data?.logo_path ?? null;
+}

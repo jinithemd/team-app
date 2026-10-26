@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TeamCrest } from "@/components/ui";
 import { Check, Clock, HelpCircle, MapPin, X } from "lucide-react";
 import type { EventWithMine, RsvpResponse, TeamEvent } from "@/lib/data/types";
 import { formatDateBlock, formatTimeRange, isToday, weekLabel } from "@/lib/time";
@@ -95,10 +96,10 @@ export function UnavailableChip({ kind }: { kind: "injured" | "away" | "other" }
   );
 }
 
-export function TeamDot({ name }: { name: string }) {
+export function TeamDot({ name, teamId, crestUrl }: { name: string; teamId?: string; crestUrl?: string | null }) {
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold text-muted">
-      <span aria-hidden className="size-2.5 shrink-0 rounded-pill bg-team ring-1 ring-border" />
+      {teamId ? <TeamCrest teamId={teamId} name={name} crestUrl={crestUrl} size={16} /> : <span aria-hidden className="size-2.5 shrink-0 rounded-pill bg-team ring-1 ring-border" />}
       <span className="truncate">{name}</span>
     </span>
   );
@@ -154,7 +155,7 @@ export function EventCard({ e, showTeam = false }: { e: EventWithMine; showTeam?
         </div>
         {(showTeam || (!cancelled && e.mine)) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
-            {showTeam && <TeamDot name={e.team.name} />}
+            {showTeam && <TeamDot name={e.team.name} teamId={e.team.id} crestUrl={e.team.crestUrl} />}
             {!cancelled && e.mine && (e.mine.unavailable && !e.mine.response ? <UnavailableChip kind={e.mine.unavailable} /> : !past && <RsvpChip response={e.mine.response} />)}
           </div>
         )}

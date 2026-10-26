@@ -1,4 +1,5 @@
 import "server-only";
+import { crestUrl } from "../images";
 import type { ActionResult, ChatMessage, ID, NotificationPrefs, Person, Poll } from "./types";
 import { APP_URL, activePlayers, db, hasTeamPerm, isSponsorOfTeam, isTeamMember, isTeamStaff, myRow, newId, now, personOf, profileById, queueEmail, requireUser, teamById } from "./store";
 import type { SponsorTier } from "./types";
@@ -49,6 +50,7 @@ export async function listConversations() {
         kind: c.kind,
         teamId: team.id,
         teamName: team.name,
+        crestUrl: crestUrl(team.id, team.settings.crest),
         asSponsor: !isTeamMember(user.id, c.teamId),
         last: last ? { who: personOf(last.userId).firstName, text: last.poll ? `Poll: ${last.poll.question}` : last.imageUrl && !last.body ? "Photo" : last.body, at: last.createdAt } : null,
         unread: unread(user.id, c.id),

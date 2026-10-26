@@ -6,6 +6,8 @@ import { CLUB_ROLE_LABEL } from "@/lib/data/types";
 import { ButtonLink, EmptyState, PageHeader } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
+import { TeamCrest } from "@/components/ui";
+import { crestUrl } from "@/lib/images";
 
 export const metadata: Metadata = { title: "Teams" };
 
@@ -59,9 +61,7 @@ export default async function TeamsPage() {
                 href={`/t/${t.id}/schedule`}
                 className="flex min-h-18 items-center gap-3 rounded-lg border border-border bg-bg p-3 hover:border-border-input focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
               >
-                <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-pill border-2 border-team-2 bg-team font-display text-lg font-bold text-on-team">
-                  {initials(t.name)}
-                </span>
+                <TeamCrest teamId={t.id} name={t.name} crestUrl={crestUrl(t.id, t.settings.crest)} size={48} />
                 <span className="min-w-0 flex-1">
                   <span className="block font-semibold break-words">{t.name}</span>
                   <span className="block text-sm text-muted">
@@ -91,9 +91,4 @@ export default async function TeamsPage() {
       )}
     </main>
   );
-}
-
-function initials(name: string) {
-  const words = name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w));
-  return (words.slice(0, 2).map((w) => w[0]).join("") || name.slice(0, 2)).toUpperCase();
 }

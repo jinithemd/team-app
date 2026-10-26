@@ -1,26 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSessionUser, listMyHats } from "@/lib/data";
+import { getSessionUser, listMyHats, photoImage } from "@/lib/data";
 import { HatBadges } from "@/components/hats";
 import { CLUB_ROLE_LABEL } from "@/lib/data/types";
 import { signOutAction, updatePreferencesAction } from "@/app/actions";
-import { Avatar, PageHeader, buttonClass } from "@/components/ui";
+import { PageHeader, TeamCrest, buttonClass } from "@/components/ui";
+import { ProfilePhoto } from "@/components/profile-photo";
+import { photoUrl } from "@/lib/data/store";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
   const [user0, hats] = await Promise.all([getSessionUser(), listMyHats()]);
   const user = user0!;
+  const myPhoto = await photoImage(user.id);
   const name = `${user.firstName} ${user.lastName}`;
   return (
     <main id="main" className="gutter mx-auto grid max-w-2xl gap-6 py-6">
       <PageHeader title="Account" />
-      <section className="flex items-center gap-3">
-        <Avatar name={name} size={64} />
+      <section className="grid gap-4">
         <div className="min-w-0">
           <p className="text-lg font-semibold break-words">{name}</p>
           <p className="text-sm break-all text-muted">{user.email}</p>
         </div>
+        <ProfilePhoto name={name} photo={myPhoto ? photoUrl({ ...user, photoMaybe: true }) : null} />
       </section>
 
       <section aria-labelledby="hats-h" className="grid gap-3 rounded-lg border border-border p-4">
@@ -39,7 +42,8 @@ export default async function AccountPage() {
           ))}
           {hats.teams.map((t) => (
             <li key={t.teamId} data-team={t.teamId} className="flex flex-wrap items-center justify-between gap-2">
-              <Link href={`/t/${t.teamId}/you`} className="font-semibold text-fg hover:underline">
+              <Link href={`/t/${t.teamId}/you`} className="inline-flex min-w-0 items-center gap-2 font-semibold text-fg hover:underline">
+                <TeamCrest teamId={t.teamId} name={t.name} crestUrl={t.crestUrl} size={24} />
                 {t.name}
               </Link>
               <HatBadges labels={t.labels} />

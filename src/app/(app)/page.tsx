@@ -6,6 +6,8 @@ import { SponsorMark, TierBadge } from "@/components/sponsor-badge";
 import { EventCard } from "@/components/event-bits";
 import { ButtonLink, EmptyState, SectionTitle } from "@/components/ui";
 import { hatLabels } from "@/lib/data/types";
+import { TeamCrest } from "@/components/ui";
+import { crestUrl } from "@/lib/images";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -69,6 +71,7 @@ export default async function HomePage() {
                   href={`/t/${t.id}/schedule`}
                   className="flex min-h-16 w-56 items-center gap-3 rounded-lg border-b-4 border-team-2 bg-team px-3.5 py-3 text-on-team focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 >
+                  <TeamCrest teamId={t.id} name={t.name} crestUrl={crestUrl(t.id, t.settings.crest)} size={40} className="ring-2 ring-on-team/30" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-display text-lg leading-tight font-bold uppercase">{t.name}</span>
                     <span className="block truncate text-xs opacity-90">

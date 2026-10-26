@@ -23,7 +23,7 @@ export default async function MyRsvpsPage() {
           {pending.map((e) => (
             <li key={e.id} data-team={e.teamId} className="grid gap-3 rounded-lg border border-border p-4">
               <div className="min-w-0">
-                <TeamDot name={e.team.name} />
+                <TeamDot name={e.team.name} teamId={e.team.id} crestUrl={e.team.crestUrl} />
                 <Link href={`/t/${e.teamId}/e/${e.id}`} className="mt-1 block text-base font-semibold break-words hover:underline">
                   {eventTitle(e)}
                 </Link>

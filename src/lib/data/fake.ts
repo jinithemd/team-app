@@ -1,4 +1,5 @@
 import "server-only";
+import { crestUrl } from "../images";
 import { randomUUID } from "node:crypto";
 import { newInviteToken } from "./invite-token";
 import { setSessionUserId, clearSession, getSessionUserId } from "./session";
@@ -144,7 +145,7 @@ export async function listMyHats() {
     .filter((t) => myRow(user.id, t.id) || t.createdBy === user.id)
     .map((t) => {
       const row = myRow(user.id, t.id);
-      return { teamId: t.id, name: t.name, labels: hatLabels({ ...hatsFor(user.id, t), clubRole: null }, row?.jersey) };
+      return { teamId: t.id, name: t.name, crestUrl: crestUrl(t.id, t.settings.crest), labels: hatLabels({ ...hatsFor(user.id, t), clubRole: null }, row?.jersey) };
     })
     .sort((a, b) => a.name.localeCompare(b.name));
   return { clubs, teams };
@@ -666,7 +667,7 @@ function withMine(uid: ID, e: TeamEvent): EventWithMine {
   const score = db.scores.find((s) => s.eventId === e.id);
   return {
     ...e,
-    team: { id: team.id, name: team.name, color: team.color, colorSecondary: team.colorSecondary },
+    team: { id: team.id, name: team.name, color: team.color, colorSecondary: team.colorSecondary, crestUrl: crestUrl(team.id, team.settings.crest) },
     venue: e.venueId ? db.venues.find((v) => v.id === e.venueId) ?? null : null,
     mine: isActivePlayer(uid, e.teamId)
       ? { response: r?.response ?? null, note: r?.note ?? null, unavailable: unavailableKind(uid, e.teamId, e.startAt, e.tz) }

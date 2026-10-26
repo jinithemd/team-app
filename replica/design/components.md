@@ -183,10 +183,34 @@ PersonRow
   used on   S10, S12, S14, S21
 
 Avatar
-  sizes     24, 32, 40, 64
-  states    image, initials (on team-2 / on-team-2 inside a team, sunken outside), loading
+  sizes     24, 32, 40, 64, 96
+  states    photo, initials (on team-2 / on-team-2), loading (initials show under the photo,
+            so never an empty circle), failed/no photo (falls back to initials, no broken icon)
+  source    /api/img/photo/<userId>?v=<profile version>, cached for good, read with the
+            viewer's access rules (only people you share a team with)
   a11y      decorative when the name is next to it (alt="")
-  used on   all people lists, chat
+  used on   roster, player page, RSVP list, carpool, chat, You page preview, Account
+
+ProfilePhoto (Account)
+  layout    96 px avatar with a camera badge (the whole avatar is a button) + Add/Change and
+            Remove buttons + one status line
+  states    empty ("Add a photo"), has photo ("Change photo", Remove), saving, saved, error
+            (wrong type, over 20 MB, unreadable, save failed: preview reverts)
+  behaviour cropped to a centred square and shrunk to 320 px JPEG in the browser, saved
+            straight away (no separate Save)
+  a11y      real buttons with labels, file input labelled "Photo file", status line is
+            role=status
+  used on   Account; the You page links to it
+
+TeamCrest
+  sizes     16, 20, 24, 32, 40, 48, 64; radius grows with size (square-ish tile, not a circle,
+            so it never reads as a person)
+  states    crest image (bg + 1px border so white crests show), no crest (team initials in
+            display font, team / on-team colours, scoped with data-team so it's right anywhere)
+  source    /api/img/crest/<teamId>?v=<hash>; the team header uses it at 48
+  a11y      decorative (the team name is always next to it)
+  used on   team header, home team cards, Teams list, Chat list (with a staff/sponsor badge
+            in the corner), event cards and My RSVPs (16, replacing the team dot), Account roles
 
 RosterTabs
   content   Players (count) | Staff (count), add FAB for staff, Print

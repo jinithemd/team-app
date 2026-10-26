@@ -68,7 +68,7 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
     byTeam("messages"),
     byTeam("points_ledger"),
     rows(t("notification_prefs").select("*").eq("user_id", uid)),
-    rows(t("profiles").select("*").eq("id", uid)),
+    rows(t("profiles").select("id, first_name, last_name, email, phone, theme, use_team_colors, updated_at").eq("id", uid)),
   ]);
   const clubIds = uniq([...adminClubs, ...teams.map((r) => r.club_id as string)]);
   const eventIds = uniq(events.map((r) => r.id as string));
@@ -82,7 +82,8 @@ export async function loadSlice(sb: DB, uid: string | null): Promise<Loaded> {
     await Promise.all([
       clubIds.length ? rows(t("clubs").select("*").in("id", clubIds)) : none,
       clubIds.length ? rows(t("club_admins").select("*").in("club_id", clubIds)) : none,
-      rows(t("profiles").select("*").in("id", people)),
+      // Not avatar_path: photos are fetched one by one from /api/img/photo.
+      rows(t("profiles").select("id, first_name, last_name, email, phone, theme, use_team_colors, updated_at").in("id", people)),
       byEvent("rsvps"),
       byEvent("rsvps_public"),
       rows(t("availability_periods").select("*").in("user_id", people)),

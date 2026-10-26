@@ -209,13 +209,16 @@ export async function requireUser(): Promise<Profile> {
   return user;
 }
 
+export function photoUrl(p: Profile | undefined | null): string | null {
+  return p?.photoMaybe ? `/api/img/photo/${p.id}?v=${encodeURIComponent(p.photoV ?? "0")}` : null;
+}
 export function personOf(userId: ID): Person {
   const p = profileById(userId);
-  return p ? { id: p.id, firstName: p.firstName, lastName: p.lastName } : { id: userId, firstName: "Someone", lastName: "" };
+  return p ? { id: p.id, firstName: p.firstName, lastName: p.lastName, photo: photoUrl(p) } : { id: userId, firstName: "Someone", lastName: "" };
 }
 export function personFor(r: RosterMember): Person {
   const p = profileById(r.userId);
-  if (p) return { id: p.id, firstName: p.firstName, lastName: p.lastName };
+  if (p) return { id: p.id, firstName: p.firstName, lastName: p.lastName, photo: photoUrl(p) };
   return { id: r.id, firstName: r.invitedName?.firstName ?? "", lastName: r.invitedName?.lastName ?? "" };
 }
 export const fullName = (p: Person) => `${p.firstName} ${p.lastName}`.trim();

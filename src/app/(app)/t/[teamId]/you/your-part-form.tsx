@@ -16,6 +16,7 @@ export function YourPartForm({
   clubRole,
   canChangeRoles,
   sport,
+  photo,
   initial,
 }: {
   teamId: string;
@@ -25,6 +26,7 @@ export function YourPartForm({
   clubRole: ClubRole | null;
   canChangeRoles: boolean;
   sport: string;
+  photo: string | null;
   initial: { isPlayer: boolean; jersey: string; position: string; roles: TeamRole[] };
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(setMyPartAction.bind(null, teamId, next), null);
@@ -113,7 +115,7 @@ export function YourPartForm({
           How you&apos;ll show on the roster
         </h3>
         <div className="flex items-center gap-3">
-          <Avatar name={name} />
+          <Avatar name={name} src={photo} />
           <div className="min-w-0">
             <p className="font-semibold break-words">
               {name}
@@ -122,6 +124,9 @@ export function YourPartForm({
             <HatBadges labels={labels} />
           </div>
         </div>
+        <a href="/account" className="text-xs font-semibold text-team-ink underline">
+          {photo ? "Change your photo" : "Add a profile photo"}
+        </a>
         <p className="text-xs text-muted">
           {plays
             ? "You'll answer, check in and vote like any player, and see the captain tools under each event."

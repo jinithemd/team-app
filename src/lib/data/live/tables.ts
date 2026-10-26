@@ -45,7 +45,7 @@ export const TABLES: TableSpec[] = [
     key: "profiles",
     table: "profiles",
     pk: ["id"],
-    toApp: (r) => ({ id: s(r.id)!, firstName: s(r.first_name)!, lastName: s(r.last_name) ?? "", email: s(r.email) ?? "", phone: s(r.phone) ?? undefined, theme: (r.theme as T.Profile["theme"]) ?? "system", useTeamColors: r.use_team_colors !== false }),
+    toApp: (r) => ({ id: s(r.id)!, firstName: s(r.first_name)!, lastName: s(r.last_name) ?? "", email: s(r.email) ?? "", phone: s(r.phone) ?? undefined, theme: (r.theme as T.Profile["theme"]) ?? "system", useTeamColors: r.use_team_colors !== false, photoV: s(r.updated_at) ?? "0", photoMaybe: true }),
     toDb: (p: T.Profile) => ({ id: p.id, first_name: p.firstName, last_name: p.lastName, email: p.email, phone: p.phone ?? null, theme: p.theme, use_team_colors: p.useTeamColors }),
   },
   {

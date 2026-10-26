@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
+import { AvatarImg } from "./avatar-img";
 
 // Server-safe primitives from replica/design/components.md. Tokens only, no raw colours.
 
@@ -142,17 +143,50 @@ export function Banner({ tone = "info", icon, children }: { tone?: "info" | "war
   );
 }
 
-export function Avatar({ name, size = 40 }: { name: string; size?: 24 | 32 | 40 | 64 }) {
+export function Avatar({ name, size = 40, src }: { name: string; size?: 24 | 32 | 40 | 64 | 96; src?: string | null }) {
   const initials = name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())
     .join("");
-  const dims = { 24: "size-6 text-[10px]", 32: "size-8 text-xs", 40: "size-10 text-sm", 64: "size-16 text-lg" }[size];
+  const dims = { 24: "size-6 text-[10px]", 32: "size-8 text-xs", 40: "size-10 text-sm", 64: "size-16 text-lg", 96: "size-24 text-2xl" }[size];
+  // Initials sit underneath the photo, so there's never an empty circle while it loads.
+  if (src) return <AvatarImg src={src} initials={initials} className={dims} />;
   return (
     <span aria-hidden className={`grid shrink-0 place-items-center rounded-pill bg-team-2 font-bold text-on-team-2 ${dims}`}>
       {initials}
+    </span>
+  );
+}
+
+/**
+ * A team's crest, or its initials in the team colours when it has none. Wrapped in the
+ * team's colour scope so it shows the right colours anywhere in the app.
+ */
+export function TeamCrest({
+  teamId,
+  name,
+  crestUrl,
+  size = 40,
+  className = "",
+}: {
+  teamId: string;
+  name: string;
+  crestUrl: string | null | undefined;
+  size?: 16 | 20 | 24 | 32 | 40 | 48 | 64;
+  className?: string;
+}) {
+  const dims = { 16: "size-4 text-[7px] rounded-[4px]", 20: "size-5 text-[8px] rounded-[5px]", 24: "size-6 text-[9px] rounded-md", 32: "size-8 text-[11px] rounded-md", 40: "size-10 text-xs rounded-lg", 48: "size-12 text-sm rounded-lg", 64: "size-16 text-base rounded-xl" }[size];
+  const initials = name
+    .split(/\s+/)
+    .filter((w) => /^[A-Za-z0-9]/.test(w))
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+  return (
+    <span data-team={teamId} aria-hidden className={`grid shrink-0 place-items-center overflow-hidden ${dims} ${crestUrl ? "bg-bg ring-1 ring-border" : "bg-team font-display font-bold text-on-team"} ${className}`}>
+      {crestUrl ? <img src={crestUrl} alt="" loading="lazy" decoding="async" className="size-full object-cover" /> : initials}
     </span>
   );
 }

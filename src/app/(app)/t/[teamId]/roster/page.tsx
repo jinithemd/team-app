@@ -160,7 +160,7 @@ function RosterItem({ r, showContacts, isMe, href, out }: { r: RosterRow; showCo
           {r.jersey ?? "–"}
         </span>
       )}
-      <Avatar name={name} />
+      <Avatar name={name} src={r.person.photo} />
       <div className="min-w-0 flex-1">
         <p className="font-semibold break-words">
           {name}

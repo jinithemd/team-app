@@ -137,7 +137,7 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
           return (
             <li key={m.id} id={`m-${m.id}`} className={`flex gap-2 ${m.mine ? "flex-row-reverse" : ""} ${grouped ? "-mt-2" : ""}`}>
               <span className={`shrink-0 ${grouped || m.mine ? "invisible" : ""}`} aria-hidden={grouped || m.mine}>
-                <Avatar name={name} size={32} />
+                <Avatar name={name} size={32} src={m.authorSponsor ? null : m.author.photo} />
               </span>
               <div className={`grid max-w-[82%] min-w-0 gap-1 ${m.mine ? "justify-items-end" : "justify-items-start"}`}>
                 {!grouped && (

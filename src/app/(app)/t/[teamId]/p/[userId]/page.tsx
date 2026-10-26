@@ -46,7 +46,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ teamId:
             {p.row.jersey}
           </span>
         ) : (
-          <Avatar name={name} size={64} />
+          <Avatar name={name} size={64} src={p.person.photo} />
         )}
         <div className="min-w-0">
           <h2 className="font-display text-3xl leading-none font-bold break-words uppercase">{name}</h2>

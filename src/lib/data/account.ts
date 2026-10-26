@@ -1,6 +1,6 @@
 import "server-only";
 import type { ActionResult } from "./types";
-import { db, requireUser } from "./store";
+import { db, isTeamMember, requireUser } from "./store";
 import { clearSession } from "./session";
 import { planAccountDeletion, type DeletePlan } from "../account-delete";
 
@@ -62,4 +62,40 @@ export async function deleteAccount(confirmEmail: string): Promise<ActionResult>
   db.profiles = db.profiles.filter((p) => p.id !== uid);
   await clearSession();
   return { ok: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Profile photos and team crests, served one at a time by /api/img/* (sample build).
+// Photos live beside the store so lists of people stay light.
+// ---------------------------------------------------------------------------
+
+const photoStore = ((globalThis as unknown as { __clbxPhotos?: Map<string, string> }).__clbxPhotos ??= new Map<string, string>());
+
+export const PHOTO_MAX_CHARS = 400_000;
+const IMAGE_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+
+/** Save or remove your own profile photo (a small JPEG data URL made in the browser). */
+export async function setMyPhoto(dataUrl: string | null): Promise<ActionResult> {
+  const user = await requireUser();
+  if (dataUrl && (!IMAGE_RE.test(dataUrl) || dataUrl.length > PHOTO_MAX_CHARS)) return { ok: false, error: "Use a JPG, PNG or WebP photo." };
+  if (dataUrl) photoStore.set(user.id, dataUrl);
+  else photoStore.delete(user.id);
+  user.photoMaybe = !!dataUrl;
+  user.photoV = String(Date.now());
+  return { ok: true, data: undefined };
+}
+
+/** Someone's photo, if you share a team with them (or it's yours). */
+export async function photoImage(userId: string): Promise<string | null> {
+  const user = await requireUser();
+  const shares = userId === user.id || db.teams.some((t) => isTeamMember(user.id, t.id) && isTeamMember(userId, t.id));
+  return shares ? photoStore.get(userId) ?? null : null;
+}
+
+/** A team's crest, if you can see the team. */
+export async function crestImage(teamId: string): Promise<string | null> {
+  const user = await requireUser();
+  const t = db.teams.find((x) => x.id === teamId);
+  if (!t || !(isTeamMember(user.id, t.id) || t.isPublic)) return null;
+  return t.settings.crest;
 }

@@ -157,7 +157,10 @@ export const getJoinPage = pick("getJoinPage");
 export const joinByLink = pick("joinByLink");
 export const accountDeletionBlockers = pick("accountDeletionBlockers");
 export const deleteAccount = pick("deleteAccount");
+export const setMyPhoto = pick("setMyPhoto");
+export const photoImage = pick("photoImage");
+export const crestImage = pick("crestImage");
 
-export { METHOD_LABEL, EMOJI } from "./demo";
+export { METHOD_LABEL, EMOJI, PHOTO_MAX_CHARS } from "./demo";
 export type { InviteRow, EventInput, CarpoolView, DueStatus, ChatView, SponsorInput } from "./demo";
 export type * from "./types";

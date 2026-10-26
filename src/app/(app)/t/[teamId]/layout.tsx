@@ -3,6 +3,7 @@ import { getSessionUser, getTeam, getTeamDues, myPerms } from "@/lib/data";
 import { TeamTabs } from "@/components/nav";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
+import { crestUrl } from "@/lib/images";
 
 export default async function TeamLayout({ children, params }: { children: React.ReactNode; params: Promise<{ teamId: string }> }) {
   const { teamId } = await params;
@@ -17,7 +18,7 @@ export default async function TeamLayout({ children, params }: { children: React
       <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(env(safe-area-inset-top,0px)+20px)] pb-4 text-on-team">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           {team.settings.crest ? (
-            <img src={team.settings.crest} alt="" className="size-12 shrink-0 rounded-lg bg-bg object-cover ring-2 ring-on-team/40" />
+            <img src={crestUrl(team.id, team.settings.crest)!} alt="" className="size-12 shrink-0 rounded-lg bg-bg object-cover ring-2 ring-on-team/40" />
           ) : (
           <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-pill border-2 border-on-team font-display text-lg font-bold">
             {team.name

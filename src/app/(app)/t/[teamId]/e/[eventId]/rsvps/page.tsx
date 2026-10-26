@@ -49,7 +49,7 @@ export default async function AvailabilityPage({ params }: { params: Promise<{ t
                   <span className="w-7 text-center font-display text-lg font-bold text-team-ink tabular" aria-label={r.jersey ? `Number ${r.jersey}` : undefined}>
                     {r.jersey}
                   </span>
-                  <Avatar name={`${r.person.firstName} ${r.person.lastName}`} size={32} />
+                  <Avatar name={`${r.person.firstName} ${r.person.lastName}`} size={32} src={r.person.photo} />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold break-words">
                       {r.person.firstName} {r.person.lastName}

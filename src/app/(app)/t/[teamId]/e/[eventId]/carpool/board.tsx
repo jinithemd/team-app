@@ -43,7 +43,7 @@ export function CarpoolBoard({ teamId, eventId, view, closed }: { teamId: string
           return (
             <li key={o.id} className={`grid gap-2.5 rounded-lg border p-3.5 ${o.free === 0 && !mineHere && !driving ? "border-transparent bg-surface" : "border-border"}`}>
               <div className="flex items-center gap-3">
-                <Avatar name={`${o.driver.firstName} ${o.driver.lastName}`} />
+                <Avatar name={`${o.driver.firstName} ${o.driver.lastName}`} src={o.driver.photo} />
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold">
                     {o.driver.firstName} {o.driver.lastName}
