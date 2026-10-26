@@ -94,20 +94,29 @@ export function SponsorForm({
   scope: { teamId?: string; clubId?: string };
   id: string | null;
   back: string;
-  initial: { name: string; tier: SponsorTier; website: string; blurb: string; email: string; startsOn: string; endsOn: string; logo: string | null };
+  initial: { name: string; tier: SponsorTier | null; website: string; blurb: string; email: string; startsOn: string; endsOn: string; logo: string | null };
 }) {
   const [state, action, pending] = useActionState<FormState, FormData>(saveSponsorAction.bind(null, scope, id, back), null);
   const fe = state?.fieldErrors ?? {};
-  const [tier, setTier] = useState<SponsorTier>(initial.tier);
+  const [tier, setTier] = useState<SponsorTier | null>(initial.tier);
   return (
     <form action={action} className="grid gap-5" noValidate>
       <Field id="name" label="Business name" error={fe.name}>
         <Input id="name" name="name" maxLength={80} defaultValue={initial.name} placeholder="e.g. Corner Cafe" error={fe.name} />
       </Field>
       <fieldset className="grid gap-2">
-        <legend className="mb-1 text-sm font-semibold">Tier</legend>
-        <input type="hidden" name="tier" value={tier} />
+        <legend className="mb-1 text-sm font-semibold">Badge (optional)</legend>
+        <input type="hidden" name="tier" value={tier ?? ""} />
         <div role="radiogroup" aria-label="Tier" className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={tier === null}
+            onClick={() => setTier(null)}
+            className={`min-h-9 rounded-pill border border-border px-3 text-xs font-bold tracking-[.05em] text-muted uppercase ${tier === null ? "outline-2 outline-offset-1 outline-fg" : ""}`}
+          >
+            No badge
+          </button>
           {SPONSOR_TIERS.map((t) => (
             <button
               key={t}
@@ -122,7 +131,7 @@ export function SponsorForm({
             </button>
           ))}
         </div>
-        <p className="text-xs text-muted">Higher tiers show first and bigger wherever sponsors appear.</p>
+        <p className="text-xs text-muted">Higher badges show first and bigger wherever sponsors appear. Sponsors without a badge show after them.</p>
         {fe.tier && <p className="text-xs font-medium text-danger">{fe.tier}</p>}
       </fieldset>
       <ImagePicker name="logo" initial={initial.logo} label="Logo" fallback={<span className="text-xs text-muted">No logo</span>} />
@@ -133,7 +142,12 @@ export function SponsorForm({
       <Field id="blurb" label="A line about them (optional)" hint="Shown on the sponsor strip for Diamond and Platinum.">
         <Input id="blurb" name="blurb" maxLength={200} defaultValue={initial.blurb} placeholder="e.g. Post-match coffee on us" />
       </Field>
-      <Field id="email" label="Contact email" error={fe.email} hint={id ? "Change it to hand the sponsor page to someone else. They'll get an invite." : "They get an invite to their sponsor page."}>
+      <Field
+        id="email"
+        label="Contact email (optional)"
+        error={fe.email}
+        hint={id ? "Add or change it to hand the sponsor their own page. They'll get an invite." : "Add one and they get an invite to their own sponsor page. Leave it blank to just show them as a sponsor."}
+      >
         <Input id="email" name="email" type="email" defaultValue={initial.email} error={fe.email} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
@@ -150,7 +164,7 @@ export function SponsorForm({
       </section>
       {state?.error && !Object.keys(fe).length && <p role="alert" className="text-sm text-danger">{state.error}</p>}
       <button className={buttonClass("primary", "lg", "w-full sm:w-auto sm:justify-self-start")} disabled={pending}>
-        {pending ? "Saving…" : id ? "Save" : "Add sponsor and send invite"}
+        {pending ? "Saving…" : id ? "Save" : "Add sponsor"}
       </button>
     </form>
   );

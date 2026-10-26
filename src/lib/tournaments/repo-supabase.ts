@@ -26,7 +26,7 @@ const toT = (r: Row): Tournament => ({
   rules: s(r.rules), feeCents: Number(r.fee_cents ?? 0), currency: s(r.currency) ?? "CAD", payTo: s(r.pay_to),
   pointsWin: Number(r.points_win), pointsDraw: Number(r.points_draw), pointsLoss: Number(r.points_loss), maxTeams: n(r.max_teams),
   status: r.status as Tournament["status"], isPublic: !!r.is_public, registrationOpen: !!r.registration_open,
-  rosterMax: n(r.roster_max), rosterMin: n(r.roster_min), rosterRules: s(r.roster_rules), rosterDeadline: s(r.roster_deadline), createdBy: s(r.created_by), updatedAt: s(r.updated_at)!,
+  rosterMax: n(r.roster_max), rosterMin: n(r.roster_min), rosterRules: s(r.roster_rules), rosterDeadline: s(r.roster_deadline), bannerAt: s(r.banner_at), createdBy: s(r.created_by), updatedAt: s(r.updated_at)!,
 });
 const fromT = (t: Partial<Tournament>): Row => {
   const map: Record<string, string> = {
@@ -34,7 +34,7 @@ const fromT = (t: Partial<Tournament>): Row => {
     startsOn: "starts_on", endsOn: "ends_on", venueName: "venue_name", venueAddress: "venue_address", venueLat: "venue_lat", venueLng: "venue_lng", rules: "rules",
     feeCents: "fee_cents", currency: "currency", payTo: "pay_to", pointsWin: "points_win", pointsDraw: "points_draw", pointsLoss: "points_loss", maxTeams: "max_teams",
     status: "status", isPublic: "is_public", registrationOpen: "registration_open", createdBy: "created_by",
-    rosterMax: "roster_max", rosterMin: "roster_min", rosterRules: "roster_rules", rosterDeadline: "roster_deadline",
+    rosterMax: "roster_max", rosterMin: "roster_min", rosterRules: "roster_rules", rosterDeadline: "roster_deadline", bannerAt: "banner_at",
   };
   const out: Row = {};
   for (const [k, v] of Object.entries(t)) if (map[k]) out[map[k]] = v;
@@ -154,7 +154,10 @@ export const supabaseRepo: Repo = {
   },
   async tournamentsByIds(ids) {
     if (!ids.length) return [];
-    const { data } = await (await sb()).from("tournaments").select("*").in("id", ids);
+    const { c, visitor } = await reader();
+    let q = c.from("tournaments").select("*").in("id", ids);
+    if (visitor) q = q.eq("is_public", true).neq("status", "draft");
+    const { data } = await q;
     return (data ?? []).map(toT);
   },
   async isOrganizer(t) {
@@ -171,7 +174,8 @@ export const supabaseRepo: Repo = {
   },
   async entriesForTeams(teamIds) {
     if (!teamIds.length) return [];
-    const { data } = await (await sb()).from("tournament_teams").select("*").in("team_id", teamIds);
+    // Visitors get entries only through tournamentsByIds' public filter (fan pages' honours).
+    const { data } = await (await reader()).c.from("tournament_teams").select("*").in("team_id", teamIds);
     return (data ?? []).map(toE);
   },
   async matches(tid) {
@@ -352,6 +356,23 @@ export const supabaseRepo: Repo = {
       const del = await a.from("events").delete().in("id", gone);
       if (del.error) console.error("[tournaments] calendar delete:", del.error.message);
     }
+  },
+  async banner(tid) {
+    const { c } = await reader();
+    const { data } = await c.from("tournament_banners").select("image").eq("tournament_id", tid).maybeSingle();
+    return s(data?.image);
+  },
+  async setBanner(tid, image) {
+    const c = await sb();
+    if (image) {
+      const { error } = await c.from("tournament_banners").upsert({ tournament_id: tid, image, updated_at: new Date().toISOString() });
+      check(error, "save the banner");
+    } else {
+      const { error } = await c.from("tournament_banners").delete().eq("tournament_id", tid);
+      check(error, "remove the banner");
+    }
+    const { error } = await c.from("tournaments").update({ banner_at: image ? new Date().toISOString() : null }).eq("id", tid);
+    check(error, "save the banner");
   },
   async teamPlayers(teamId) {
     const c = await sb();

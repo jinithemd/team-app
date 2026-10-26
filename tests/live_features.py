@@ -149,7 +149,7 @@ with sync_playwright() as pw:
         k.get_by_label("Message", exact=True).fill("Welcome aboard"); k.keyboard.press("Enter"); expect(k.get_by_text("Welcome aboard")).to_be_visible(); settle(k); k.wait_for_timeout(500)
         c.goto(f"{BASE}/t/{TEAM}/sponsors/new"); settle(c)
         c.fill("#name", "Corner Cafe"); c.get_by_role("radio", name="Gold").click(); c.fill("#website", "https://example.com/cafe"); c.fill("#email", "cafe@example.com")
-        c.get_by_role("button", name="Add sponsor and send invite").click(); c.wait_for_url(re.compile(r"saved=new"))
+        c.get_by_role("button", name="Add sponsor").click(); c.wait_for_url(re.compile(r"saved=new"))
         expect(c.locator("li", has_text="Corner Cafe").get_by_text("Invite sent")).to_be_visible(); step("Jin adds Corner Cafe as a Gold sponsor")
         href = next(l["href"] for l in json.loads(sql("select payload::text from outbox where payload->>'to' = 'cafe@example.com' order by created_at desc limit 1"))["links"] if l["label"] == "Open the sponsor page")
         sp = ctx().new_page(); watch(sp, "sponsor")

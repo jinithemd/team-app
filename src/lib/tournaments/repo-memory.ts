@@ -19,6 +19,7 @@ interface Mem {
 const g = globalThis as unknown as { __clbxTournaments?: Mem };
 const mem = (g.__clbxTournaments ??= { tournaments: [], entries: [], contacts: {}, matches: [], events: [], officials: [] });
 const now = () => new Date().toISOString();
+const banners = ((globalThis as unknown as { __clbxBanners?: Map<string, string> }).__clbxBanners ??= new Map<string, string>());
 
 async function me() {
   return currentUserId();
@@ -265,6 +266,15 @@ export const memoryRepo: Repo = {
       }
     }
     db.events = db.events.filter((e) => e.tournamentId !== tid || keep.has(key(e.teamId, e.tournamentMatchId)));
+  },
+  async banner(tid) {
+    return banners.get(tid) ?? null;
+  },
+  async setBanner(tid, image) {
+    if (image) banners.set(tid, image);
+    else banners.delete(tid);
+    const t = mem.tournaments.find((x) => x.id === tid);
+    if (t) Object.assign(t, { bannerAt: image ? now() : null, updatedAt: now() });
   },
   async setCaptain(entryId, personId) {
     const e = mem.entries.find((x) => x.id === entryId)!;

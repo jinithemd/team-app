@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { APP_URL } from "@/lib/data/store";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MapPin } from "lucide-react";
@@ -19,6 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: v.t.name,
     description: `${[v.clubName, FORMAT_LABEL[v.t.format], fmtDates(v.t)].filter(Boolean).join(" · ")}. Fixtures, results and table on ${APP_NAME}.`,
+    ...(v.bannerUrl ? { openGraph: { images: [{ url: `${APP_URL}${v.bannerUrl}` }] } } : {}),
   };
 }
 
@@ -46,8 +48,9 @@ export default async function PublicTournament({ params }: { params: Promise<{ s
             </Link>
             <ShareLink path={`/tournament/${t.slug}`} title={t.name} />
           </div>
+          {v.bannerUrl && <img src={v.bannerUrl} alt={`${t.name} banner`} className="max-h-[480px] w-full rounded-lg border border-border bg-bg object-contain" />}
           <div className="flex items-center gap-3">
-            <TournamentLogo url={v.logoUrl} name={t.name} size={64} />
+            {!v.bannerUrl && <TournamentLogo url={v.logoUrl} name={t.name} size={64} />}
             <div className="min-w-0 flex-1">
               <h1 className="font-display text-2xl leading-tight font-bold break-words uppercase">{t.name}</h1>
               <p className="text-sm text-muted">{[v.clubName, FORMAT_LABEL[t.format], fmtDates(t)].filter(Boolean).join(" · ")}</p>

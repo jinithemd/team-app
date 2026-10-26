@@ -18,7 +18,7 @@ export default async function NewTeamSponsor({ params }: { params: Promise<{ tea
         Sponsors
       </Link>
       <h2 className="text-xl font-bold">Add a sponsor</h2>
-      <SponsorForm scope={{ teamId }} id={null} back={`/t/${teamId}/sponsors`} initial={{ name: "", tier: "gold", website: "", blurb: "", email: "", startsOn: "", endsOn: "", logo: null }} />
+      <SponsorForm scope={{ teamId }} id={null} back={`/t/${teamId}/sponsors`} initial={{ name: "", tier: null, website: "", blurb: "", email: "", startsOn: "", endsOn: "", logo: null }} />
     </div>
   );
 }

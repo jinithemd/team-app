@@ -12,7 +12,7 @@ import { sign, verify } from "../tokens";
  * player of the match and shared news. No rosters, answers, chat, dues, injuries or contacts.
  */
 
-const rank = (t: SponsorTier) => SPONSOR_TIERS.indexOf(t);
+const rank = (t: SponsorTier | null) => (t ? SPONSOR_TIERS.indexOf(t) : SPONSOR_TIERS.length);
 const MAX_LOGO = 400_000;
 const today = () => now().slice(0, 10);
 const live = (s: Sponsor) => s.status === "active" && (!s.endsOn || s.endsOn >= today());
@@ -82,22 +82,21 @@ export async function saveSponsor(scope: { teamId?: ID; clubId?: ID }, id: ID | 
   const website = input.website?.trim() || null;
   const email = input.email ? norm(input.email) : "";
   if (!name) fieldErrors.name = "Add the sponsor's name.";
-  if (!tier) fieldErrors.tier = "Pick a tier.";
+  if (input.tier && !tier) fieldErrors.tier = "Pick a badge, or no badge.";
   if (website && !/^https?:\/\/[^\s.]+\.[^\s]+$/i.test(website)) fieldErrors.website = "Use a full link like https://cornercafe.ca";
-  if (!existing && !EMAIL_RE.test(email)) fieldErrors.email = "Add the email of whoever looks after the sponsorship.";
-  if (existing && email && !EMAIL_RE.test(email)) fieldErrors.email = "Enter an email like name@company.ca.";
+  if (email && !EMAIL_RE.test(email)) fieldErrors.email = "Enter an email like name@company.ca, or leave it blank.";
   for (const k of ["startsOn", "endsOn"] as const) if (input[k] && !/^\d{4}-\d{2}-\d{2}$/.test(input[k]!)) fieldErrors[k] = "Pick a date.";
   if (input.startsOn && input.endsOn && input.endsOn < input.startsOn) fieldErrors.endsOn = "Ends before it starts.";
   if (input.logo && input.logo !== "keep" && (!/^data:image\/(png|jpe?g|webp|svg\+xml);base64,/.test(input.logo) || input.logo.length > MAX_LOGO)) fieldErrors.logo = "Use a PNG, JPG or SVG under 300 KB.";
   if (Object.keys(fieldErrors).length) return { ok: false, error: "Check the highlighted fields.", fieldErrors };
 
   const s: Sponsor = existing ?? {
-    id: newId(), clubId: sc.clubId ?? null, teamId: sc.teamId ?? null, name, tier: tier!, logo: null, website, blurb: null,
-    contactUserId: null, invitedEmail: null, status: "invited", startsOn: null, endsOn: null, createdBy: user.id, createdAt: now(),
+    id: newId(), clubId: sc.clubId ?? null, teamId: sc.teamId ?? null, name, tier: tier ?? null, logo: null, website, blurb: null,
+    contactUserId: null, invitedEmail: null, status: email ? "invited" : "active", startsOn: null, endsOn: null, createdBy: user.id, createdAt: now(),
   };
   Object.assign(s, {
     name: name.slice(0, 80),
-    tier,
+    tier: tier ?? null,
     website,
     blurb: input.blurb?.trim().slice(0, 200) || null,
     startsOn: input.startsOn || null,
@@ -105,7 +104,7 @@ export async function saveSponsor(scope: { teamId?: ID; clubId?: ID }, id: ID | 
     ...(input.logo !== undefined && input.logo !== "keep" ? { logo: input.logo || null } : {}),
   });
   if (!existing) db.sponsors.push(s);
-  if (s.status === "ended" && (!s.endsOn || s.endsOn >= today())) s.status = s.contactUserId ? "active" : "invited";
+  if (s.status === "ended" && (!s.endsOn || s.endsOn >= today())) s.status = s.contactUserId || !s.invitedEmail ? "active" : "invited";
 
   // New contact: invite them. Same email as now: nothing to send.
   const currentEmail = s.contactUserId ? profileById(s.contactUserId)?.email : s.invitedEmail;
@@ -126,8 +125,8 @@ function sendInvite(s: Sponsor, from: string) {
   const token = sign({ k: "sponsor", s: s.id, e: s.invitedEmail }, 60 * 60 * 24 * 30);
   queueEmail({
     to: s.invitedEmail!,
-    subject: `${scopeName(s)} · You're a ${TIER_LABEL[s.tier]} sponsor`,
-    text: `${from} added ${s.name} as a ${TIER_LABEL[s.tier]} sponsor of ${scopeName(s)}. Sign in to follow the matches, results and news the team shares with sponsors.`,
+    subject: `${scopeName(s)} · You're a${s.tier ? ` ${TIER_LABEL[s.tier]}` : ""} sponsor`,
+    text: `${from} added ${s.name} as a${s.tier ? ` ${TIER_LABEL[s.tier]}` : ""} sponsor of ${scopeName(s)}. Sign in to follow the matches, results and news the team shares with sponsors.`,
     links: [{ label: "Open the sponsor page", href: `${APP_URL}/sponsor-invite/${token}` }],
   });
 }
@@ -140,7 +139,7 @@ export async function endSponsor(id: ID, end: boolean): Promise<ActionResult> {
     s.status = "ended";
     s.endsOn = today() > (s.startsOn ?? "") ? new Date(Date.now() - 86400_000).toISOString().slice(0, 10) : s.startsOn;
   } else {
-    s.status = s.contactUserId ? "active" : "invited";
+    s.status = s.contactUserId || !s.invitedEmail ? "active" : "invited";
     if (s.endsOn && s.endsOn < today()) s.endsOn = null;
   }
   return { ok: true, data: undefined };

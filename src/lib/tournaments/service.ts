@@ -47,6 +47,7 @@ export async function listMyTournaments() {
   const card = async (t: Tournament) => ({
     t,
     logoUrl: tournamentLogoUrl(t),
+    bannerUrl: tournamentBannerUrl(t),
     clubName: await repo.clubName(t.clubId),
     mine: (byT.get(t.id) ?? []).map((e) => ({ entryId: e.id, status: e.status, teamName: teams.find((x) => x.id === e.teamId)?.name ?? e.name })),
   });
@@ -78,6 +79,7 @@ export interface MatchView extends Match {
 }
 
 export interface TournamentView {
+  bannerUrl: string | null;
   t: Tournament;
   logoUrl: string | null;
   clubName: string | null;
@@ -147,6 +149,7 @@ export async function getTournament(key: string): Promise<TournamentView | null>
   return {
     t,
     logoUrl: tournamentLogoUrl(t),
+    bannerUrl: tournamentBannerUrl(t),
     clubName,
     role,
     entries: ev,
@@ -162,6 +165,23 @@ export async function getTournament(key: string): Promise<TournamentView | null>
 export async function tournamentLogo(id: string): Promise<string | null> {
   return (await repo.tournament(id))?.logo ?? null;
 }
+
+/** The banner / poster, for whoever can see the tournament. */
+export async function tournamentBanner(id: string): Promise<string | null> {
+  const t = await repo.tournament(id);
+  return t?.bannerAt ? repo.banner(t.id) : null;
+}
+
+export const tournamentBannerUrl = (t: Pick<Tournament, "id" | "bannerAt">) => (t.bannerAt ? `/api/img/tbanner/${t.id}?v=${encodeURIComponent(t.bannerAt)}` : null);
+
+const BANNER = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/;
+export const BANNER_MAX_CHARS = 2_000_000;
+
+/** Today in Toronto, as YYYY-MM-DD. */
+const torontoToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+
+/** The location can change until the tournament's first day starts. */
+export const venueLocked = (t: Pick<Tournament, "startsOn">) => torontoToday() >= t.startsOn;
 
 // ---------------------------------------------------------------------------
 // creating and editing
@@ -190,6 +210,8 @@ export interface TournamentInput {
   pointsLoss: string;
   isPublic: boolean;
   registrationOpen: boolean;
+  /** Data URL, null to remove, undefined to leave as is. */
+  banner?: string | null;
   rosterMax: string;
   rosterMin: string;
   rosterRules: string;
@@ -226,6 +248,7 @@ function clean(input: TournamentInput) {
   const lng = input.venueLng.trim() ? Number(input.venueLng) : null;
   if (input.logo && (!LOGO.test(input.logo) || input.logo.length > 400_000)) fe.logo = "Use a PNG, JPG, WebP or SVG under 300 KB.";
   if (input.rules.length > 5000) fe.rules = "Keep the rules under 5,000 characters.";
+  if (input.banner && (!BANNER.test(input.banner) || input.banner.length > BANNER_MAX_CHARS)) fe.banner = "Use a JPG, PNG or WebP image (it's shrunk for you; try a smaller one if this keeps happening).";
   const rosterMax = input.rosterMax.trim() ? int(input.rosterMax, 0, 1, 80, "rosterMax", "1 to 80 players.") : null;
   const rosterMin = input.rosterMin.trim() ? int(input.rosterMin, 0, 1, 80, "rosterMin", "1 to 80 players.") : null;
   if (rosterMax != null && rosterMin != null && rosterMin > rosterMax) fe.rosterMin = "Can't be more than the most players allowed.";
@@ -279,8 +302,10 @@ export async function createTournament(input: TournamentInput): Promise<Result<{
       logo: input.logo ?? null,
       currency: "CAD",
       status: data.registrationOpen ? "registration" : "draft",
+      bannerAt: null,
       createdBy: await repo.uid(),
     });
+    if (input.banner) await repo.setBanner(t.id, input.banner);
     return { ok: true, data: { id: t.id } };
   });
 }
@@ -306,7 +331,11 @@ export async function updateTournament(id: string, input: TournamentInput): Prom
     const fixturesExist = (await repo.matches(id)).length > 0;
     if (fixturesExist && (data.format !== t.format || data.legs !== t.legs || data.groupCount !== t.groupCount || data.advancePerGroup !== t.advancePerGroup))
       return fail("Fixtures are already made. Clear them on the Teams tab before changing the format.", { format: "Clear the fixtures first." });
+    const moved =
+      (data.venueName ?? null) !== (t.venueName ?? null) || (data.venueAddress ?? null) !== (t.venueAddress ?? null) || data.venueLat !== t.venueLat || data.venueLng !== t.venueLng;
+    if (moved && venueLocked(t)) return fail("The tournament has started, so the location can't change any more.", { venueName: "Locked from the first day." });
     await repo.updateTournament(id, { ...data, ...(input.logo !== undefined ? { logo: input.logo } : {}) });
+    if (input.banner !== undefined) await repo.setBanner(id, input.banner);
     await syncCalendars(id);
     return { ok: true, data: undefined };
   });

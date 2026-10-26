@@ -614,3 +614,14 @@ export async function setMyPhotoAction(dataUrl: string): Promise<FormState> {
   revalidatePath("/", "layout");
   return { ok: true, message: dataUrl ? "Photo saved." : "Photo removed." };
 }
+
+// ---------- fans ----------
+
+export async function followTeamAction(teamId: string, on: boolean): Promise<FormState> {
+  const { setFollow } = await import("@/lib/fans");
+  const res = await setFollow(teamId, on);
+  if (!res.ok) return { error: res.error };
+  revalidatePath(`/f/${teamId}`);
+  revalidatePath("/teams");
+  return { ok: true };
+}

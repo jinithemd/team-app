@@ -6,6 +6,7 @@ import { createTournamentAction, updateTournamentAction } from "@/app/tournament
 import type { FormState } from "@/app/actions";
 import { Field, Input, buttonClass, inputClass } from "@/components/ui";
 import { ImagePicker } from "@/components/image-picker";
+import { BannerPicker } from "@/components/banner-picker";
 import { LocationPicker } from "@/components/location-picker";
 import { FORMAT_HINT, FORMAT_LABEL, type Format } from "@/lib/tournaments/engine";
 import type { Tournament } from "@/lib/tournaments/types";
@@ -20,7 +21,21 @@ const toLocalInput = (iso: string | null | undefined) => {
 };
 
 /** Host a tournament, or edit one (T2). */
-export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: string; name: string }[]; t?: Tournament; logoUrl?: string | null; locked?: boolean }) {
+export function TournamentForm({
+  clubs,
+  t,
+  logoUrl,
+  bannerUrl,
+  locked,
+  venueLocked,
+}: {
+  clubs: { id: string; name: string }[];
+  t?: Tournament;
+  logoUrl?: string | null;
+  bannerUrl?: string | null;
+  locked?: boolean;
+  venueLocked?: boolean;
+}) {
   const editing = !!t;
   const bound = editing ? updateTournamentAction.bind(null, t!.id) : createTournamentAction;
   const [state, action, pending] = useActionState<FormState, FormData>(bound, null);
@@ -51,7 +66,14 @@ export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: str
       <Field id="name" label="Tournament name" error={fe.name}>
         <Input id="name" name="name" maxLength={80} defaultValue={t?.name} placeholder="e.g. Limestone Summer Cup" error={fe.name} />
       </Field>
-      <ImagePicker name="logo" initial={logoUrl ?? null} label="Logo" fallback={<Trophy aria-hidden className="size-6 text-muted" />} />
+      <BannerPicker
+        name="banner"
+        initial={bannerUrl ?? null}
+        label="Banner or poster"
+        hint="Shown big at the top of the tournament page. Use your poster, a wide banner with your logo, or one with your sponsors."
+      />
+      {fe.banner && <p className="-mt-4 text-xs text-danger">{fe.banner}</p>}
+      <ImagePicker name="logo" initial={logoUrl ?? null} label="Small logo (optional)" fallback={<Trophy aria-hidden className="size-6 text-muted" />} />
       {fe.logo && <p className="-mt-4 text-xs text-danger">{fe.logo}</p>}
 
       <fieldset className="grid gap-2" disabled={locked}>
@@ -87,7 +109,15 @@ export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: str
               <Input id="groupCount" name="groupCount" type="number" min={1} max={16} defaultValue={t?.groupCount ?? 2} error={fe.groupCount} />
             </Field>
             <Field id="advancePerGroup" label="Through from each" error={fe.advancePerGroup}>
-              <Input id="advancePerGroup" name="advancePerGroup" type="number" min={1} max={8} defaultValue={t?.advancePerGroup ?? 2} error={fe.advancePerGroup} />
+              <Input
+                id="advancePerGroup"
+                name="advancePerGroup"
+                type="number"
+                min={1}
+                max={8}
+                defaultValue={t?.advancePerGroup ?? 2}
+                error={fe.advancePerGroup}
+              />
             </Field>
           </div>
         )}
@@ -109,31 +139,52 @@ export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: str
         </Field>
       </div>
 
-      <fieldset className="grid gap-3 rounded-md border border-border p-3">
-        <legend className="px-1 text-sm font-semibold">Venue</legend>
-        <LocationPicker
-          idPrefix="tvenue"
-          lat={lat}
-          lng={lng}
-          radiusM={150}
-          onPin={(a, b) => {
-            setLat(a);
-            setLng(b);
-          }}
-          onPlace={(p) => {
-            if (!venueName.trim()) setVenueName(p.label.slice(0, 120));
-            setVenueAddress([p.label, p.detail].filter(Boolean).join(", ").slice(0, 200));
-          }}
-        />
-        <input type="hidden" name="lat" value={lat} />
-        <input type="hidden" name="lng" value={lng} />
-        <Field id="venueName" label="Venue name">
-          <Input id="venueName" name="venueName" maxLength={120} value={venueName} onChange={(e) => setVenueName(e.target.value)} placeholder="e.g. Caraco Park" />
-        </Field>
-        <Field id="venueAddress" label="Address" hint="Optional">
-          <Input id="venueAddress" name="venueAddress" maxLength={200} value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)} />
-        </Field>
-      </fieldset>
+      {venueLocked ? (
+        <div className="grid gap-1 rounded-md border border-border p-3 text-sm">
+          <span className="font-semibold">Venue</span>
+          <span>{[t?.venueName, t?.venueAddress].filter(Boolean).join(", ") || "Not set"}</span>
+          <span className="text-xs text-muted">The tournament has started, so the location is locked.</span>
+          <input type="hidden" name="venueName" value={t?.venueName ?? ""} />
+          <input type="hidden" name="venueAddress" value={t?.venueAddress ?? ""} />
+          <input type="hidden" name="lat" value={t?.venueLat ?? ""} />
+          <input type="hidden" name="lng" value={t?.venueLng ?? ""} />
+        </div>
+      ) : (
+        <fieldset className="grid gap-3 rounded-md border border-border p-3">
+          <legend className="px-1 text-sm font-semibold">Venue</legend>
+          <p className="text-xs text-muted">You can change the location until the tournament&apos;s first day. Teams&apos; calendars update by themselves.</p>
+          {fe.venueName && <p className="text-sm text-danger">{fe.venueName}</p>}
+          <LocationPicker
+            idPrefix="tvenue"
+            lat={lat}
+            lng={lng}
+            radiusM={150}
+            onPin={(a, b) => {
+              setLat(a);
+              setLng(b);
+            }}
+            onPlace={(p) => {
+              if (!venueName.trim()) setVenueName(p.label.slice(0, 120));
+              setVenueAddress([p.label, p.detail].filter(Boolean).join(", ").slice(0, 200));
+            }}
+          />
+          <input type="hidden" name="lat" value={lat} />
+          <input type="hidden" name="lng" value={lng} />
+          <Field id="venueName" label="Venue name">
+            <Input
+              id="venueName"
+              name="venueName"
+              maxLength={120}
+              value={venueName}
+              onChange={(e) => setVenueName(e.target.value)}
+              placeholder="e.g. Caraco Park"
+            />
+          </Field>
+          <Field id="venueAddress" label="Address" hint="Optional">
+            <Input id="venueAddress" name="venueAddress" maxLength={200} value={venueAddress} onChange={(e) => setVenueAddress(e.target.value)} />
+          </Field>
+        </fieldset>
+      )}
 
       <Field id="rules" label="Rules" error={fe.rules} hint="Match length, squad sizes, tie-breakers, what to bring. Shown on the tournament page.">
         <textarea id="rules" name="rules" rows={5} maxLength={5000} defaultValue={t?.rules ?? ""} className={`${inputClass} py-2.5`} />
@@ -142,21 +193,50 @@ export function TournamentForm({ clubs, t, logoUrl, locked }: { clubs: { id: str
       <fieldset className="grid gap-3 rounded-md border border-border p-3">
         <legend className="px-1 text-sm font-semibold">Team rosters</legend>
         <p className="text-xs text-muted">
-          Each team lists its players with jersey numbers, plus a manager and a coach, then submits. After that only you can change a roster, and every change you make is marked on it.
+          Each team lists its players with jersey numbers, plus a manager and a coach, then submits. After that only you can change a roster, and every change
+          you make is marked on it.
         </p>
         <div className="grid grid-cols-2 gap-3">
           <Field id="rosterMax" label="Most players per team" error={fe.rosterMax} hint="Leave blank for no limit">
-            <Input id="rosterMax" name="rosterMax" type="number" min={1} max={80} defaultValue={t?.rosterMax ?? ""} placeholder="e.g. 18" error={fe.rosterMax} />
+            <Input
+              id="rosterMax"
+              name="rosterMax"
+              type="number"
+              min={1}
+              max={80}
+              defaultValue={t?.rosterMax ?? ""}
+              placeholder="e.g. 18"
+              error={fe.rosterMax}
+            />
           </Field>
           <Field id="rosterMin" label="Fewest players" error={fe.rosterMin} hint="Optional">
-            <Input id="rosterMin" name="rosterMin" type="number" min={1} max={80} defaultValue={t?.rosterMin ?? ""} placeholder="e.g. 11" error={fe.rosterMin} />
+            <Input
+              id="rosterMin"
+              name="rosterMin"
+              type="number"
+              min={1}
+              max={80}
+              defaultValue={t?.rosterMin ?? ""}
+              placeholder="e.g. 11"
+              error={fe.rosterMin}
+            />
           </Field>
         </div>
-        <Field id="rosterDeadlineLocal" label="Roster deadline" error={fe.rosterDeadline} hint="Optional. Either way, a team's roster closes when its first game kicks off.">
+        <Field
+          id="rosterDeadlineLocal"
+          label="Roster deadline"
+          error={fe.rosterDeadline}
+          hint="Optional. Either way, a team's roster closes when its first game kicks off."
+        >
           <Input id="rosterDeadlineLocal" type="datetime-local" value={deadline} onChange={(e) => setDeadline(e.target.value)} error={fe.rosterDeadline} />
         </Field>
         <input type="hidden" name="rosterDeadline" value={deadlineIso} />
-        <Field id="rosterRules" label="Player criteria" error={fe.rosterRules} hint="Anything players must meet, one per line. Teams confirm it when they submit.">
+        <Field
+          id="rosterRules"
+          label="Player criteria"
+          error={fe.rosterRules}
+          hint="Anything players must meet, one per line. Teams confirm it when they submit."
+        >
           <textarea
             id="rosterRules"
             name="rosterRules"

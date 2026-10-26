@@ -16,7 +16,9 @@ const refresh = (id?: string) => {
 
 function input(f: FormData): svc.TournamentInput {
   const logo = f.get("logo");
+  const banner = f.get("banner");
   return {
+    banner: banner === null || String(banner) === "keep" ? undefined : String(banner) || null,
     clubId: str(f, "clubId"),
     name: str(f, "name"),
     logo: logo === null || String(logo) === "keep" ? undefined : String(logo) || null,

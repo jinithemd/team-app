@@ -38,6 +38,8 @@ export interface Tournament {
   rosterRules: string | null;
   /** Teams can't change their roster after this (and never after their first kick-off). */
   rosterDeadline: string | null;
+  /** When the banner / poster was last set (null: none). The image itself is stored apart. */
+  bannerAt: string | null;
   createdBy: string | null;
   updatedAt: string;
 }

@@ -79,6 +79,8 @@ export interface Repo {
   submitRoster(entryId: string): Promise<void>;
   /** Make the tournament's events on team calendars exactly these (adds, updates, removes). */
   syncCalendar(tid: string, wanted: CalendarEvent[]): Promise<void>;
+  banner(tid: string): Promise<string | null>;
+  setBanner(tid: string, image: string | null): Promise<void>;
   /** One captain per roster (null: none). */
   setCaptain(entryId: string, personId: string | null): Promise<void>;
   /** Players on a Clbx team, to pick from. */

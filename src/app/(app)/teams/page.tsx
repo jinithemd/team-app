@@ -9,11 +9,12 @@ import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
 import { TeamCrest } from "@/components/ui";
 import { crestUrl } from "@/lib/images";
+import { followedTeams } from "@/lib/fans";
 
 export const metadata: Metadata = { title: "Teams" };
 
 export default async function TeamsPage() {
-  const [teams, clubs, tours] = await Promise.all([listMyTeams(), listMyClubs(), listMyTournaments().catch(() => null)]);
+  const [teams, clubs, tours, follows] = await Promise.all([listMyTeams(), listMyClubs(), listMyTournaments().catch(() => null), followedTeams().catch(() => [])]);
   const invites = tours?.invitations.length ?? 0;
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-5 py-6">
@@ -106,6 +107,24 @@ export default async function TeamsPage() {
             </ButtonLink>
           }
         />
+      )}
+      {follows.length > 0 && (
+        <section aria-labelledby="follow-h" className="grid gap-2">
+          <h2 id="follow-h" className="eyebrow">
+            Teams you follow
+          </h2>
+          <ul className="grid gap-2">
+            {follows.map((t) => (
+              <li key={t.id}>
+                <Link href={`/f/${t.id}`} className="flex min-h-14 items-center gap-3 rounded-lg border border-border p-3 hover:border-border-input">
+                  <TeamCrest teamId={t.id} name={t.name} crestUrl={t.crestUrl} size={40} />
+                  <span className="min-w-0 flex-1 font-semibold break-words">{t.name}</span>
+                  <ChevronRight aria-hidden className="size-5 shrink-0 text-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );

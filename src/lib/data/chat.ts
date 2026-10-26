@@ -65,13 +65,13 @@ export async function unreadChatCount() {
 }
 
 /** The sponsor someone speaks for in this team's sponsor room, if any (best tier first). */
-function sponsorOf(userId: ID, teamId: ID): { name: string; tier: SponsorTier } | null {
+function sponsorOf(userId: ID, teamId: ID): { name: string; tier: SponsorTier | null } | null {
   const team = teamById(teamId);
   const today = now().slice(0, 10);
   const order = ["diamond", "platinum", "gold", "silver", "bronze"];
   const s = db.sponsors
     .filter((x) => x.contactUserId === userId && x.status === "active" && (!x.endsOn || x.endsOn >= today) && (x.teamId === teamId || (!!x.clubId && x.clubId === team?.clubId)))
-    .sort((a, b) => order.indexOf(a.tier) - order.indexOf(b.tier))[0];
+    .sort((a, b) => order.indexOf(a.tier ?? "none") - order.indexOf(b.tier ?? "none"))[0];
   return s ? { name: s.name, tier: s.tier } : null;
 }
 
@@ -96,7 +96,7 @@ export interface ChatView {
     author: Person;
     /** As this viewer may see it: sponsors see team members as "First L." */
     authorName: string;
-    authorSponsor: { name: string; tier: SponsorTier } | null;
+    authorSponsor: { name: string; tier: SponsorTier | null } | null;
     mine: boolean;
     body: string;
     imageUrl: string | null;

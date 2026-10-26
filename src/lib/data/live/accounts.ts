@@ -195,5 +195,9 @@ export async function crestImage(teamId: string): Promise<string | null> {
   const { userClient } = await import("../../supabase/server");
   const sb = await userClient();
   const { data } = await sb.from("teams").select("logo_path").eq("id", teamId).maybeSingle();
-  return data?.logo_path ?? null;
+  if (data) return data.logo_path ?? null;
+  // Visitors to a public team's fan page or a public tournament page: public teams' crests only.
+  const { adminClient } = await import("../../supabase/server");
+  const { data: pub } = await adminClient().from("teams").select("logo_path").eq("id", teamId).eq("is_public", true).is("archived_at", null).maybeSingle();
+  return pub?.logo_path ?? null;
 }

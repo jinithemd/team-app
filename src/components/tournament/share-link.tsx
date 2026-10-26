@@ -21,7 +21,7 @@ export function ShareLink({ path, title }: { path: string; title: string }) {
     setTimeout(() => setCopied(false), 2000);
   }
   return (
-    <button type="button" onClick={share} className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border bg-bg px-3 text-sm font-semibold">
+    <button type="button" onClick={share} className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-border bg-bg px-3 text-sm font-semibold text-fg">
       {copied ? <Check aria-hidden className="size-4" /> : <Share2 aria-hidden className="size-4" />}
       {copied ? "Link copied" : "Share"}
     </button>

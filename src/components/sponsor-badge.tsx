@@ -11,7 +11,8 @@ const TIER_STYLE: Record<SponsorTier, { bg: string; fg: string; ring: string }> 
   bronze: { bg: "linear-gradient(135deg,#F2D2B6,#FAE6D6)", fg: "#7A3712", ring: "#DDA77F" },
 };
 
-export function TierBadge({ tier, size = "sm" }: { tier: SponsorTier; size?: "sm" | "lg" }) {
+export function TierBadge({ tier, size = "sm" }: { tier: SponsorTier | null; size?: "sm" | "lg" }) {
+  if (!tier) return null;
   const s = TIER_STYLE[tier];
   const Icon = tier === "diamond" ? Gem : tier === "platinum" ? Award : Medal;
   return (

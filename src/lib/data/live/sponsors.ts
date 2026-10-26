@@ -13,7 +13,7 @@ import { onLive } from "./run";
  * because the person opening it isn't anyone yet.
  */
 
-const rank = (t: string) => SPONSOR_TIERS.indexOf(t as SponsorTier);
+const rank = (t: string | null) => (t ? SPONSOR_TIERS.indexOf(t as SponsorTier) : SPONSOR_TIERS.length);
 const pub = (r: { id: string | null; name: string | null; tier: string | null; logo_url: string | null; website: string | null; blurb: string | null; team_id: string | null }): PublicSponsor => ({
   id: r.id!, name: r.name!, tier: r.tier as SponsorTier, logo: r.logo_url, website: r.website, blurb: r.blurb, scope: r.team_id ? "team" : "club",
 });

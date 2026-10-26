@@ -425,7 +425,8 @@ export interface Sponsor {
   clubId: ID | null; // a club sponsor backs every club team
   teamId: ID | null;
   name: string;
-  tier: SponsorTier;
+  /** The badge (Diamond … Bronze), or none. */
+  tier: SponsorTier | null;
   logo: string | null;
   website: string | null;
   blurb: string | null;
@@ -442,7 +443,7 @@ export interface Sponsor {
 export interface PublicSponsor {
   id: ID;
   name: string;
-  tier: SponsorTier;
+  tier: SponsorTier | null;
   logo: string | null;
   website: string | null;
   blurb: string | null;

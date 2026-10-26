@@ -52,7 +52,7 @@ with sync_playwright() as pw:
     pr.fill("#name", "Lakeside Dental"); pr.get_by_role("radio", name="Platinum").click()
     pr.fill("#website", "https://example.com/lakeside"); pr.fill("#email", "dental@example.com")
     shot(pr, "sponsor-add")
-    pr.get_by_role("button", name="Add sponsor and send invite").click(); pr.wait_for_url(re.compile(r"saved=new"), wait_until="commit")
+    pr.get_by_role("button", name="Add sponsor").click(); pr.wait_for_url(re.compile(r"saved=new"), wait_until="commit")
     row = pr.locator("li", has_text="Lakeside Dental")
     expect(row.get_by_text("Platinum sponsor", exact=True)).to_be_visible(); expect(row.get_by_text("Invite sent")).to_be_visible(); shot(pr, "sponsor-manage"); step("captain adds a Platinum sponsor, invite sent")
 
