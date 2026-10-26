@@ -32,7 +32,7 @@ function TournamentCard({ c, note }: { c: Card; note?: string }) {
 
 export default async function TournamentsPage({ searchParams }: { searchParams: Promise<{ deleted?: string }> }) {
   const sp = await searchParams;
-  const { canHost, hosting, playing, invitations } = await listMyTournaments();
+  const { canHost, runsTeams, hosting, playing, invitations } = await listMyTournaments();
   const nothing = !hosting.length && !playing.length && !invitations.length;
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6 py-6">
@@ -40,7 +40,7 @@ export default async function TournamentsPage({ searchParams }: { searchParams: 
         title="Tournaments"
         subtitle="Cups, leagues and festivals your club hosts or your teams play in."
         action={
-          canHost ? (
+          canHost || runsTeams ? (
             <ButtonLink href="/tournaments/new">
               <Plus aria-hidden />
               Host a tournament
@@ -101,7 +101,7 @@ export default async function TournamentsPage({ searchParams }: { searchParams: 
           icon={<Trophy />}
           title="No tournaments yet"
           hint={
-            canHost
+            canHost || runsTeams
               ? "Host one for your club: pick a format, invite teams, and the fixtures and table look after themselves."
               : "When a club invites one of your teams, the invitation shows up here. Club owners and admins can host tournaments."
           }

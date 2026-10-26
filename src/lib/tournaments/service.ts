@@ -54,6 +54,8 @@ export async function listMyTournaments() {
   const organizing = await Promise.all(cards.map((c) => repo.isOfficial(c.t)));
   return {
     canHost: clubs.length > 0,
+    /** Runs a team but no club: Host leads to "make your team a club". */
+    runsTeams: teams.length > 0,
     hosting: cards.filter((c, i) => clubIds.has(c.t.clubId) || organizing[i]),
     invitations: cards.flatMap((c) => c.mine.filter((m) => m.status === "invited").map((m) => ({ ...c, invite: m }))),
     playing: cards.filter((c, i) => !(clubIds.has(c.t.clubId) || organizing[i]) && c.mine.some((m) => m.status === "accepted" || m.status === "applied")),

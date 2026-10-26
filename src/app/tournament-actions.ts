@@ -175,3 +175,12 @@ export async function removeOfficialAction(id: string, userId: string): Promise<
   refresh(id);
   return { ok: true };
 }
+
+/** "My team is my club": make a club from a team I run, then go host. */
+export async function clubFromTeamAction(teamId: string): Promise<FormState> {
+  const { createClubFromTeam } = await import("@/lib/data");
+  const res = await createClubFromTeam(teamId);
+  if (!res.ok) return { error: res.error };
+  revalidatePath("/", "layout");
+  redirect("/tournaments/new?club=1");
+}

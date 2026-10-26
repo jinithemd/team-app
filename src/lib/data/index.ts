@@ -137,6 +137,7 @@ export const updateClub = pick("updateClub");
 export const addClubAdmin = pick("addClubAdmin");
 export const removeClubAdmin = pick("removeClubAdmin");
 export const getClubStats = pick("getClubStats");
+export const createClubFromTeam = pick("createClubFromTeam");
 export const teamSponsors = pick("teamSponsors");
 export const clubSponsors = pick("clubSponsors");
 export const listTeamSponsors = pick("listTeamSponsors");

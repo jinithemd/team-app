@@ -271,3 +271,35 @@ export async function getClubStats(clubId: ID) {
     staffCanSee: teams.some((t) => isTeamStaff(user.id, t.id)),
   };
 }
+
+/**
+ * Turn a team you run into a club: a club with the team's name, colours and crest, you as
+ * its owner, and the team inside it. For people who think of their team as their club
+ * (tournaments, sponsors and club pages all hang off a club).
+ */
+export async function createClubFromTeam(teamId: ID): Promise<ActionResult<{ clubId: ID }>> {
+  const user = await requireUser();
+  const team = teamById(teamId);
+  if (!team) return { ok: false, error: "Team not found." };
+  if (team.createdBy !== user.id && !hasTeamPerm(user.id, teamId, "edit_settings")) return { ok: false, error: "Only someone who can change the team's settings can do this." };
+  if (team.clubId) return { ok: true, data: { clubId: team.clubId } };
+  const base = team.name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 36) || "club";
+  let slug = base.length >= 3 ? base : `${base}-club`;
+  for (let n = 2; db.clubs.some((c) => c.slug === slug); n++) slug = `${base}-${n}`;
+  const club: Club = {
+    id: newId(),
+    name: team.name.slice(0, 80),
+    slug,
+    color: team.color,
+    colorSecondary: team.colorSecondary,
+    logo: team.settings.crest,
+    blurb: null,
+    joinOpen: true,
+    createdBy: user.id,
+    createdAt: now(),
+  };
+  db.clubs.push(club);
+  db.clubAdmins.push({ clubId: club.id, userId: user.id, role: "owner" });
+  team.clubId = club.id;
+  return { ok: true, data: { clubId: club.id } };
+}
