@@ -36,8 +36,8 @@ export default function TermsPage() {
       <p>
         Card payments in {APP_NAME} are processed by Stripe. To receive payments you set up a payout account with Stripe inside {APP_NAME} and agree
         to the <a href="https://stripe.com/connect-account/legal">Stripe Connected Account Agreement</a>, which includes the{" "}
-        <a href="https://stripe.com/legal">Stripe Services Agreement</a>. Stripe verifies your identity and holds your ID and bank details; {APP_NAME}
-        keeps only whether your account is ready. Whoever collects receives the full amount they charge. The person paying pays an online fee of 3.2% +
+        <a href="https://stripe.com/legal">Stripe Services Agreement</a>. Stripe verifies your identity and holds your ID and bank details;{" "}
+        {APP_NAME}        keeps only whether your account is ready. Whoever collects receives the full amount they charge. The person paying pays an online fee of 3.2% +
         90¢ on top, shown before they pay, which {APP_NAME} keeps to cover card processing and run the service. Refunds and disagreements about what
         a payment was for are between the person who paid and the team or host who collected it; contact us if you need help.
       </p>
