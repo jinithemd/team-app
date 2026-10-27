@@ -53,6 +53,7 @@ export default async function EditEventPage({ params }: { params: Promise<{ team
           homeAway: e.homeAway ?? "home",
           notes: e.notes ?? "",
           squadSize: e.squadSize ? String(e.squadSize) : "",
+          fee: e.feeCents ? (e.feeCents / 100).toFixed(2).replace(/\.00$/, "") : "",
           sponsorVisible: e.sponsorVisible === true ? "show" : e.sponsorVisible === false ? "hide" : "auto",
         }}
       />

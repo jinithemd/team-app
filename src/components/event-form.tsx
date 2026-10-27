@@ -30,6 +30,7 @@ export interface EventFormInitial {
   homeAway: "home" | "away" | "neutral";
   notes: string;
   squadSize: string;
+  fee?: string;
   sponsorVisible?: "auto" | "show" | "hide";
 }
 
@@ -184,6 +185,9 @@ export function EventForm({
         </Field>
         <Field id="squadSize" label="Players needed" error={fe.squadSize} hint="Optional. Shows “12 of 14” on the event.">
           <Input id="squadSize" name="squadSize" type="number" min={1} max={60} defaultValue={initial.squadSize} error={fe.squadSize} />
+        </Field>
+        <Field id="fee" label="Fee per player ($)" error={fe.fee} hint="Optional, like a field rental split. Players can pay it on the event.">
+          <Input id="fee" name="fee" inputMode="decimal" placeholder="0" defaultValue={initial.fee ?? ""} error={fe.fee} />
         </Field>
       </div>
 

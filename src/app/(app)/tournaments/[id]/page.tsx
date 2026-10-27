@@ -4,9 +4,13 @@ import { getTournament } from "@/lib/tournaments/service";
 import { Banner, buttonClass } from "@/components/ui";
 import { AwardsBoard, ChampionBanner, FixtureList, fmtKickoff, money } from "@/components/tournament/bits";
 import { ApplyForm, WithdrawButton } from "@/components/tournament/entry-actions";
+import { tournamentCollector } from "@/lib/payments/service";
+import { priceFor } from "@/lib/payments/pricing";
+import { PayButton } from "@/components/payments";
 
-export default async function TournamentOverview({ params }: { params: Promise<{ id: string }> }) {
+export default async function TournamentOverview({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ payment?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
   const v = await getTournament(id);
   if (!v) notFound();
   const { t } = v;
@@ -16,9 +20,12 @@ export default async function TournamentOverview({ params }: { params: Promise<{
   const upcoming = v.matches.filter((m) => m.status === "scheduled" && m.home && m.away).slice(0, 4);
   const recent = v.matches.filter((m) => m.status === "finished" && m.homeSource !== "BYE" && m.awaySource !== "BYE").slice(-4).reverse();
   const mine = v.entries.filter((e) => e.mine);
+  const owing = t.feeCents > 0 && mine.some((e) => e.status === "accepted" && !e.paid);
+  const online = owing ? (await tournamentCollector(t.id))?.active ?? false : false;
   const hrefFor = manage ? (m: { id: string }) => `/tournaments/${t.id}/matches/${m.id}` : undefined;
   return (
     <>
+      {sp.payment === "cancelled" && <Banner tone="warning">Payment cancelled. Nothing was charged.</Banner>}
       <ChampionBanner entry={v.entries.find((e) => e.id === v.championId)} />
       {(v.awards.length > 0 || v.topScorers.length > 0) && (
         <section aria-labelledby="awards-h" className="grid gap-3">
@@ -66,6 +73,9 @@ export default async function TournamentOverview({ params }: { params: Promise<{
                   </span>
                 </span>
                 <span className="flex flex-wrap items-center gap-2">
+                  {online && e.status === "accepted" && !e.paid && (
+                    <PayButton kind="tournament" refId={e.id} scopeId={t.id} price={priceFor(t.feeCents)} label="Pay entry fee" />
+                  )}
                   {e.status === "accepted" && (
                     <Link href={`/tournaments/${t.id}/teams/${e.id}`} className={buttonClass(e.rosterSubmittedAt ? "secondary" : "primary", "sm")}>
                       {e.rosterSubmittedAt ? "Roster submitted" : "Add your roster"}

@@ -181,6 +181,8 @@ export interface TeamEvent {
   homeAway: "home" | "away" | "neutral" | null;
   notes: string | null;
   squadSize: number | null;
+  /** What each player pays for this one event (cents), paid online or recorded by staff. 0/undefined = free. */
+  feeCents?: number | null;
   status: EventStatus;
   statusReason: string | null;
   potmOpen: boolean;
@@ -351,7 +353,7 @@ export interface Due {
   userId: ID;
   amountCents: number;
 }
-export type PaymentMethod = "etransfer" | "cash" | "other";
+export type PaymentMethod = "etransfer" | "cash" | "other" | "card";
 export interface Payment {
   id: ID;
   dueId: ID;

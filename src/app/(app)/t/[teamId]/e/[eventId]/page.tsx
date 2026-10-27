@@ -11,6 +11,8 @@ import { Banner } from "@/components/ui";
 import { eventTitle } from "@/lib/event-title";
 import { formatLongDate, formatTime, formatTimeRange, zoneLabel } from "@/lib/time";
 import { StaffEventActions } from "./staff-actions";
+import { eventPayments } from "@/lib/payments/service";
+import { CashToggle, PayButton } from "@/components/payments";
 
 export async function generateMetadata({ params }: { params: Promise<{ eventId: string }> }): Promise<Metadata> {
   const e = await getEvent((await params).eventId);
@@ -22,7 +24,7 @@ export default async function EventPage({
   searchParams,
 }: {
   params: Promise<{ teamId: string; eventId: string }>;
-  searchParams: Promise<{ created?: string; saved?: string }>;
+  searchParams: Promise<{ created?: string; saved?: string; payment?: string }>;
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
@@ -30,6 +32,7 @@ export default async function EventPage({
     getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId), eventPerms(eventId), carpoolSummary(eventId),
   ]);
   if (!team || !e || e.teamId !== teamId) notFound();
+  const fee = e.feeCents ? await eventPayments(eventId) : null;
 
   const title = eventTitle(e);
   const past = Date.parse(e.endAt) < Date.now();
@@ -51,6 +54,7 @@ export default async function EventPage({
 
       {sp.created && <Banner>Added to the schedule. Every player got an email with one-tap answers.</Banner>}
       {sp.saved && <Banner>Saved.</Banner>}
+      {sp.payment === "cancelled" && <Banner tone="warning">Payment cancelled. Nothing was charged.</Banner>}
 
       <section aria-labelledby="ev-h" className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -200,6 +204,40 @@ export default async function EventPage({
             initialNote={e.mine.note}
             locked={lockReason}
           />
+        </section>
+      )}
+
+      {fee && !cancelled && (
+        <section aria-labelledby="fee-h" className="grid gap-3 rounded-lg border border-border p-4">
+          <h2 id="fee-h" className="text-lg font-semibold">
+            Fee: ${(fee.fee / 100).toFixed(2)} per player
+          </h2>
+          {fee.iPaid ? (
+            <p className="text-sm font-semibold text-success">You&apos;ve paid. Thanks!</p>
+          ) : e.mine && fee.collecting ? (
+            <PayButton kind="event" refId={e.id} scopeId={teamId} price={fee.price} />
+          ) : e.mine ? (
+            <p className="text-sm text-muted">Pay the organiser directly (cash or e-Transfer).</p>
+          ) : null}
+          {fee.staff && fee.rows.length > 0 && (
+            <div className="grid gap-1 border-t border-border pt-3">
+              <p className="text-sm">
+                <strong className="tabular">{fee.rows.filter((r) => r.paid).length}</strong> of {fee.rows.length} paid
+              </p>
+              <ul>
+                {fee.rows.map((r) => (
+                  <li key={r.userId} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
+                    <span className="min-w-0">
+                      <span className="block font-semibold">{r.name}</span>
+                      {!r.going && <span className="block text-xs text-muted">Not going</span>}
+                    </span>
+                    <CashToggle eventId={e.id} userId={r.userId} paid={r.paid} name={r.name} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {fee.staff && fee.rows.length === 0 && <p className="text-sm text-muted">Players who say they&apos;re going show here with whether they&apos;ve paid.</p>}
         </section>
       )}
 

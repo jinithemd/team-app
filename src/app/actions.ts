@@ -144,6 +144,7 @@ function eventInput(f: FormData) {
     homeAway: (str(f, "homeAway") || "home") as "home" | "away" | "neutral",
     notes: str(f, "notes"),
     squadSize: str(f, "squadSize"),
+    fee: str(f, "fee"),
     repeatWeeks: str(f, "repeat") === "on" ? str(f, "repeatWeeks") : "1",
     sponsorVisible: (["show", "hide"].includes(str(f, "sponsorVisible")) ? str(f, "sponsorVisible") : "auto") as "auto" | "show" | "hide",
     notify: str(f, "notify") === "on",

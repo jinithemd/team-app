@@ -5,11 +5,11 @@ import { activePlayers, clubRoleFor, db, hasTeamPerm, isClubAdmin, isTeamMember,
 /*
  * Dues, tracked by hand: the treasurer sets a fee, players pay by e-Transfer or cash and
  * report it, the treasurer confirms. Players see only their own balance (like the RLS).
- * No card payments in this version.
+ * Card payments go through lib/payments and land here as confirmed payments.
  */
 
 const METHODS: PaymentMethod[] = ["etransfer", "cash", "other"];
-export const METHOD_LABEL: Record<PaymentMethod, string> = { etransfer: "e-Transfer", cash: "Cash", other: "Other" };
+export const METHOD_LABEL: Record<PaymentMethod, string> = { etransfer: "e-Transfer", cash: "Cash", other: "Other", card: "Card (online)" };
 
 function paidOn(dueId: ID, verifiedOnly: boolean) {
   return db.payments.filter((p) => p.dueId === dueId && (!verifiedOnly || p.verifiedAt)).reduce((n, p) => n + p.amountCents, 0);

@@ -5,6 +5,8 @@ import { searchTeams } from "@/lib/data";
 import { getTournament, rosterStatuses } from "@/lib/tournaments/service";
 import { Banner, TeamCrest, buttonClass, inputClass } from "@/components/ui";
 import { FeeSummary, SeededTeams, money } from "@/components/tournament/bits";
+import { tournamentCollector } from "@/lib/payments/service";
+import { CollectorPanel } from "@/components/payments";
 import { EntryControls, FixtureMaker, GuestForm, InviteButton, SeedingEditor } from "./manage-teams";
 
 const STATUS: Record<string, string> = {
@@ -36,7 +38,7 @@ export default async function TeamsTab({ params, searchParams }: { params: Promi
   const groups = t.format === "groups_knockout";
   const seedSorted = [...acceptedList].sort((a, b) => (a.seed ?? 1e9) - (b.seed ?? 1e9) || a.createdAt.localeCompare(b.createdAt));
   const locked = v.matches.length > 0;
-  const rosters = await rosterStatuses(t.id);
+  const [rosters, collect] = await Promise.all([rosterStatuses(t.id), t.feeCents > 0 && org ? tournamentCollector(t.id) : Promise.resolve(null)]);
   const rosterRows = [...acceptedList].sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name));
   const submittedCount = rosters ? acceptedList.filter((e) => rosters[e.id]?.submittedAt).length : 0;
 
@@ -90,7 +92,8 @@ export default async function TeamsTab({ params, searchParams }: { params: Promi
         </section>
       )}
 
-      {t.feeCents > 0 && accepted > 0 && <FeeSummary entries={acceptedList} fee={money(t.feeCents, t.currency)} payTo={t.payTo} />}
+      {t.feeCents > 0 && accepted > 0 && <FeeSummary entries={acceptedList} fee={money(t.feeCents, t.currency)} payTo={t.payTo} online={!!collect?.active} />}
+      {collect && <CollectorPanel scope="tournament" id={t.id} info={collect} what="the entry fee" />}
 
       {rosters && accepted > 0 && (
         <section id="rosters" aria-labelledby="ros-h" className="grid gap-2">

@@ -72,6 +72,11 @@ export default function PrivacyPage() {
           <strong>Resend</strong>: sends our emails, from the United States.
         </li>
         <li>
+          <strong>Stripe</strong>: card payments and payouts. If you pay online, Stripe processes your card. If you collect payments, you give your
+          identity, SIN and bank details to Stripe directly, in a Stripe form inside {APP_NAME}; we only store your Stripe account id and whether it&apos;s
+          ready. Stripe may process data in the United States.
+        </li>
+        <li>
           <strong>Google</strong>: only if you choose &quot;Continue with Google&quot; to sign in.
         </li>
       </ul>

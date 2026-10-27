@@ -353,7 +353,7 @@ export function SeededTeams({ entries, groups, showPaid = false }: { entries: En
 }
 
 /** Who has paid the entry fee and who hasn't (fees are paid outside the app; the host ticks them off). */
-export function FeeSummary({ entries, fee, payTo }: { entries: EntryView[]; fee: string; payTo?: string | null }) {
+export function FeeSummary({ entries, fee, payTo, online = false }: { entries: EntryView[]; fee: string; payTo?: string | null; online?: boolean }) {
   const paid = entries.filter((e) => e.paid).sort((a, b) => a.name.localeCompare(b.name));
   const unpaid = entries.filter((e) => !e.paid).sort((a, b) => a.name.localeCompare(b.name));
   const col = (title: string, list: EntryView[], tone: string, mark: string) => (
@@ -388,7 +388,9 @@ export function FeeSummary({ entries, fee, payTo }: { entries: EntryView[]; fee:
           </span>
         </h2>
         <p className="text-xs text-muted">
-          {fee} per team, paid to the host outside the app{payTo ? ` (${payTo})` : ""}. The host marks each team once it&apos;s paid.
+          {online
+            ? `${fee} per team. Teams can pay by card in the app and are marked paid by themselves; the host ticks off anyone who pays another way.`
+            : <>{fee} per team, paid to the host outside the app{payTo ? ` (${payTo})` : ""}. The host marks each team once it&apos;s paid.</>}
         </p>
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-label="Teams paid" aria-valuemin={0} aria-valuemax={entries.length} aria-valuenow={paid.length}>

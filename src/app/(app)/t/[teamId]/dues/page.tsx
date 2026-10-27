@@ -4,6 +4,9 @@ import { getTeamDues } from "@/lib/data";
 import { Banner, EmptyState } from "@/components/ui";
 import { Wallet } from "lucide-react";
 import { AddFee, ConfirmRow, Remind, ReportPayment } from "./dues-forms";
+import { teamCollector } from "@/lib/payments/service";
+import { priceFor } from "@/lib/payments/pricing";
+import { CollectorPanel, PayButton } from "@/components/payments";
 
 export const metadata: Metadata = { title: "Dues" };
 
@@ -16,11 +19,12 @@ const STATUS = {
   owes: ["bg-sunken text-muted", "Owes"],
 } as const;
 
-export default async function DuesPage({ params, searchParams }: { params: Promise<{ teamId: string }>; searchParams: Promise<{ show?: string }> }) {
+export default async function DuesPage({ params, searchParams }: { params: Promise<{ teamId: string }>; searchParams: Promise<{ show?: string; payment?: string }> }) {
   const { teamId } = await params;
   const sp = await searchParams;
-  const d = await getTeamDues(teamId);
+  const [d, collect] = await Promise.all([getTeamDues(teamId), teamCollector(teamId)]);
   if (!d) return null;
+  const cancelled = sp.payment === "cancelled" && <Banner tone="warning">Payment cancelled. Nothing was charged.</Banner>;
 
   if (!d.treasurer)
     return (
@@ -29,6 +33,7 @@ export default async function DuesPage({ params, searchParams }: { params: Promi
           <h2 className="text-xl font-bold">Your dues</h2>
           <p className="text-sm text-muted">Only you and the treasurer see this.</p>
         </div>
+        {cancelled}
         {d.mine.length === 0 ? (
           <EmptyState icon={<Wallet />} title="Nothing to pay" hint="If the team adds a fee, it shows up here." />
         ) : (
@@ -59,9 +64,10 @@ export default async function DuesPage({ params, searchParams }: { params: Promi
               )}
               {m.left - m.reported > 0 && (
                 <>
+                  {collect.active && <PayButton kind="dues" refId={m.dueId} scopeId={teamId} price={priceFor(m.left - m.reported)} />}
                   {d.payTo && (
                     <Banner>
-                      e-Transfer to <strong className="break-all">{d.payTo}</strong>, then tell us below.
+                      {collect.active ? "Or e-Transfer" : "e-Transfer"} to <strong className="break-all">{d.payTo}</strong>, then tell us below.
                     </Banner>
                   )}
                   <ReportPayment teamId={teamId} dueId={m.dueId} left={(m.left - m.reported) / 100} />
@@ -79,6 +85,7 @@ export default async function DuesPage({ params, searchParams }: { params: Promi
   const pct = d.totals.total ? Math.round((d.totals.collected / d.totals.total) * 100) : 0;
   return (
     <div className="grid gap-5">
+      {cancelled}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-xl font-bold">Dues</h2>
         <a href={`/t/${teamId}/export/dues.csv`} className="text-sm font-semibold text-team-ink">
@@ -118,7 +125,7 @@ export default async function DuesPage({ params, searchParams }: { params: Promi
             {d.toConfirm.length} {d.toConfirm.length === 1 ? "payment" : "payments"} to confirm
           </h3>
           {d.toConfirm.map((p) => (
-            <ConfirmRow key={p.id} teamId={teamId} paymentId={p.id} label={`${p.person.firstName} ${p.person.lastName} · ${money(p.amount)} ${p.method === "etransfer" ? "e-Transfer" : p.method}`} sub={`${p.fee} · paid ${day(p.paidOn)}${p.ref ? ` · ref ${p.ref}` : ""}`} />
+            <ConfirmRow key={p.id} teamId={teamId} paymentId={p.id} label={`${p.person.firstName} ${p.person.lastName} · ${money(p.amount)} ${p.method === "etransfer" ? "e-Transfer" : p.method === "card" ? "card" : p.method}`} sub={`${p.fee} · paid ${day(p.paidOn)}${p.ref ? ` · ref ${p.ref}` : ""}`} />
           ))}
         </section>
       )}
@@ -168,11 +175,13 @@ export default async function DuesPage({ params, searchParams }: { params: Promi
         </section>
       )}
 
+      <CollectorPanel scope="team" id={teamId} info={collect} what="dues and game fees" />
+
       <div className="grid gap-3 sm:grid-cols-2">
         <AddFee teamId={teamId} />
         {toRemind > 0 && <Remind teamId={teamId} count={toRemind} />}
       </div>
-      <p className="text-xs text-muted">Players only see their own balance. Payments are e-Transfer or cash, tracked by hand; no cards in this version.</p>
+      <p className="text-xs text-muted">Players only see their own balance. Card payments are ticked off on their own; e-Transfer and cash you confirm by hand.</p>
     </div>
   );
 }

@@ -64,6 +64,9 @@ export default async function AccountPage() {
           <Link href="/account/notifications" className="text-team-ink">
             Notifications
           </Link>
+          <Link href="/account/payouts" className="text-team-ink">
+            Payouts
+          </Link>
           <Link href="/calendar/subscribe" className="text-team-ink">
             Add to your phone&apos;s calendar
           </Link>

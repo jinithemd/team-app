@@ -750,6 +750,7 @@ export interface EventInput {
   homeAway?: "home" | "away" | "neutral";
   notes?: string;
   squadSize?: string;
+  fee?: string; // "10" = $10 per player
   repeatWeeks?: string; // trainings: repeat weekly for N weeks
   sponsorVisible?: "auto" | "show" | "hide";
   notify: boolean;
@@ -768,6 +769,9 @@ function validateEvent(teamId: ID, input: EventInput) {
     fieldErrors.title = input.type === "tournament" ? "Give the tournament a name." : "Give the event a name, like End-of-season night.";
   const squad = input.squadSize?.trim() ? Number(input.squadSize) : null;
   if (squad !== null && (!Number.isInteger(squad) || squad < 1 || squad > 60)) fieldErrors.squadSize = "Use a number from 1 to 60.";
+  const feeRaw = input.fee?.replace(/[$,\s]/g, "") ?? "";
+  const feeCents = feeRaw ? Math.round(Number(feeRaw) * 100) : 0;
+  if (!Number.isFinite(feeCents) || feeCents < 0 || feeCents > 100_000) fieldErrors.fee = "Use an amount from 0 to 1000, like 10.";
   const meetMin = input.meetMinutes?.trim() ? Number(input.meetMinutes) : 0;
   if (!Number.isInteger(meetMin) || meetMin < 0 || meetMin > 180) fieldErrors.meetMinutes = "Use 0 to 180 minutes.";
   const weeks = input.repeatWeeks?.trim() ? Number(input.repeatWeeks) : 1;
@@ -781,7 +785,7 @@ function validateEvent(teamId: ID, input: EventInput) {
     endAt = zonedToUtc(input.date, input.endTime, tz);
     if (endAt <= startAt) fieldErrors.endTime = "End time needs to be after the start.";
   }
-  return { tz, fieldErrors, startAt, endAt, squad, meetMin, weeks, venue };
+  return { tz, fieldErrors, startAt, endAt, squad, meetMin, weeks, venue, feeCents: Number.isFinite(feeCents) ? feeCents : 0 };
 }
 
 export async function createEvent(teamId: ID, input: EventInput): Promise<ActionResult<TeamEvent>> {
@@ -819,6 +823,7 @@ export async function createEvent(teamId: ID, input: EventInput): Promise<Action
       homeAway: input.type === "match" ? input.homeAway ?? "home" : null,
       notes: input.notes?.trim() || null,
       squadSize: v.squad,
+      feeCents: v.feeCents || null,
       sponsorVisible: sponsorFlag(input.sponsorVisible),
       status: "active",
       statusReason: null,
@@ -859,6 +864,7 @@ export async function updateEvent(eventId: ID, input: EventInput & { scope?: "on
       homeAway: input.type === "match" ? input.homeAway ?? "home" : null,
       notes: input.notes?.trim() || null,
       squadSize: v.squad,
+      feeCents: v.feeCents || null,
       sponsorVisible: sponsorFlag(input.sponsorVisible),
     });
   }
