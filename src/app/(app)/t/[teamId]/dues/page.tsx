@@ -8,7 +8,7 @@ import { teamCollector } from "@/lib/payments/service";
 import { priceFor } from "@/lib/payments/pricing";
 import { CollectorPanel, PayButton } from "@/components/payments";
 
-export const metadata: Metadata = { title: "Dues" };
+export const metadata: Metadata = { title: "Payments" };
 
 const money = (c: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: c % 100 ? 2 : 0 }).format(c / 100);
 const day = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: "UTC" });
@@ -30,12 +30,12 @@ export default async function DuesPage({ params, searchParams }: { params: Promi
     return (
       <div className="grid gap-5">
         <div>
-          <h2 className="text-xl font-bold">Your dues</h2>
+          <h2 className="text-xl font-bold">Your payments</h2>
           <p className="text-sm text-muted">Only you and the treasurer see this.</p>
         </div>
         {cancelled}
         {d.mine.length === 0 ? (
-          <EmptyState icon={<Wallet />} title="Nothing to pay" hint="If the team adds a fee, it shows up here." />
+          <EmptyState icon={<Wallet />} title="Nothing to pay" hint="Season fees from your team show up here. Game fees are on each event." />
         ) : (
           d.mine.map((m) => (
             <section key={m.dueId} aria-label={m.fee} className="grid gap-3 rounded-lg border border-border p-4">
@@ -87,7 +87,7 @@ export default async function DuesPage({ params, searchParams }: { params: Promi
     <div className="grid gap-5">
       {cancelled}
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-bold">Dues</h2>
+        <h2 className="text-xl font-bold">Payments</h2>
         <a href={`/t/${teamId}/export/dues.csv`} className="text-sm font-semibold text-team-ink">
           Export to a spreadsheet
         </a>

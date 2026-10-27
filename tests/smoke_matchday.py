@@ -27,7 +27,7 @@ with sync_playwright() as pw:
     full = r.locator("li", has_text="Leo Grant").first
     expect(full.get_by_text("This car is full")).to_be_visible(); step("full car shows as full")
     # dues: Rahul's own balance on the Reserves
-    r.goto(f"{BASE}/t/t-reserves/dues"); expect(r.get_by_text("Your dues")).to_be_visible()
+    r.goto(f"{BASE}/t/t-reserves/dues"); expect(r.get_by_text("Your payments")).to_be_visible()
     r.get_by_role("button", name="I've paid").click(); expect(r.get_by_text("waiting for the treasurer to confirm")).to_be_visible()
     r.screenshot(path=f"{OUT}/S-dues-player.png", full_page=True); step("Rahul reports his $40")
     # treasurer confirms

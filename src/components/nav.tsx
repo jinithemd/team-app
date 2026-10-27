@@ -99,16 +99,16 @@ export function PrimaryNav({ pendingCount, chatCount = 0 }: { pendingCount: numb
   );
 }
 
-export function TeamTabs({ teamId, show = {} }: { teamId: string; show?: { points?: boolean; dues?: boolean; settings?: boolean } }) {
+export function TeamTabs({ teamId, show = {} }: { teamId: string; show?: { points?: boolean; settings?: boolean } }) {
   const path = usePathname();
   const tabs = [
     { href: `/t/${teamId}/schedule`, label: "Schedule", match: (p: string) => p.includes("/schedule") || p.includes("/e/") },
+    { href: `/t/${teamId}/dues`, label: "Payments", match: (p: string) => p.includes("/dues") },
     { href: `/t/${teamId}/roster`, label: "Roster", match: (p: string) => p.includes("/roster") || p.includes("/you") || p.includes("/p/") },
     { href: `/t/${teamId}/chat`, label: "Chat", match: (p: string) => p.includes("/chat") },
     { href: `/t/${teamId}/achievements`, label: "Achievements", match: (p: string) => p.includes("/achievements") },
     { href: `/t/${teamId}/share`, label: "Share", match: (p: string) => p.includes("/share") },
     ...(show.points ? [{ href: `/t/${teamId}/points`, label: "Points", match: (p: string) => p.includes("/points") || p.includes("/seasons") }] : []),
-    ...(show.dues ? [{ href: `/t/${teamId}/dues`, label: "Dues", match: (p: string) => p.includes("/dues") }] : []),
     { href: `/t/${teamId}/messages`, label: "Messages", match: (p: string) => p.includes("/messages") },
     ...(show.settings ? [{ href: `/t/${teamId}/settings`, label: "Settings", match: (p: string) => p.includes("/settings") || p.includes("/venues") }] : []),
   ];

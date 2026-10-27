@@ -99,7 +99,7 @@ with sync_playwright() as pw:
         c.fill("input[name=name]", "Season fee"); c.fill("input[name=amount]", "120")
         c.get_by_role("button", name="Add fee").click(); expect(c.get_by_text("$120").first).to_be_visible(); settle(c)
         assert sql("select count(*) from dues") == "2"; step("Jin adds a $120 season fee; both players owe it")
-        k.goto(f"{BASE}/t/{TEAM}/dues"); expect(k.get_by_text("Your dues")).to_be_visible()
+        k.goto(f"{BASE}/t/{TEAM}/dues"); expect(k.get_by_text("Your payments")).to_be_visible()
         k.get_by_role("button", name="I've paid").click(); expect(k.get_by_text("waiting for the treasurer to confirm")).to_be_visible(); settle(k)
         assert sql("select count(*) from payments") == "1"; step("Kai reports paying")
         c.reload(); c.get_by_role("button", name="Confirm").first.click(); c.wait_for_timeout(1000)
