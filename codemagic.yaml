@@ -1,0 +1,64 @@
+# Store builds of the Clbx phone apps on Codemagic (codemagic.io), so no Mac is needed.
+# One-time setup in Codemagic (see replica/app-store-guide.md):
+#   - Team integrations → App Store Connect API key, named "Clbx App Store"
+#   - Code signing → Android keystore, reference name "clbx_upload"
+#   - Environment group "clbx_firebase" with GOOGLE_SERVICES_JSON (the file's contents)
+#   - Google Play service account JSON in group "clbx_play" as GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+workflows:
+  ios-release:
+    name: iPhone → TestFlight
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    integrations:
+      app_store_connect: Clbx App Store
+    environment:
+      node: 22
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: ca.clbx.app
+    scripts:
+      - name: Install
+        script: npm ci && npx cap sync ios
+      - name: Signing
+        script: xcode-project use-profiles --project ios/App/App.xcodeproj
+      - name: Build number
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" || echo 0)
+          cd ios/App && agvtool new-version -all $((LATEST + 1))
+      - name: Build
+        script: xcode-project build-ipa --project ios/App/App.xcodeproj --scheme App
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+
+  android-release:
+    name: Android → Play (internal testing)
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      node: 22
+      java: 21
+      android_signing:
+        - clbx_upload
+      groups:
+        - clbx_firebase
+        - clbx_play
+    scripts:
+      - name: Install
+        script: npm ci && npx cap sync android
+      - name: Firebase config
+        script: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+      - name: Build
+        script: |
+          cd android
+          ./gradlew bundleRelease -PversionCode=$((PROJECT_BUILD_NUMBER + 1)) --no-daemon
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+    publishing:
+      google_play:
+        credentials: $GCLOUD_SERVICE_ACCOUNT_CREDENTIALS
+        track: internal

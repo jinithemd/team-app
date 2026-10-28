@@ -32,7 +32,7 @@ export async function setCollectingAction(scope: "team" | "tournament", id: stri
 
 export async function startCheckoutAction(_: { error?: string } | null, f: FormData): Promise<{ error?: string } | null> {
   const kind = String(f.get("kind") ?? "") as PayKind;
-  if (!["dues", "event", "tournament"].includes(kind)) return { error: "Something went wrong. Try again." };
+  if (!["dues", "event", "tournament", "session"].includes(kind)) return { error: "Something went wrong. Try again." };
   const r = await pay.startCheckout({ kind, refId: String(f.get("refId") ?? ""), scopeId: String(f.get("scopeId") ?? "") });
   if (!r.ok) return { error: r.error };
   redirect(r.data.url);

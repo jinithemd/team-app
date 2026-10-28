@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
@@ -15,6 +16,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { next, expired, google, deleted } = await searchParams;
   if (await getSessionUser()) redirect(safeNext(next));
   const accounts = LIVE ? [] : await listDemoAccounts();
+  // Google doesn't allow its sign-in inside apps' web views, so the phone app uses the email code.
+  const inApp = ((await headers()).get("user-agent") ?? "").includes("ClbxApp");
   return (
     <main className="gutter min-h-dvh bg-surface py-10">
       <div className="mx-auto grid max-w-md grid-cols-1 gap-6">
@@ -38,7 +41,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <p className="text-sm text-muted">No password. We email you a link that signs you in.</p>
             </div>
             <SignInForm next={next} />
-            {googleEnabled() && (
+            {googleEnabled() && !inApp && (
               <form action={googleSignInAction}>
                 <input type="hidden" name="next" value={next ?? ""} />
                 <button className={buttonClass("secondary", "lg", "w-full")}>Continue with Google</button>

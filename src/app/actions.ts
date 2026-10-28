@@ -62,6 +62,14 @@ export async function deleteAccountAction(_: FormState, f: FormData): Promise<Fo
 }
 
 export async function signOutAction() {
+  // Stop this phone's notifications for the account that's leaving.
+  const { cookies } = await import("next/headers");
+  const jar = await cookies();
+  const pushToken = jar.get("clbx_push")?.value;
+  if (pushToken) {
+    await (await import("@/lib/push/send")).forgetDevice(pushToken).catch(() => {});
+    jar.delete("clbx_push");
+  }
   await data.signOut();
   redirect("/login");
 }
@@ -476,6 +484,14 @@ export async function remindUnpaidAction(teamId: string, _: FormState): Promise<
 export async function sendChatAction(convId: string, input: { body: string; replyToId?: string | null; imageUrl?: string | null; poll?: { question: string; options: string[]; multi: boolean } | null }) {
   const res = await data.sendChat(convId, input);
   revalidatePath("/", "layout");
+  if (res.ok) {
+    const me = await data.getSessionUser();
+    const text = input.poll ? `Poll: ${input.poll.question}` : input.body;
+    if (me) {
+      const { after } = await import("next/server");
+      after(() => import("@/lib/push/chat").then((m) => m.pushChat(convId, me.id, text)));
+    }
+  }
   return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
 }
 

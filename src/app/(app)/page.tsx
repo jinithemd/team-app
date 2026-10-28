@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertCircle, CalendarPlus, ChevronRight, Plus, Users } from "lucide-react";
+import { sessionsForMe } from "@/lib/sessions/service";
+import { SessionRow } from "@/components/session-bits";
 import { getSessionUser, listMyAvailability, listMyTeams, listPendingRsvps, listUpcomingForMe, mySponsorships } from "@/lib/data";
 import { SponsorMark, TierBadge } from "@/components/sponsor-badge";
 import { EventCard } from "@/components/event-bits";
@@ -21,6 +23,8 @@ export default async function HomePage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   const [teams, upcoming, pending, avail, sponsorships] = await Promise.all([listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability(), mySponsorships()]);
+  const sessions = await sessionsForMe(teams.map((t) => t.id));
+  const myTeamIds = new Set(teams.map((t) => t.id));
   const tBadges = await tournamentBadges([...upcoming, ...pending].map((e) => e.tournamentId));
   const out = avail.periods[0];
   const fmtDay = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(d + "T12:00:00Z"));
@@ -147,6 +151,19 @@ export default async function HomePage() {
               <EventCard key={e.id} e={e} showTeam tournament={e.tournamentId ? tBadges[e.tournamentId] : undefined} />
             ))}
           </div>
+        </section>
+      )}
+
+      {sessions.length > 0 && (
+        <section aria-labelledby="ses-h" className="grid gap-3">
+          <SectionTitle>
+            <span id="ses-h">Games you can join</span>
+          </SectionTitle>
+          <ul className="grid gap-2">
+            {sessions.map((c) => (
+              <SessionRow key={c.id} c={c} member={myTeamIds.has(c.teamId)} showTeam />
+            ))}
+          </ul>
         </section>
       )}
 

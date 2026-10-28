@@ -10,6 +10,8 @@ import { formatDateBlock, formatTime } from "@/lib/time";
 import { SponsorStrip } from "@/components/sponsor-badge";
 import { ShareLink } from "@/components/tournament/share-link";
 import { FollowButton } from "./follow-button";
+import { publicSessions } from "@/lib/sessions/service";
+import { SessionRow } from "@/components/session-bits";
 
 // A team's fan page: what the QR poster points to. Games, results, sponsors and trophies,
 // and a Follow button. Nothing about people.
@@ -69,6 +71,7 @@ export default async function FanPageView({ params }: { params: Promise<{ teamId
   const v = await getFanPage(teamId);
   if (!v) notFound();
   const { team } = v;
+  const sessions = await publicSessions(team.id);
   const initials = team.name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const wins = v.honours.filter((h) => h.place === "champions").length;
   return (
@@ -117,6 +120,20 @@ export default async function FanPageView({ params }: { params: Promise<{ teamId
               <Lock aria-hidden className="mt-0.5 size-4 shrink-0" />
               Only your team can see this page right now. Turn on &ldquo;Public team&rdquo; in the team&apos;s settings so fans can find and follow you.
             </p>
+          )}
+
+          {sessions.length > 0 && (
+            <section aria-labelledby="ses-h" className="grid gap-2">
+              <h2 id="ses-h" className="eyebrow">
+                Come and play
+              </h2>
+              <p className="text-sm text-muted">Drop-in games anyone can join. Book a spot before they fill up.</p>
+              <ul className="grid gap-2">
+                {sessions.map((c) => (
+                  <SessionRow key={c.id} c={c} member={v.isMember} />
+                ))}
+              </ul>
+            </section>
           )}
 
           <section aria-labelledby="next-h" className="grid gap-2">

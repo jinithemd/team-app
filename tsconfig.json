@@ -39,6 +39,11 @@
   ],
   "exclude": [
     "node_modules",
-    "replica"
+    "replica",
+    "android",
+    "ios",
+    "native",
+    "assets",
+    "capacitor.config.ts"
   ]
 }

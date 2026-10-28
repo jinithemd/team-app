@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Share2 } from "lucide-react";
 import { buttonClass } from "@/components/ui";
+import { inApp, shareImageInApp } from "@/lib/native";
 
 /** A ready-made post: preview, save it, or send it straight to Instagram/WhatsApp via the share sheet. */
 export function ShareImage({ src, file, title, text, alt, square }: { src: string; file: string; title: string; text: string; alt: string; square?: boolean }) {
@@ -11,6 +12,11 @@ export function ShareImage({ src, file, title, text, alt, square }: { src: strin
     setMsg(null);
     try {
       const blob = await (await fetch(src)).blob();
+      if (inApp()) {
+        // The phone's own sheet: Instagram, WhatsApp, Save Image.
+        await shareImageInApp(blob, file, title, text);
+        return;
+      }
       const f = new File([blob], file, { type: "image/png" });
       if (navigator.canShare?.({ files: [f] })) {
         await navigator.share({ files: [f], title, text });
@@ -33,7 +39,17 @@ export function ShareImage({ src, file, title, text, alt, square }: { src: strin
           <Share2 aria-hidden />
           Share
         </button>
-        <a href={src} download={file} className={buttonClass("secondary", "md")}>
+        <a
+          href={src}
+          download={file}
+          onClick={(e) => {
+            if (inApp()) {
+              e.preventDefault();
+              void share();
+            }
+          }}
+          className={buttonClass("secondary", "md")}
+        >
           <Download aria-hidden />
           Save image
         </a>

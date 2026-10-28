@@ -2,20 +2,14 @@
 
 import { useState } from "react";
 import { Check, Share2 } from "lucide-react";
+import { shareLink } from "@/lib/native";
 
 /** Share the public page: the phone's share sheet when there is one, otherwise copy the link. */
 export function ShareLink({ path, title }: { path: string; title: string }) {
   const [copied, setCopied] = useState(false);
   async function share() {
     const url = `${location.origin}${path}`;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title, url });
-        return;
-      } catch {
-        /* closed the sheet: fall through to copy */
-      }
-    }
+    if (await shareLink(title, url)) return;
     await navigator.clipboard?.writeText(url).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

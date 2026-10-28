@@ -18,7 +18,7 @@ export interface PayoutAccount {
   needsInfo: boolean;
 }
 
-export type PayKind = "dues" | "event" | "tournament";
+export type PayKind = "dues" | "event" | "tournament" | "session";
 export type PayStatus = "pending" | "paid" | "failed" | "cancelled" | "refunded";
 
 export interface OnlinePayment {

@@ -182,7 +182,7 @@ export async function setMyCollecting(scope: "team" | "tournament", id: string, 
 
 export interface PayTarget {
   kind: PayKind;
-  /** dues: the due id; event: the event id; tournament: the entry id. */
+  /** dues: the due id; event: the event id; tournament: the entry id; session: the booking id. */
   refId: string;
   /** dues and event: the team; tournament: the tournament id. */
   scopeId: string;
@@ -218,6 +218,12 @@ async function resolve(t: PayTarget, uid: string): Promise<Resolved | string> {
     const when = new Date(e.startAt).toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: e.tz });
     const what = e.title || (e.opponent ? `vs ${e.opponent}` : e.type[0].toUpperCase() + e.type.slice(1));
     return { amountCents: e.feeCents, label: `${team?.name ?? "Team"} · ${what} (${when})`, teamId: e.teamId, tournamentId: null, forUserId: uid, collectorScope: "team", collectorId: e.teamId, back: `/t/${e.teamId}/e/${e.id}` };
+  }
+  if (t.kind === "session") {
+    const { bookingForPayment } = await import("../sessions/service");
+    const b = await bookingForPayment(t.refId, uid);
+    if (!b) return "That spot isn't yours to pay for.";
+    return { amountCents: b.amountCents, label: b.label, teamId: b.teamId, tournamentId: null, forUserId: uid, collectorScope: "team", collectorId: b.teamId, back: b.back };
   }
   const v = await getTournament(t.scopeId);
   const entry = v?.entries.find((x) => x.id === t.refId);
@@ -269,6 +275,7 @@ async function settle(p: OnlinePayment, intent: string | null) {
   if (!done) return; // already settled
   if (p.kind === "dues") await creditDue(p.refId, p.amountCents, p.payerId, intent ?? "Card");
   if (p.kind === "tournament") await markEntryPaid(p.refId);
+  if (p.kind === "session") await (await import("../sessions/service")).bookingPaid(p.refId);
 }
 
 /** Stripe's checkout.session.completed / async_payment_succeeded webhooks. */
@@ -302,7 +309,9 @@ export async function receipt(paymentId: string, sessionId?: string): Promise<Re
       // The webhook will catch up.
     }
   }
-  const back = p.kind === "tournament" ? `/tournaments/${p.tournamentId}` : p.kind === "event" ? `/t/${p.teamId}/e/${p.refId}` : `/t/${p.teamId}/dues`;
+  const bookedSession = p.kind === "session" ? (await (await import("../sessions/store")).bookingById(p.refId))?.sessionId : null;
+  const back =
+    p.kind === "tournament" ? `/tournaments/${p.tournamentId}` : p.kind === "event" ? `/t/${p.teamId}/e/${p.refId}` : p.kind === "session" ? `/s/${bookedSession}` : `/t/${p.teamId}/dues`;
   return { payment: p, back, demo: !LIVE };
 }
 

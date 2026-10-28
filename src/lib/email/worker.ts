@@ -3,6 +3,7 @@ import { adminClient } from "../supabase/server";
 import { renderOutbox } from "./render";
 import { emailHtml, emailText } from "./template";
 import { APP_NAME } from "../brand";
+import { pushForEmail } from "../push/send";
 
 /*
  * Sends what's waiting in the outbox through Resend. Runs straight after a save that queued
@@ -57,6 +58,8 @@ export async function processOutbox(limit = 50): Promise<{ sent: number; failed:
       await sendEmail({ to: mail.to, subject: mail.subject, html: emailHtml(mail), text: emailText(mail) });
       await admin.from("outbox").update({ status: "sent", last_error: null }).eq("id", row.id);
       out.sent++;
+      // The same message as a phone notification, for people with the app.
+      if (row.kind !== "signin") await pushForEmail(mail.to, mail);
     } catch (e) {
       const tries = row.attempts + 1;
       const wait = Math.min(60, 2 ** tries) * 60_000; // 2, 4, 8, 16, 32 minutes

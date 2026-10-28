@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { NavProgress } from "@/components/nav-progress";
+import { AppBridge } from "@/components/app-bridge";
 import type { Metadata, Viewport } from "next";
 // Self-hosted (SIL Open Font License): no request to Google, and pages never wait on a font CDN.
 import "@fontsource/inter/latin-400.css";
@@ -38,6 +39,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Suspense fallback={null}>
           <NavProgress />
         </Suspense>
+        <AppBridge />
         {children}
       </body>
     </html>
