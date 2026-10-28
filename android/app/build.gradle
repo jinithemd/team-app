@@ -1,5 +1,9 @@
 apply plugin: 'com.android.application'
 
+// Store builds pass -PversionCode; Codemagic provides the upload key through CM_* variables.
+def clbxVersionCode = project.hasProperty("versionCode") ? project.property("versionCode").toString().toInteger() : 1
+def clbxKeystore = System.getenv("CM_KEYSTORE_PATH")
+
 android {
     namespace = "ca.clbx.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,7 +11,7 @@ android {
         applicationId "ca.clbx.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode (project.findProperty("versionCode") ?: "1").toInteger()
+        versionCode clbxVersionCode
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,11 +20,10 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    // Store builds: Codemagic provides the upload key through these variables.
-    signingConfigs {
-        release {
-            if (System.getenv("CM_KEYSTORE_PATH")) {
-                storeFile file(System.getenv("CM_KEYSTORE_PATH"))
+    if (clbxKeystore) {
+        signingConfigs {
+            release {
+                storeFile file(clbxKeystore)
                 storePassword System.getenv("CM_KEYSTORE_PASSWORD")
                 keyAlias System.getenv("CM_KEY_ALIAS")
                 keyPassword System.getenv("CM_KEY_PASSWORD")
@@ -29,7 +32,7 @@ android {
     }
     buildTypes {
         release {
-            if (System.getenv("CM_KEYSTORE_PATH")) signingConfig signingConfigs.release
+            if (clbxKeystore) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -28,7 +28,7 @@ jobs:
             { [ -z "$GOOGLE_SERVICES_JSON" ] || echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; } &&
             (cd android && ./gradlew assembleDebug --no-daemon --console=plain)
           } 2>&1 | tee build.log || {
-            grep -E -i "error|what went wrong|failed|exception" -A2 build.log | grep -v "^--$" | tail -30 | sed 's/^/::error::/'
+            grep -E -i "error|what went wrong|where:|failed|exception" -A3 build.log | grep -v "^--$" | tail -40 | sed 's/^/::error::/'
             exit 1
           }
       - uses: actions/upload-artifact@v4
