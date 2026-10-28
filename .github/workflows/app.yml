@@ -1,5 +1,6 @@
 # Checks the Clbx phone apps still build. Android: a test APK you can install (download it
 # from the run's Artifacts). iPhone: a simulator build (store builds run on Codemagic).
+# Failures are also posted as annotations (the last lines of the log), so they show on the commit.
 name: Phone apps
 
 on:
@@ -12,28 +13,41 @@ jobs:
   android:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with: { distribution: temurin, java-version: 21 }
-      - run: npm ci
-      - run: npx cap sync android
-      - name: Firebase config (push notifications), if set
+      - name: Build
         env: { GOOGLE_SERVICES_JSON: "${{ secrets.GOOGLE_SERVICES_JSON }}" }
-        run: '[ -n "$GOOGLE_SERVICES_JSON" ] && echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json || echo "no google-services.json: building without push"'
-      - run: ./gradlew assembleDebug --no-daemon
-        working-directory: android
+        run: |
+          set -o pipefail
+          {
+            npm ci &&
+            npx cap sync android &&
+            { [ -z "$GOOGLE_SERVICES_JSON" ] || echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; } &&
+            (cd android && ./gradlew assembleDebug --no-daemon --console=plain)
+          } 2>&1 | tee build.log || {
+            grep -E -i "error|what went wrong|failed|exception" -A2 build.log | grep -v "^--$" | tail -30 | sed 's/^/::error::/'
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with: { name: clbx-android-debug, path: android/app/build/outputs/apk/debug/*.apk }
 
   ios:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npx cap sync ios
-      - run: xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -40
-        shell: bash -o pipefail {0}
+      - name: Build
+        run: |
+          set -o pipefail
+          {
+            npm ci &&
+            npx cap sync ios &&
+            xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+          } 2>&1 | tee build.log | tail -5 || {
+            grep -E "error:|BUILD FAILED|fatal" build.log | tail -30 | sed 's/^/::error::/'
+            exit 1
+          }
