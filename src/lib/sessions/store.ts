@@ -351,3 +351,35 @@ export async function sendEmails(list: { key: string; to: string; subject: strin
   const { kickOutbox } = await import("../email/worker");
   await kickOutbox();
 }
+
+// ---- the team calendar ----------------------------------------------------
+
+/** Puts a posted session on the team's calendar (schedule, calendar, phone feeds), or updates it. */
+export async function syncCalendarEvent(x: Session) {
+  const fields = {
+    title: x.title, startAt: x.startsAt, endAt: x.endsAt, tz: x.tz, locationText: [x.venueName, x.venueAddress].filter(Boolean).join(", ") || null,
+    notes: x.notes, status: x.status === "cancelled" ? ("cancelled" as const) : ("active" as const),
+  };
+  if (!LIVE) {
+    const { db, newId } = await import("../data/store");
+    const e = db.events.find((y) => y.sessionId === x.id);
+    if (e) Object.assign(e, fields, { statusReason: x.status === "cancelled" ? "Session cancelled" : null });
+    else
+      db.events.push({
+        id: newId(), teamId: x.teamId, seasonId: null, seriesId: null, type: "other", competition: null, meetAt: null, venueId: null, opponent: null, homeAway: null,
+        squadSize: null, statusReason: null, potmOpen: false, createdBy: x.createdBy, sessionId: x.id, ...fields,
+      });
+    db.events.sort((a, b) => a.startAt.localeCompare(b.startAt));
+    return;
+  }
+  const sb = await admin();
+  const row = {
+    title: fields.title, start_at: fields.startAt, end_at: fields.endAt, tz: fields.tz, location_text: fields.locationText, notes: fields.notes, status: fields.status,
+    status_reason: x.status === "cancelled" ? "Session cancelled" : null,
+  };
+  const { data: have } = await sb.from("events").select("id").eq("session_id", x.id).maybeSingle();
+  const res = have
+    ? await sb.from("events").update(row).eq("id", String((have as Row).id))
+    : await sb.from("events").insert({ ...row, team_id: x.teamId, type: "other", session_id: x.id, created_by: x.createdBy });
+  if (res.error) console.error("[sessions] calendar:", res.error.message);
+}

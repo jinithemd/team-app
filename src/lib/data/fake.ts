@@ -716,7 +716,7 @@ export async function listUpcomingForMe(limit = 20): Promise<EventWithMine[]> {
 
 export async function listPendingRsvps(): Promise<EventWithMine[]> {
   const all = await listUpcomingForMe(200);
-  return all.filter((e) => e.status === "active" && e.mine && e.mine.response === null && !e.mine.unavailable && Date.parse(e.startAt) > Date.now());
+  return all.filter((e) => !e.sessionId && e.status === "active" && e.mine && e.mine.response === null && !e.mine.unavailable && Date.parse(e.startAt) > Date.now());
 }
 
 /** The most recent finished match I played in, for the home card. */

@@ -33,24 +33,26 @@ export function StatusBadge({ status }: { status: TeamEvent["status"] | "live" |
  * Every event has a colour by kind, so a list is easy to scan: training, matches, league
  * matches and tournaments (the tournament itself and its games). Socials and others stay neutral.
  */
-export type EventKind = "training" | "match" | "league" | "tournament";
-type KindSource = Pick<TeamEvent, "type" | "competition"> & { tournamentId?: string | null };
+export type EventKind = "training" | "match" | "league" | "tournament" | "session";
+type KindSource = Pick<TeamEvent, "type" | "competition"> & { tournamentId?: string | null; sessionId?: string | null };
 export function eventKind(e: KindSource): EventKind | null {
+  if (e.sessionId) return "session";
   if (e.tournamentId || e.type === "tournament") return "tournament";
   if (e.type === "match") return e.competition === "league" ? "league" : "match";
   if (e.type === "training") return "training";
   return null;
 }
-export const KIND_LABEL: Record<EventKind, string> = { training: "Training", match: "Match", league: "League", tournament: "Tournament" };
+export const KIND_LABEL: Record<EventKind, string> = { training: "Training", match: "Match", league: "League", tournament: "Tournament", session: "Drop-in" };
 // Whole class names, so Tailwind sees them.
-export const KIND_STRIPE: Record<EventKind, string> = { training: "border-l-ev-training", match: "border-l-ev-match", league: "border-l-ev-league", tournament: "border-l-ev-tournament" };
+export const KIND_STRIPE: Record<EventKind, string> = { training: "border-l-ev-training", match: "border-l-ev-match", league: "border-l-ev-league", tournament: "border-l-ev-tournament", session: "border-l-ev-session" };
 export const KIND_CHIP: Record<EventKind, string> = {
   training: "bg-ev-training-soft text-ev-training",
   match: "bg-ev-match-soft text-ev-match",
   league: "bg-ev-league-soft text-ev-league",
   tournament: "bg-ev-tournament-soft text-ev-tournament",
+  session: "bg-ev-session-soft text-ev-session",
 };
-export const KIND_DOT: Record<EventKind, string> = { training: "bg-ev-training", match: "bg-ev-match", league: "bg-ev-league", tournament: "bg-ev-tournament" };
+export const KIND_DOT: Record<EventKind, string> = { training: "bg-ev-training", match: "bg-ev-match", league: "bg-ev-league", tournament: "bg-ev-tournament", session: "bg-ev-session" };
 
 export function TypeTag({ e, title }: { e: KindSource & Pick<TeamEvent, "homeAway">; title?: string }) {
   const k = eventKind(e);
@@ -142,11 +144,11 @@ export function EventCard({ e, showTeam = false, tournament }: { e: EventWithMin
   const cancelled = e.status === "cancelled";
   const today = isToday(e.startAt, e.tz);
   const past = Date.parse(e.endAt) < Date.now();
-  const mineLabel = e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : e.mine.unavailable ? "you're marked unavailable" : "no answer yet") : "";
+  const mineLabel = e.sessionId ? "" : e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : e.mine.unavailable ? "you're marked unavailable" : "no answer yet") : "";
   const kind = eventKind(e);
   return (
     <Link
-      href={`/t/${e.teamId}/e/${e.id}`}
+      href={e.sessionId ? `/s/${e.sessionId}` : `/t/${e.teamId}/e/${e.id}`}
       data-team={showTeam ? e.teamId : undefined}
       aria-label={`${title}${kind ? `, ${KIND_LABEL[kind]}` : ""}, ${d.dow} ${d.month} ${d.day}, ${formatTimeRange(e.startAt, e.endAt, e.tz)}${cancelled ? ", cancelled" : ""}${mineLabel ? ", " + mineLabel : ""}`}
       className={`grid ${badge ? "grid-cols-[52px_minmax(0,1fr)_auto]" : "grid-cols-[52px_minmax(0,1fr)]"} gap-3 rounded-lg border border-l-4 p-3.5 shadow-card transition-colors ${kind ? KIND_STRIPE[kind] : ""} hover:border-border-input focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
@@ -185,10 +187,10 @@ export function EventCard({ e, showTeam = false, tournament }: { e: EventWithMin
             </>
           )}
         </div>
-        {(showTeam || (!cancelled && e.mine)) && (
+        {(showTeam || (!cancelled && e.mine && !e.sessionId)) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {showTeam && <TeamDot name={e.team.name} teamId={e.team.id} crestUrl={e.team.crestUrl} />}
-            {!cancelled && e.mine && (e.mine.unavailable && !e.mine.response ? <UnavailableChip kind={e.mine.unavailable} /> : !past && <RsvpChip response={e.mine.response} />)}
+            {!cancelled && e.mine && !e.sessionId && (e.mine.unavailable && !e.mine.response ? <UnavailableChip kind={e.mine.unavailable} /> : !past && <RsvpChip response={e.mine.response} />)}
           </div>
         )}
       </div>

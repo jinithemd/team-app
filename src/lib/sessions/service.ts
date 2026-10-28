@@ -78,6 +78,7 @@ export function occurrences(x: Series, fromIso = new Date().toISOString(), count
 
 async function announce(s: Session) {
   if (!(await st.updateSession(s.id, { announcedAt: new Date().toISOString() }, true))) return; // someone else did
+  await st.syncCalendarEvent(s);
   const team = await st.teamBasics(s.teamId);
   if (!team) return;
   const ids = [...new Set([...(await st.teamMemberIds(s.teamId)), ...(team.isPublic ? await st.followerIds(s.teamId) : [])])].filter((id) => id !== s.createdBy);
@@ -454,6 +455,7 @@ export async function cancelSession(sessionId: string): Promise<Result> {
   if (!s || !(await canManage(s.teamId))) return fail("Only team staff can cancel sessions.");
   if (s.status === "cancelled") return { ok: true, data: undefined };
   await st.updateSession(s.id, { status: "cancelled" });
+  if (s.announcedAt) await st.syncCalendarEvent({ ...s, status: "cancelled" });
   const team = await st.teamBasics(s.teamId);
   const bookings = (await st.bookingsFor([s.id])).filter((b) => b.status !== "cancelled");
   const who = await st.people(bookings.map((b) => b.userId));

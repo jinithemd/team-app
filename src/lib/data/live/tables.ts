@@ -198,6 +198,7 @@ export const TABLES: TableSpec[] = [
       sponsorVisible: (r.sponsor_visible as boolean | null) ?? null,
       createdBy: s(r.created_by),
       tournamentId: s(r.tournament_id),
+      sessionId: s(r.session_id),
       tournamentMatchId: s(r.tournament_match_id),
     }),
     toDb: (e: T.TeamEvent) => ({

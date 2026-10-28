@@ -192,6 +192,8 @@ export interface TeamEvent {
   /** Put on the calendar by a tournament the team is in (kept in step by the tournament). */
   tournamentId?: ID | null;
   tournamentMatchId?: ID | null;
+  /** The team calendar entry for a game session (booking happens on the session page). */
+  sessionId?: ID | null;
 }
 
 export interface Venue {

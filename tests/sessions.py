@@ -59,6 +59,11 @@ with sync_playwright() as pw:
     expect(p.get_by_text("Posted. Your players and supporters have been told.")).to_be_visible()
     expect(p.get_by_text("4 of 4 spots left")).to_be_visible()
     expect(p.get_by_text("2 kept for Kingston Strikers players")).to_be_visible()
+    # It's on the team's schedule as a Drop-in, opening the session.
+    p.goto(f"{BASE}/t/t-strikers/schedule")
+    card = p.get_by_role("link", name=re.compile(r"^Indoor night game, Drop-in"))
+    expect(card).to_be_visible()
+    assert card.get_attribute("href") == f"/s/{sid}"
     # Marcus got told.
     p.goto(f"{BASE}/dev/outbox")
     expect(p.locator("li", has_text="marcus.lee@example.com").filter(has_text="Indoor night game").first).to_be_visible()
@@ -92,8 +97,10 @@ with sync_playwright() as pw:
     p.get_by_role("button", name="Join the waitlist").click()
     expect(p.get_by_text("You're number 1 on the waitlist.")).to_be_visible()
 
-    # 4) A Strikers player still gets one of the kept spots.
+    # 4) A Strikers player still gets one of the kept spots, and it's on his calendar.
     login(p, "Rahul")
+    p.goto(f"{BASE}/calendar")
+    expect(p.get_by_role("link", name=re.compile(r"^Indoor night game, Drop-in")).first).to_be_visible()
     p.goto(f"{BASE}/s/{sid}")
     expect(p.get_by_text("you can use the spots kept for players")).to_be_visible()
     p.get_by_role("button", name="Book a spot").click()
@@ -149,6 +156,8 @@ with sync_playwright() as pw:
     expect(p.get_by_text("This session is cancelled.")).to_be_visible()
     p.goto(f"{BASE}/dev/outbox")
     expect(p.locator("li", has_text="Cancelled: Indoor night game").first).to_be_visible()
+    p.goto(f"{BASE}/t/t-strikers/schedule")
+    expect(p.get_by_role("link", name=re.compile(r"^Indoor night game, Drop-in.*cancelled"))).to_be_visible()
     b.close()
 
 real = [e for e in errors if "#418" not in e]

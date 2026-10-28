@@ -20,7 +20,7 @@ export function SessionRow({ c, member = false, showTeam = false, staff = false 
     <li>
       <Link
         href={`/s/${c.id}`}
-        className="flex items-center gap-3 rounded-lg border border-border border-l-4 border-l-ev-training bg-bg p-3 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
+        className="flex items-center gap-3 rounded-lg border border-border border-l-4 border-l-ev-session bg-bg p-3 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
       >
         <span className="grid w-12 shrink-0 justify-items-center leading-tight">
           <span className="text-[11px] font-semibold text-muted uppercase">{d.dow}</span>

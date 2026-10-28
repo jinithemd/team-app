@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Car, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Trophy, UserCog, Users } from "lucide-react";
+import { Ticket, ArrowLeft, Car, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Trophy, UserCog, Users } from "lucide-react";
 import { attendanceSummary, carpoolSummary, eventPerms, getAvailability, getCheckIn, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
 import { CheckInCard } from "@/components/check-in";
 import { EVENT_TYPE_LABEL, isFixture } from "@/lib/data/types";
@@ -62,7 +62,12 @@ export default async function EventPage({
           <TypeTag e={e} />
           <StatusBadge status={e.status} />
           <ScoreBadge score={e.score} />
-          {e.tournamentId ? (
+          {e.sessionId ? (
+            <Link href={`/s/${e.sessionId}`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
+              <Ticket aria-hidden className="size-4" />
+              Open session
+            </Link>
+          ) : e.tournamentId ? (
             <Link href={`/tournaments/${e.tournamentId}`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
               <Trophy aria-hidden className="size-4" />
               Open tournament
@@ -191,7 +196,21 @@ export default async function EventPage({
         </Link>
       )}
 
-      {e.mine && user && !(past && att && att.present + att.late > 0) && (
+      {e.sessionId && !cancelled && (
+        <Link
+          href={`/s/${e.sessionId}`}
+          className="flex items-center gap-3 rounded-lg border border-border border-l-4 border-l-ev-session p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <Ticket aria-hidden className="size-6 shrink-0 text-ev-session" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Drop-in session: book your spot</span>
+            <span className="block text-sm text-muted">See who&apos;s coming, spots left and the cost. Booking happens on the session page.</span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-muted" />
+        </Link>
+      )}
+
+      {!e.sessionId && e.mine && user && !(past && att && att.present + att.late > 0) && (
         <section aria-labelledby="mine-h" className="grid gap-4 rounded-lg border border-border p-4">
           <h2 id="mine-h" className="text-lg font-semibold">
             Are you in?
@@ -263,7 +282,7 @@ export default async function EventPage({
         </Link>
       )}
 
-      {avail && !cancelled && (
+      {avail && !cancelled && !e.sessionId && (
         <section aria-labelledby="avail-h" className="grid gap-3">
           <div className="flex items-baseline justify-between gap-3">
             <h2 id="avail-h" className="text-lg font-semibold">
@@ -278,7 +297,7 @@ export default async function EventPage({
         </section>
       )}
 
-      {team.isStaff && !past && !cancelled && (
+      {team.isStaff && !past && !cancelled && !e.sessionId && (
         <Link href={`/t/${teamId}/e/${eventId}/managers`} className="inline-flex min-h-10 items-center gap-2 justify-self-start text-sm font-semibold text-team-ink">
           <UserCog aria-hidden className="size-[18px]" />
           Hand this event to someone
@@ -286,7 +305,7 @@ export default async function EventPage({
       )}
 
       {team.isStaff && (
-        <StaffEventActions eventId={e.id} teamId={teamId} status={e.status} noReply={avail?.counts.none ?? 0} past={past} />
+        !e.sessionId && <StaffEventActions eventId={e.id} teamId={teamId} status={e.status} noReply={avail?.counts.none ?? 0} past={past} />
       )}
 
     </div>

@@ -92,6 +92,8 @@
   --ev-league-soft: #EFEAFA;
   --ev-tournament: #8A5700;
   --ev-tournament-soft: #F2EDE3;
+  --ev-session: #0B5E9E;
+  --ev-session-soft: #E3EDF6;
   --team: var(--accent);
   --on-team: var(--on-accent);
   --team-ink: var(--accent);
@@ -134,6 +136,8 @@
     --ev-league-soft: #29273B;
     --ev-tournament: #F5C04A;
     --ev-tournament-soft: #332D1E;
+    --ev-session: #7CC0F7;
+    --ev-session-soft: #1A2A38;
     --team: var(--accent);
     --on-team: var(--on-accent);
     --team-ink: var(--accent);
@@ -174,6 +178,8 @@
   --ev-league-soft: #29273B;
   --ev-tournament: #F5C04A;
   --ev-tournament-soft: #332D1E;
+  --ev-session: #7CC0F7;
+  --ev-session-soft: #1A2A38;
   --team: var(--accent);
   --on-team: var(--on-accent);
   --team-ink: var(--accent);
