@@ -66,7 +66,7 @@ with sync_playwright() as pw:
     p.goto(f"{BASE}/t/t-strikers/schedule")
     card = p.get_by_role("link", name=re.compile(r"^Indoor night game, Drop-in"))
     expect(card).to_be_visible()
-    assert card.get_attribute("href") == f"/s/{sid}"
+    assert "/t/t-strikers/e/" in card.get_attribute("href")
     # Marcus got told.
     p.goto(f"{BASE}/dev/outbox")
     expect(p.locator("li", has_text="marcus.lee@example.com").filter(has_text="Indoor night game").first).to_be_visible()
@@ -104,10 +104,14 @@ with sync_playwright() as pw:
     login(p, "Rahul")
     p.goto(f"{BASE}/calendar")
     expect(p.get_by_role("link", name=re.compile(r"^Indoor night game, Drop-in")).first).to_be_visible()
-    p.goto(f"{BASE}/s/{sid}")
-    expect(p.get_by_text("you can use the spots kept for players")).to_be_visible()
-    p.get_by_role("button", name="Book a spot").click()
-    expect(p.get_by_text("You're in. See you there!")).to_be_visible()
+    # He answers on the event itself, like a training: "I'm in".
+    p.get_by_role("link", name=re.compile(r"^Indoor night game, Drop-in")).first.click()
+    p.wait_for_url(re.compile(r"/t/t-strikers/e/"))
+    spot = p.get_by_role("region", name="Are you in?")
+    expect(spot).to_contain_text("spots are kept for players like you")
+    spot.get_by_role("button", name="I'm in").click()
+    expect(p.get_by_role("region", name="Are you in?")).to_contain_text("You've got a spot")
+    p.screenshot(path=f"{SHOTS}/dropin-event.png", full_page=True)
 
     # 5) Priya sees everyone, ticks off Marcus's cash, removes Dan: Aisha moves up and is told.
     login(p, "Priya")
@@ -148,7 +152,7 @@ with sync_playwright() as pw:
     # Posted weeks are on the schedule like any event.
     expect(p.get_by_role("link", name=re.compile(r"^Sunday fun game, Drop-in")).first).to_be_visible()
     # Skip a week, then pause.
-    weekly.get_by_role("button", name=re.compile("^Skip")).nth(1).click()
+    weekly.get_by_role("button", name=re.compile("^Skip")).first.click()
     expect(p.get_by_role("region", name="Drop-ins you've set up")).to_contain_text("skipped")
     p.get_by_role("region", name="Drop-ins you've set up").get_by_role("button", name="Pause").click()
     expect(p.get_by_role("region", name="Drop-ins you've set up")).to_contain_text("paused")
@@ -163,6 +167,32 @@ with sync_playwright() as pw:
     expect(p.locator("li", has_text="Cancelled: Indoor night game").first).to_be_visible()
     p.goto(f"{BASE}/t/t-strikers/schedule")
     expect(p.get_by_role("link", name=re.compile(r"^Indoor night game, Drop-in.*cancelled"))).to_be_visible()
+
+    # 8) With card payments on, only people who pay get a spot. Aisha collects for the Reserves;
+    #    Marcus posts a $5 drop-in; Rahul's "I'm in" takes him to pay, and the spot is his once paid.
+    login(p, "Aisha")
+    p.goto(f"{BASE}/account/payouts")
+    p.get_by_role("button", name="Finish payout setup (sample)").click()
+    p.goto(f"{BASE}/t/t-reserves/dues")
+    p.get_by_role("button", name="Turn on: collect into my account").click()
+    expect(p.get_by_role("region", name="Online payments")).to_contain_text("On.")
+    login(p, "Marcus")
+    p.goto(f"{BASE}/t/t-reserves/e/new?type=dropin")
+    p.fill("#title", "Paid futsal"); p.fill("#date", day); p.fill("#price", "5"); p.fill("#capacity", "10")
+    p.get_by_role("button", name="Post drop-in").click()
+    p.wait_for_url(re.compile(r"/s/[0-9a-f-]{36}\?posted=1"))
+    login(p, "Rahul")
+    p.goto(f"{BASE}/t/t-reserves/schedule")
+    p.get_by_role("link", name=re.compile(r"^Paid futsal, Drop-in")).first.click()
+    spot = p.get_by_role("region", name="Are you in?")
+    expect(spot).to_contain_text("Your spot is confirmed once you've paid")
+    spot.get_by_role("button", name="I'm in · $6.06").click()
+    p.wait_for_url(re.compile(r"/pay/[0-9a-f-]{36}"))
+    p.get_by_role("button", name=re.compile(r"^Pay \$")).click()
+    expect(p.get_by_text("Payment received.")).to_be_visible()
+    p.get_by_role("link", name="Done").click()
+    expect(p.get_by_text("You're in. See you there!")).to_be_visible()
+    expect(p.get_by_text("Paid by card.")).to_be_visible()
     b.close()
 
 real = [e for e in errors if "#418" not in e]

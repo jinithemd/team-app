@@ -26,11 +26,27 @@ export async function createSessionAction(teamId: string, weekly: boolean, _: Fo
   redirect(weekly ? `/t/${teamId}/schedule?weekly=1` : `/s/${r.data.id}?posted=1`);
 }
 
-export async function bookSessionAction(sessionId: string): Promise<{ error?: string; payUrl?: string }> {
+export async function bookSessionAction(sessionId: string, eventId?: string): Promise<{ error?: string; payUrl?: string }> {
   const r = await svc.book(sessionId);
+  if (r.ok && r.data.status === "booked" && eventId) await markAvailability(eventId, "going");
   refresh();
   if (!r.ok) return { error: r.error };
   return { payUrl: r.data.payUrl };
+}
+
+/** Team players answer on the event too, so captains see who can't make it. */
+async function markAvailability(eventId: string, response: "going" | "not_going") {
+  const { getSessionUser, setRsvp } = await import("@/lib/data");
+  const me = await getSessionUser();
+  if (me) await setRsvp(eventId, me.id, response).catch(() => null);
+}
+
+/** "Can't make it": gives up a spot (or the waitlist place) and says so on the event. */
+export async function declineSessionAction(sessionId: string, eventId: string): Promise<{ error?: string }> {
+  await svc.cancelMyBooking(sessionId).catch(() => null);
+  await markAvailability(eventId, "not_going");
+  refresh();
+  return {};
 }
 
 export async function payForBookingAction(sessionId: string): Promise<{ error?: string; payUrl?: string }> {

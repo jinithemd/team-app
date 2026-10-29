@@ -54,18 +54,18 @@ export async function DropInManager({ teamId }: { teamId: string }) {
               </div>
               <SeriesControls seriesId={x.id} active={x.active} />
             </div>
-            {x.active && (
-              <ul className="grid border-t border-border pt-1">
-                {x.next.map((o) => (
-                  <li key={o.date} className="flex items-center justify-between gap-2 text-sm">
-                    <span className={o.skipped ? "text-muted line-through" : ""}>
-                      {day(o.startsAt, x.tz)}
-                      <span className="text-xs text-muted"> · {o.skipped ? "skipped" : Date.parse(o.postAt) <= Date.now() ? "posted" : `posts ${day(o.postAt, x.tz, true)}`}</span>
-                    </span>
-                    <SkipWeek seriesId={x.id} date={o.date} skipped={o.skipped} label={day(o.startsAt, x.tz)} />
-                  </li>
-                ))}
-              </ul>
+            {x.active && x.next[0] && (
+              // Only the coming week: players see it once it's posted, the rest comes week by week.
+              <div className="flex items-center justify-between gap-2 border-t border-border pt-2 text-sm">
+                <span className={x.next[0].skipped ? "text-muted line-through" : ""}>
+                  <span className="font-semibold">Next: {day(x.next[0].startsAt, x.tz)}</span>
+                  <span className="text-xs text-muted">
+                    {" "}
+                    · {x.next[0].skipped ? "skipped" : Date.parse(x.next[0].postAt) <= Date.now() ? "posted" : `goes up ${day(x.next[0].postAt, x.tz, true)}`}
+                  </span>
+                </span>
+                <SkipWeek seriesId={x.id} date={x.next[0].date} skipped={x.next[0].skipped} label={day(x.next[0].startsAt, x.tz)} />
+              </div>
             )}
           </li>
         ))}

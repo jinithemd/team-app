@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, CreditCard } from "lucide-react";
-import { bookSessionAction, cancelBookingAction, cancelSessionAction, payForBookingAction, seriesAction, staffBookingAction } from "@/app/session-actions";
+import { bookSessionAction, declineSessionAction, cancelBookingAction, cancelSessionAction, payForBookingAction, seriesAction, staffBookingAction } from "@/app/session-actions";
 import { buttonClass } from "./ui";
 
 function useOp() {
@@ -29,11 +29,11 @@ function useOp() {
   return { pending, run, err };
 }
 
-export function BookButton({ sessionId, label, waitlist }: { sessionId: string; label: string; waitlist: boolean }) {
+export function BookButton({ sessionId, label, waitlist, eventId, size = "lg" }: { sessionId: string; label: string; waitlist: boolean; eventId?: string; size?: "md" | "lg" }) {
   const { pending, run, err } = useOp();
   return (
     <div className="grid gap-1">
-      <button type="button" disabled={pending} onClick={() => run(() => bookSessionAction(sessionId))} className={buttonClass(waitlist ? "secondary" : "primary", "lg", "w-full")}>
+      <button type="button" disabled={pending} onClick={() => run(() => bookSessionAction(sessionId, eventId))} className={buttonClass(waitlist ? "secondary" : "primary", size, "w-full")}>
         <CalendarPlus aria-hidden />
         {pending ? "Booking…" : label}
       </button>
@@ -157,5 +157,25 @@ export function SkipWeek({ seriesId, date, skipped, label }: { seriesId: string;
       </button>
       {err}
     </span>
+  );
+}
+
+/** On the team's event page: "Can't make it" (gives up a spot and tells the captains). */
+export function DeclineButton({ sessionId, eventId, booked }: { sessionId: string; eventId: string; booked: boolean }) {
+  const { pending, run, err } = useOp();
+  return (
+    <div className="grid gap-1">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          if (!booked || confirm("Give up your spot? The next person on the waitlist gets it.")) run(() => declineSessionAction(sessionId, eventId));
+        }}
+        className={buttonClass("secondary", "md", "w-full")}
+      >
+        Can&apos;t make it
+      </button>
+      {err}
+    </div>
   );
 }

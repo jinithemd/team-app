@@ -144,11 +144,11 @@ export function EventCard({ e, showTeam = false, tournament }: { e: EventWithMin
   const cancelled = e.status === "cancelled";
   const today = isToday(e.startAt, e.tz);
   const past = Date.parse(e.endAt) < Date.now();
-  const mineLabel = e.sessionId ? "" : e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : e.mine.unavailable ? "you're marked unavailable" : "no answer yet") : "";
+  const mineLabel = e.mine ? (e.mine.response ? RSVP_LABEL[e.mine.response] : e.mine.unavailable ? "you're marked unavailable" : "no answer yet") : "";
   const kind = eventKind(e);
   return (
     <Link
-      href={e.sessionId ? `/s/${e.sessionId}` : `/t/${e.teamId}/e/${e.id}`}
+      href={`/t/${e.teamId}/e/${e.id}`}
       data-team={showTeam ? e.teamId : undefined}
       aria-label={`${title}${kind ? `, ${KIND_LABEL[kind]}` : ""}, ${d.dow} ${d.month} ${d.day}, ${formatTimeRange(e.startAt, e.endAt, e.tz)}${cancelled ? ", cancelled" : ""}${mineLabel ? ", " + mineLabel : ""}`}
       className={`grid ${badge ? "grid-cols-[52px_minmax(0,1fr)_auto]" : "grid-cols-[52px_minmax(0,1fr)]"} gap-3 rounded-lg border border-l-4 p-3.5 shadow-card transition-colors ${kind ? KIND_STRIPE[kind] : ""} hover:border-border-input focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
@@ -187,10 +187,10 @@ export function EventCard({ e, showTeam = false, tournament }: { e: EventWithMin
             </>
           )}
         </div>
-        {(showTeam || (!cancelled && e.mine && !e.sessionId)) && (
+        {(showTeam || (!cancelled && e.mine)) && (
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
             {showTeam && <TeamDot name={e.team.name} teamId={e.team.id} crestUrl={e.team.crestUrl} />}
-            {!cancelled && e.mine && !e.sessionId && (e.mine.unavailable && !e.mine.response ? <UnavailableChip kind={e.mine.unavailable} /> : !past && <RsvpChip response={e.mine.response} />)}
+            {!cancelled && e.mine && (e.mine.unavailable && !e.mine.response ? <UnavailableChip kind={e.mine.unavailable} /> : !past && <RsvpChip response={e.mine.response} />)}
           </div>
         )}
       </div>

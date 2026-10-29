@@ -13,6 +13,7 @@ import { formatLongDate, formatTime, formatTimeRange, zoneLabel } from "@/lib/ti
 import { StaffEventActions } from "./staff-actions";
 import { eventPayments } from "@/lib/payments/service";
 import { CashToggle, PayButton } from "@/components/payments";
+import { SessionSpot } from "@/components/session-spot";
 
 export async function generateMetadata({ params }: { params: Promise<{ eventId: string }> }): Promise<Metadata> {
   const e = await getEvent((await params).eventId);
@@ -58,7 +59,7 @@ export default async function EventPage({
 
       <section aria-labelledby="ev-h" className="grid gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="eyebrow">{EVENT_TYPE_LABEL[e.type]}</span>
+          <span className="eyebrow">{e.sessionId ? "Drop-in" : EVENT_TYPE_LABEL[e.type]}</span>
           <TypeTag e={e} />
           <StatusBadge status={e.status} />
           <ScoreBadge score={e.score} />
@@ -106,7 +107,7 @@ export default async function EventPage({
               <dt className="sr-only">Where</dt>
               <MapPin aria-hidden className="mt-0.5 size-[18px] shrink-0 text-muted" />
               <dd className="min-w-0">
-                <span className="break-words">{e.locationText}</span>
+                <span className="block break-words">{e.locationText}</span>
                 {e.venue?.address && <span className="block text-muted break-words">{e.venue.address}</span>}
                 <a href={mapsHref!} target="_blank" rel="noreferrer" className="font-semibold text-team-ink">
                   Open in Maps
@@ -145,7 +146,7 @@ export default async function EventPage({
         </Banner>
       )}
 
-      {checkIn && <CheckInCard eventId={e.id} tz={e.tz} {...checkIn} />}
+      {checkIn && !e.sessionId && <CheckInCard eventId={e.id} tz={e.tz} {...checkIn} />}
 
       {canEdit && team.settings.geoCheckinEnabled && !past && !cancelled && e.venue?.lat == null && (
         <Banner tone="warning">
@@ -196,19 +197,7 @@ export default async function EventPage({
         </Link>
       )}
 
-      {e.sessionId && !cancelled && (
-        <Link
-          href={`/s/${e.sessionId}`}
-          className="flex items-center gap-3 rounded-lg border border-border border-l-4 border-l-ev-session p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
-        >
-          <Ticket aria-hidden className="size-6 shrink-0 text-ev-session" />
-          <span className="min-w-0 flex-1">
-            <span className="block font-semibold">Drop-in session: book your spot</span>
-            <span className="block text-sm text-muted">See who&apos;s coming, spots left and the cost. Booking happens on the session page.</span>
-          </span>
-          <ChevronRight aria-hidden className="size-5 text-muted" />
-        </Link>
-      )}
+      {e.sessionId && !cancelled && <SessionSpot sessionId={e.sessionId} eventId={e.id} declined={e.mine?.response === "not_going"} />}
 
       {!e.sessionId && e.mine && user && !(past && att && att.present + att.late > 0) && (
         <section aria-labelledby="mine-h" className="grid gap-4 rounded-lg border border-border p-4">
