@@ -103,7 +103,6 @@ export function TeamTabs({ teamId, show = {} }: { teamId: string; show?: { point
   const path = usePathname();
   const tabs = [
     { href: `/t/${teamId}/schedule`, label: "Schedule", match: (p: string) => p.includes("/schedule") || p.includes("/e/") },
-    { href: `/t/${teamId}/sessions`, label: "Sessions", match: (p: string) => p.includes("/sessions") },
     { href: `/t/${teamId}/dues`, label: "Payments", match: (p: string) => p.includes("/dues") },
     { href: `/t/${teamId}/roster`, label: "Roster", match: (p: string) => p.includes("/roster") || p.includes("/you") || p.includes("/p/") },
     { href: `/t/${teamId}/chat`, label: "Chat", match: (p: string) => p.includes("/chat") },

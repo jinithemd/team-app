@@ -36,7 +36,7 @@ export default async function SessionView({ params, searchParams }: { params: Pr
   const booked = p.people.filter((x) => x.status !== "waitlist");
   const waiting = p.people.filter((x) => x.status === "waitlist");
   const spotsLeft = p.member ? p.spots.memberLeft : p.spots.openLeft;
-  const back = p.member ? `/t/${s.teamId}/sessions` : `/f/${s.teamId}`;
+  const back = p.member ? `/t/${s.teamId}/schedule` : `/f/${s.teamId}`;
   const mapsHref = s.venueAddress || s.venueName ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([s.venueName, s.venueAddress].filter(Boolean).join(", "))}` : null;
   return (
     <main className="min-h-dvh bg-surface pb-10">

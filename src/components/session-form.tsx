@@ -7,9 +7,22 @@ import { Banner, Field, Input, buttonClass, inputClass } from "@/components/ui";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-/** New game session: one date, or every week (posted automatically on a schedule). */
-export function SessionForm({ teamId, weekly, today, teamName }: { teamId: string; weekly: boolean; today: string; teamName: string }) {
-  const [state, action, pending] = useActionState<FormState, FormData>(createSessionAction.bind(null, teamId, weekly), null);
+/** New drop-in game (part of New event): one date, or every week (posted automatically on a schedule). */
+export function SessionForm({
+  teamId,
+  weekly: startWeekly = false,
+  today,
+  teamName,
+  venues = [],
+}: {
+  teamId: string;
+  weekly?: boolean;
+  today: string;
+  teamName: string;
+  venues?: { name: string; address: string | null }[];
+}) {
+  const [weekly, setWeekly] = useState(startWeekly);
+  const [state, action, pending] = useActionState<FormState, FormData>(async (prev: FormState, f: FormData) => createSessionAction(teamId, f.get("weekly") === "on", prev, f), null);
   const fe = state?.fieldErrors ?? {};
   const [postWhen, setPostWhen] = useState<"now" | "later">("now");
   const [held, setHeld] = useState("");
@@ -19,6 +32,12 @@ export function SessionForm({ teamId, weekly, today, teamName }: { teamId: strin
       <Field id="title" label="Name" error={fe.title} hint="Leave blank for “Drop-in game”.">
         <Input id="title" name="title" maxLength={80} placeholder="e.g. Sunday fun game, Indoor night 5-a-side" error={fe.title} />
       </Field>
+
+      <label className="flex min-h-11 items-center gap-3 justify-self-start rounded-md border border-border px-3">
+        <input type="checkbox" name="weekly" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} className="size-5 accent-[var(--team)]" />
+        <span className="text-sm font-semibold">Every week</span>
+        <span className="text-xs text-muted">posts itself each week</span>
+      </label>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {weekly ? (
@@ -46,7 +65,12 @@ export function SessionForm({ teamId, weekly, today, teamName }: { teamId: strin
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field id="venueName" label="Where" error={fe.venueName}>
-          <Input id="venueName" name="venueName" maxLength={120} placeholder="e.g. Invista Centre, Field 2" error={fe.venueName} />
+          <Input id="venueName" name="venueName" maxLength={120} placeholder="e.g. Invista Centre, Field 2" list="session-venues" error={fe.venueName} />
+          <datalist id="session-venues">
+            {venues.map((v) => (
+              <option key={v.name} value={v.name} />
+            ))}
+          </datalist>
         </Field>
         <Field id="venueAddress" label="Address (optional)" error={fe.venueAddress}>
           <Input id="venueAddress" name="venueAddress" maxLength={200} placeholder="1350 Gardiners Rd, Kingston" error={fe.venueAddress} />
@@ -119,7 +143,7 @@ export function SessionForm({ teamId, weekly, today, teamName }: { teamId: strin
       )}
 
       <button disabled={pending} className={buttonClass("primary", "lg", "justify-self-start")}>
-        {pending ? "Saving…" : weekly ? "Set up weekly session" : postWhen === "now" ? "Post session" : "Schedule session"}
+        {pending ? "Saving…" : weekly ? "Set up weekly drop-in" : postWhen === "now" ? "Post drop-in" : "Schedule drop-in"}
       </button>
     </form>
   );

@@ -7,6 +7,7 @@ import { EventCard, KindLegend, ScheduleList } from "@/components/event-bits";
 import { tournamentBadges } from "@/lib/tournaments/service";
 import { Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { MonthView } from "@/components/month-view";
+import { DropInManager } from "@/components/drop-in-manager";
 
 export const metadata: Metadata = { title: "Schedule" };
 
@@ -15,7 +16,7 @@ export default async function SchedulePage({
   searchParams,
 }: {
   params: Promise<{ teamId: string }>;
-  searchParams: Promise<{ view?: string; joined?: string; past?: string }>;
+  searchParams: Promise<{ view?: string; joined?: string; past?: string; weekly?: string }>;
 }) {
   const { teamId } = await params;
   const sp = await searchParams;
@@ -26,6 +27,7 @@ export default async function SchedulePage({
 
   return (
     <div className="grid gap-5">
+      {sp.weekly && <Banner>Weekly drop-in set up. Each week posts itself, goes on the schedule and tells your players and supporters.</Banner>}
       {sp.joined && <Banner>You&apos;re on the team. Answer below so your captains know if you&apos;re in.</Banner>}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -87,6 +89,7 @@ export default async function SchedulePage({
           )}
         </section>
       )}
+      {team.isStaff && <DropInManager teamId={teamId} />}
       <SponsorStrip sponsors={sponsors} manageHref={perms.settings ? `/t/${teamId}/sponsors` : undefined} />
     </div>
   );

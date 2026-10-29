@@ -23,7 +23,7 @@ export async function createSessionAction(teamId: string, weekly: boolean, _: Fo
   const r = weekly ? await svc.createSeries(teamId, input(f)) : await svc.createSession(teamId, input(f));
   if (!r.ok) return { error: r.error, fieldErrors: r.fieldErrors };
   refresh();
-  redirect(weekly ? `/t/${teamId}/sessions?weekly=1` : `/s/${r.data.id}?posted=1`);
+  redirect(weekly ? `/t/${teamId}/schedule?weekly=1` : `/s/${r.data.id}?posted=1`);
 }
 
 export async function bookSessionAction(sessionId: string): Promise<{ error?: string; payUrl?: string }> {

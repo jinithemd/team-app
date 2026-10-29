@@ -8,7 +8,7 @@ import { EventForm } from "@/components/event-form";
 
 export const metadata: Metadata = { title: "New event" };
 
-export default async function NewEventPage({ params, searchParams }: { params: Promise<{ teamId: string }>; searchParams: Promise<{ type?: string }> }) {
+export default async function NewEventPage({ params, searchParams }: { params: Promise<{ teamId: string }>; searchParams: Promise<{ type?: string; weekly?: string }> }) {
   const { teamId } = await params;
   const sp = await searchParams;
   const [team, perms, venues] = await Promise.all([getTeam(teamId), myPerms(teamId), listVenues(teamId)]);
@@ -35,6 +35,10 @@ export default async function NewEventPage({ params, searchParams }: { params: P
         venues={venues}
         canFixtures={perms.games}
         canEvents={perms.events}
+        startDropIn={sp.type === "dropin"}
+        startWeekly={sp.weekly === "1"}
+        teamName={team.name}
+        today={today}
         initial={{
           type,
           competition: "league",

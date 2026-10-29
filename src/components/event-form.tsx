@@ -5,6 +5,7 @@ import { createEventAction, updateEventAction, type FormState } from "@/app/acti
 import { Field, Input, buttonClass, inputClass } from "@/components/ui";
 import { EVENT_TYPE_LABEL, type EventType, type Venue } from "@/lib/data/types";
 import { LocationPicker } from "@/components/location-picker";
+import { SessionForm } from "@/components/session-form";
 
 const NEW = "__new";
 
@@ -47,6 +48,10 @@ export function EventForm({
   initial,
   eventId,
   inSeries,
+  startDropIn,
+  startWeekly,
+  teamName,
+  today,
 }: {
   teamId: string;
   tz: string;
@@ -56,6 +61,11 @@ export function EventForm({
   initial: EventFormInitial;
   eventId?: string;
   inSeries?: boolean;
+  /** New events only: open on Drop-in (a game session people book). */
+  startDropIn?: boolean;
+  startWeekly?: boolean;
+  teamName?: string;
+  today?: string;
 }) {
   const editing = !!eventId;
   const bound = editing ? updateEventAction.bind(null, eventId!, teamId) : createEventAction.bind(null, teamId);
@@ -74,6 +84,8 @@ export function EventForm({
   const [newAddress, setNewAddress] = useState("");
   const [repeat, setRepeat] = useState(false);
   const [viewerTz, setViewerTz] = useState<string | null>(null);
+  const dropInOk = !editing && canEvents;
+  const [dropIn, setDropIn] = useState(dropInOk && !!startDropIn);
 
   useEffect(() => setViewerTz(Intl.DateTimeFormat().resolvedOptions().timeZone), []);
   useEffect(() => {
@@ -83,29 +95,51 @@ export function EventForm({
   const city = tz.split("/").pop()!.replace(/_/g, " ");
   const fixture = kind === "match" || kind === "tournament";
   const label = editing ? "Save changes" : `Add ${EVENT_TYPE_LABEL[kind].toLowerCase()}`;
+  const picker = (
+    <fieldset className="grid gap-2">
+      <legend className="text-sm font-semibold">What is it?</legend>
+      <div role="radiogroup" aria-label="Event type" className="flex flex-wrap gap-1 justify-self-start rounded-md bg-sunken p-1">
+        {types.map((k) => (
+          <button
+            key={k}
+            type="button"
+            role="radio"
+            aria-checked={!dropIn && kind === k}
+            onClick={() => {
+              setDropIn(false);
+              setKind(k);
+            }}
+            className={`min-h-9 rounded-sm px-3.5 text-sm font-semibold ${!dropIn && kind === k ? "bg-team text-on-team" : "text-muted hover:text-fg"}`}
+          >
+            {EVENT_TYPE_LABEL[k]}
+          </button>
+        ))}
+        {dropInOk && (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={dropIn}
+            onClick={() => setDropIn(true)}
+            className={`min-h-9 rounded-sm px-3.5 text-sm font-semibold ${dropIn ? "bg-team text-on-team" : "text-muted hover:text-fg"}`}
+          >
+            Drop-in
+          </button>
+        )}
+      </div>
+      {dropIn ? (
+        <p className="text-xs text-muted">A game anyone can book: your players and the people who follow your team. Set the cost and the number of spots.</p>
+      ) : (
+        !canFixtures && <p className="text-xs text-muted">Matches and tournaments are added by your manager.</p>
+      )}
+    </fieldset>
+  );
+  if (dropIn) return <div className="grid gap-5">{picker}<SessionForm teamId={teamId} today={today ?? initial.date} teamName={teamName ?? "your team"} venues={venues.map((v) => ({ name: v.name, address: v.address }))} weekly={startWeekly} /></div>;
   return (
     <form action={action} className="grid gap-5" noValidate>
       <input type="hidden" name="type" value={kind} />
       <input type="hidden" name="tz" value={tz} />
 
-      <fieldset className="grid gap-2">
-        <legend className="text-sm font-semibold">What is it?</legend>
-        <div role="radiogroup" aria-label="Event type" className="flex flex-wrap gap-1 justify-self-start rounded-md bg-sunken p-1">
-          {types.map((k) => (
-            <button
-              key={k}
-              type="button"
-              role="radio"
-              aria-checked={kind === k}
-              onClick={() => setKind(k)}
-              className={`min-h-9 rounded-sm px-3.5 text-sm font-semibold ${kind === k ? "bg-team text-on-team" : "text-muted hover:text-fg"}`}
-            >
-              {EVENT_TYPE_LABEL[k]}
-            </button>
-          ))}
-        </div>
-        {!canFixtures && <p className="text-xs text-muted">Matches and tournaments are added by your manager.</p>}
-      </fieldset>
+      {picker}
 
       {kind === "match" && (
         <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
