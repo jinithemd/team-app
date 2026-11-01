@@ -1,0 +1,127 @@
+# Sample-data build: a player auction. Priya (Strikers captain) sets up two teams, she and Rahul
+# captain them, and they bid live from two phones. Checks the clock, budgets, pass/unsold, undo.
+import re, time
+import _waits  # noqa: F401
+from playwright.sync_api import sync_playwright, expect, Locator
+
+_click = Locator.click
+def _settled_click(self, *a, **k):
+    _click(self, *a, **k)
+    try:
+        self.page.wait_for_load_state("networkidle", timeout=4000)
+    except Exception:
+        pass
+Locator.click = _settled_click
+
+BASE = "http://localhost:3000"
+SHOTS = "/tmp/claude-0"
+errors = []
+
+def login(p, who):
+    p.context.clear_cookies(); p.goto(f"{BASE}/login")
+    p.locator("form", has_text=who).first.get_by_role("button").click(); p.wait_for_url(f"{BASE}/")
+
+def no_sideways(p, where):
+    w = p.evaluate("document.documentElement.scrollWidth")
+    assert w <= 391, f"sideways scroll on {where}: {w}"
+
+with sync_playwright() as pw:
+    b = pw.chromium.launch()
+    host = b.new_context(viewport={"width": 390, "height": 844}, timezone_id="America/Toronto").new_page()
+    cap = b.new_context(viewport={"width": 390, "height": 844}, timezone_id="America/Toronto").new_page()
+    for p in (host, cap):
+        p.on("pageerror", lambda e, p=p: errors.append(p.url + " " + str(e)[:80]))
+        p.on("dialog", lambda d: d.accept())
+
+    # 1) Priya sets up a 2-team auction: 300 points each, base 50, steps of 10, 6 seconds a player.
+    login(host, "Priya")
+    host.goto(f"{BASE}/t/t-strikers/auction")
+    host.fill("#title", "Winter Cup auction")
+    host.fill("#squads", "2"); host.fill("#budget", "300"); host.fill("#basePrice", "50")
+    host.fill("#minIncrement", "10"); host.fill("#bidSeconds", "6"); host.fill("#squadMin", "3")
+    host.get_by_role("button", name="Set up auction").click()
+    host.wait_for_url(re.compile(r"/auction/[0-9a-f-]{36}$"))
+    aid = host.url.rsplit("/", 1)[1]
+
+    # Captains: Priya for Red, Rahul for Blue. They join their teams for free.
+    cards = host.locator("section[aria-labelledby='sq-h'] li")
+    cards.nth(0).get_by_label("Captain").select_option(label="Priya Raman")
+    cards.nth(0).get_by_role("button", name=re.compile("^Save")).click()
+    expect(host.locator("li[aria-label=\'Team Red\']")).to_contain_text("Captain Priya Raman")
+    cards.nth(1).locator("input").first.fill("Blue Bombers")
+    cards.nth(1).get_by_label("Captain").select_option(label="Rahul Menon")
+    cards.nth(1).get_by_role("button", name=re.compile("^Save")).click()
+    expect(host.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("Captain Rahul Menon")
+    # Ade's a star: base 80. Tom isn't playing.
+    host.get_by_label("Base price for Ade Bello").fill("80"); host.get_by_label("Base price for Ade Bello").blur()
+    host.get_by_role("button", name="Remove Tom", exact=False).first.click()
+    host.fill("#guest", "Guest Gary"); host.get_by_role("button", name="Add", exact=True).click()
+    expect(host.get_by_text("Guest Gary").first).to_be_visible()
+    host.screenshot(path=f"{SHOTS}/auction-setup.png", full_page=True)
+    no_sideways(host, "auction setup")
+    host.get_by_role("button", name="Start the auction").click()
+    expect(host.get_by_text("Live", exact=True)).to_be_visible()
+
+    # 2) Rahul watches from his phone.
+    login(cap, "Rahul")
+    cap.goto(f"{BASE}/auction/{aid}")
+    expect(cap.get_by_text("You're bidding for Blue Bombers")).to_be_visible()
+    expect(cap.get_by_text("Waiting for the next player")).to_be_visible()
+
+    # 3) Ade goes up (base 80). Rahul 80, Priya 90, Rahul jumps to 150; Priya sells now.
+    host.get_by_label("Choose who goes next").select_option(label="Ade Bello (80)")
+    host.get_by_role("button", name="Put up").click()
+    up = cap.get_by_role("region", name="Up now")
+    expect(up).to_contain_text("Ade Bello")
+    up.get_by_role("button", name="80", exact=True).click()
+    expect(host.get_by_role("status")).to_contain_text("80 Blue Bombers")
+    host.get_by_role("region", name="Up now").get_by_role("button", name="90", exact=True).click()
+    expect(cap.get_by_role("status")).to_contain_text("90 Team Red")
+    cap.fill("#custom-bid", "150"); cap.get_by_role("button", name="Bid", exact=True).click()
+    expect(host.get_by_role("status")).to_contain_text("150 Blue Bombers")
+    cap.screenshot(path=f"{SHOTS}/auction-live.png", full_page=True)
+    no_sideways(cap, "auction live")
+    host.get_by_role("button", name="Sold now").click()
+    expect(host.get_by_text(re.compile("Ade Bello sold to Blue Bombers for 150"))).to_be_visible()
+    expect(cap.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("150 left")
+
+    # 4) Budgets: Blue has 150 left and needs 3 players (has 2), so it can spend all 150 on one.
+    #    The clock decides the next one: Rahul bids, nobody answers, it's his.
+    host.get_by_label("Choose who goes next").select_option(label="Sam Okafor (50)")
+    host.get_by_role("button", name="Put up").click()
+    expect(cap.get_by_text("You can bid up to 150.")).to_be_visible()
+    cap.get_by_role("region", name="Up now").get_by_role("button", name="50", exact=True).click()
+    expect(cap.get_by_text(re.compile("Sam Okafor sold to Blue Bombers for 50"))).to_be_visible(timeout=20000)
+    expect(cap.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("100 left")
+
+    # 5) Pass on someone, undo the last sale, bring the unsold back.
+    host.get_by_label("Choose who goes next").select_option(label="Jordan Blake (50)")
+    host.get_by_role("button", name="Put up").click()
+    host.get_by_role("button", name="Pass (unsold)").click()
+    expect(host.get_by_text("Jordan Blake went unsold")).to_be_visible()
+    host.get_by_role("button", name="Undo last sale").click()
+    expect(host.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("150 left")
+    host.get_by_role("button", name=re.compile("Bring back 1 unsold")).click()
+    expect(host.get_by_label("Choose who goes next").locator("option", has_text="Jordan Blake")).to_have_count(1)
+
+    # 6) Team Red can't go above its limit: 300 left, needs 2 more after this one at base 50 → 250 max.
+    host.get_by_label("Choose who goes next").select_option(label="Chris Wong (50)")
+    host.get_by_role("button", name="Put up").click()
+    expect(host.get_by_text("You can bid up to 250.")).to_be_visible()
+    host.fill("#custom-bid", "260"); host.get_by_role("button", name="Bid", exact=True).click()
+    expect(host.get_by_role("alert").filter(has_text="can bid up to 250")).to_be_visible()
+    host.get_by_role("button", name="Pass (unsold)").click()
+
+    # 7) Finish: the teams are picked.
+    host.get_by_role("button", name="Finish auction").click()
+    expect(host.get_by_text("The teams are picked.")).to_be_visible()
+    expect(cap.get_by_text("The teams are picked.")).to_be_visible(timeout=10000)
+    host.screenshot(path=f"{SHOTS}/auction-done.png", full_page=True)
+    # The tab shows it as finished.
+    host.goto(f"{BASE}/t/t-strikers/auction")
+    expect(host.get_by_role("link", name=re.compile("Winter Cup auction")).first).to_contain_text("Finished")
+    b.close()
+
+real = [e for e in errors if "#418" not in e]
+assert not real, real
+print("auction: all checks pass")
