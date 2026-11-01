@@ -5,6 +5,7 @@ import {
   APP_URL, EMAIL_RE, HEX_RE, activePlayers, clubRoleFor, currentUserId, db, hasTeamPerm, isClubAdmin, isTeamStaff, myRow, newId, norm, now, personFor, personOf, profileById, queueEmail, requireUser, teamById,
 } from "./store";
 import { clubDues } from "./dues";
+import { eventTitle } from "../event-title";
 import { clubSponsors } from "./sponsors";
 
 /*
@@ -234,6 +235,53 @@ export async function removeClubAdmin(clubId: ID, userId: ID): Promise<ActionRes
 // club stats
 // ---------------------------------------------------------------------------
 
+/** The club dashboard: people, what's coming up, and how each team is doing. */
+function clubOverview(teams: { id: ID; name: string }[], clubId: ID) {
+  const now = Date.now();
+  const ids = new Set(teams.map((t) => t.id));
+  const roster = db.roster.filter((r) => ids.has(r.teamId));
+  const active = roster.filter((r) => r.status === "active" && r.userId);
+  const people = new Set(active.map((r) => r.userId!));
+  const players = new Set(active.filter((r) => r.isPlayer).map((r) => r.userId!));
+  const staff = new Set(active.filter((r) => r.roles.length > 0).map((r) => r.userId!));
+  const live = db.events.filter((e) => ids.has(e.teamId) && e.status === "active");
+  const upcoming = live.filter((e) => Date.parse(e.startAt) >= now).sort((a, b) => a.startAt.localeCompare(b.startAt));
+  const week = upcoming.filter((e) => Date.parse(e.startAt) < now + 7 * 86400_000);
+  const going = (eventId: ID) => db.rsvps.filter((r) => r.eventId === eventId && r.response === "going").length;
+  const teamName = new Map(teams.map((t) => [t.id, t.name]));
+  return {
+    overview: {
+      people: people.size,
+      players: players.size,
+      staff: staff.size,
+      invited: roster.filter((r) => r.status === "invited").length,
+      joinRequests: db.joinRequests.filter((j) => ids.has(j.teamId) && j.status === "pending").length,
+      upcoming7: week.length,
+      sponsors: db.sponsors.filter((x) => x.status === "active" && (x.clubId === clubId || (x.teamId && ids.has(x.teamId)))).length,
+    },
+    upcoming: upcoming.slice(0, 8).map((e) => ({
+      id: e.id,
+      teamId: e.teamId,
+      team: teamName.get(e.teamId) ?? "",
+      title: eventTitle(e),
+      startAt: e.startAt,
+      going: going(e.id),
+      squad: activePlayers(e.teamId).length,
+    })),
+    teamRows: teams.map((t) => {
+      const next = upcoming.find((e) => e.teamId === t.id) ?? null;
+      return {
+        id: t.id,
+        name: t.name,
+        members: new Set(active.filter((r) => r.teamId === t.id).map((r) => r.userId)).size,
+        players: activePlayers(t.id).length,
+        upcoming: upcoming.filter((e) => e.teamId === t.id).length,
+        next: next ? { id: next.id, title: eventTitle(next), startAt: next.startAt } : null,
+      };
+    }),
+  };
+}
+
 export async function getClubStats(clubId: ID) {
   const user = await requireUser();
   const club = db.clubs.find((c) => c.id === clubId);
@@ -269,6 +317,7 @@ export async function getClubStats(clubId: ID) {
     dues: { collected: dues.reduce((n, d) => n + d.collected, 0), total: dues.reduce((n, d) => n + d.total, 0), owing: dues.reduce((n, d) => n + d.owing, 0) },
     carpool: { seats, trips },
     staffCanSee: teams.some((t) => isTeamStaff(user.id, t.id)),
+    ...clubOverview(teams.map((t) => ({ id: t.id, name: t.name })), clubId),
   };
 }
 

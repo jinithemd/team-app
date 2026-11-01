@@ -31,7 +31,7 @@ export default async function ClubLayout({ children, params }: { children: React
         <ul className="mx-auto flex max-w-3xl gap-1 overflow-x-auto">
           {[
             [`/clubs/${clubId}`, "Club"],
-            [`/clubs/${clubId}/stats`, "Stats"],
+            [`/clubs/${clubId}/stats`, "Dashboard"],
             ...(c.canEdit ? [[`/clubs/${clubId}/sponsors`, "Sponsors"]] : []),
             ...(c.canEdit ? [[`/clubs/${clubId}/settings`, "Settings"]] : []),
             [`/c/${c.club.slug}`, "Public page"],

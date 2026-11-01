@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getClubStats } from "@/lib/data";
 
-export const metadata: Metadata = { title: "Club stats" };
+export const metadata: Metadata = { title: "Club dashboard" };
 
 const money = (c: number) => new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD", maximumFractionDigits: 0 }).format(c / 100);
+const when = (iso: string) => new Date(iso).toLocaleString("en-CA", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "America/Toronto" });
 const short = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("en-CA", { month: "short", day: "numeric", timeZone: "UTC" });
 
 // Club stats: attendance trend and by team, how early people answer, dues, carpools.
@@ -15,8 +17,90 @@ export default async function ClubStatsPage({ params }: { params: Promise<{ club
   const pct = s.dues.total ? Math.round((s.dues.collected / s.dues.total) * 100) : null;
   return (
     <div className="grid gap-7">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-xl font-bold">Club stats</h2>
+      <div className="grid gap-1">
+        <h2 className="text-xl font-bold">Club dashboard</h2>
+        <p className="text-sm text-muted">Every team in the club at a glance. Only club admins see this.</p>
+      </div>
+
+      <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4" aria-label="Club at a glance">
+        {[
+          [s.overview.people, "members", `${s.overview.players} players · ${s.overview.staff} staff`],
+          [s.overview.upcoming7, "events this week", `${s.upcoming.length ? "next: " + when(s.upcoming[0].startAt) : "nothing scheduled"}`],
+          [s.overview.invited + s.overview.joinRequests, "waiting to join", `${s.overview.invited} invited · ${s.overview.joinRequests} asked`],
+          [s.overview.sponsors, "active sponsors", null],
+        ].map(([n, l, note]) => (
+          <li key={String(l)} className="grid content-start gap-0.5 rounded-lg border border-border p-3">
+            <p className="font-display text-3xl leading-none font-bold tabular">{n}</p>
+            <p className="text-sm font-semibold">{l}</p>
+            {note && <p className="text-xs text-muted">{note}</p>}
+          </li>
+        ))}
+      </ul>
+
+      <section aria-labelledby="up-h" className="grid gap-2">
+        <h3 id="up-h" className="font-semibold">
+          Coming up
+        </h3>
+        {s.upcoming.length === 0 ? (
+          <p className="text-sm text-muted">No events scheduled in any team.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {s.upcoming.map((e) => (
+              <li key={e.id}>
+                <Link href={`/t/${e.teamId}/e/${e.id}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 px-3 py-2.5 hover:bg-sunken">
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">{e.title}</span>
+                    <span className="block truncate text-xs text-muted">
+                      {e.team} · {when(e.startAt)}
+                    </span>
+                  </span>
+                  <span className="text-right text-sm">
+                    <strong className="tabular">{e.going}</strong>
+                    <span className="text-muted">/{e.squad} in</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="teams-h" className="grid gap-2">
+        <h3 id="teams-h" className="font-semibold">
+          Teams
+        </h3>
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead className="bg-surface text-left text-muted">
+              <tr>
+                <th className="px-3 py-2 font-semibold">Team</th>
+                <th className="px-3 py-2 text-right font-semibold">Members</th>
+                <th className="px-3 py-2 text-right font-semibold">Players</th>
+                <th className="px-3 py-2 text-right font-semibold">Upcoming</th>
+                <th className="px-3 py-2 font-semibold">Next event</th>
+              </tr>
+            </thead>
+            <tbody>
+              {s.teamRows.map((t) => (
+                <tr key={t.id} className="border-t border-border">
+                  <td className="px-3 py-2">
+                    <Link href={`/t/${t.id}`} className="font-semibold whitespace-nowrap text-team-ink hover:underline" title={t.name}>
+                      {t.name.replace(s.club.name.replace(/ FC$/, ""), "").trim() || t.name}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-right tabular">{t.members}</td>
+                  <td className="px-3 py-2 text-right tabular">{t.players}</td>
+                  <td className="px-3 py-2 text-right tabular">{t.upcoming}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">{t.next ? `${t.next.title}, ${when(t.next.startAt)}` : <span className="text-muted">none</span>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-border pt-5">
+        <h3 className="text-lg font-bold">Attendance and money</h3>
         <p className="text-sm text-muted">This season</p>
       </div>
       <ul className="grid grid-cols-3 gap-2" aria-label="Headline numbers">
