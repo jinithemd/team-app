@@ -56,3 +56,6 @@ export async function deleteAuctionAction(auctionId: string): Promise<Out> {
   if (!r.ok) return { error: r.error };
   redirect(`/t/${r.data.teamId}/auction`);
 }
+export async function setMonitorAction(auctionId: string, userId: string): Promise<Out> {
+  return out(await svc.setMonitor(auctionId, userId));
+}

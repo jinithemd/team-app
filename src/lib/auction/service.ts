@@ -95,6 +95,15 @@ async function settle(snap: Snapshot, force?: "sold" | "unsold"): Promise<boolea
 // the room
 // ---------------------------------------------------------------------------
 
+export interface AuctionSummary {
+  sold: number;
+  unsold: number;
+  toGo: number;
+  spent: number;
+  topBuys: { player: string; squad: string; color: string; price: number }[];
+  teams: { id: string; name: string; color: string; spent: number; left: number; count: number; average: number; top: string | null }[];
+}
+
 export interface AuctionView {
   auction: Auction;
   squads: SquadView[];
@@ -102,11 +111,72 @@ export interface AuctionView {
   unsold: Player[];
   lot: (st.Lot & { player: Player; squadName: string | null; squadColor: string | null; minNext: number; secondsLeft: number }) | null;
   bids: { squad: string; color: string; amount: number; at: string }[];
-  recent: { player: string; squad: string | null; price: number | null; status: string }[];
+  recent: { id: string; player: string; squad: string | null; color: string | null; price: number | null; status: string; at: string | null }[];
+  summary: AuctionSummary;
   host: boolean;
+  /** I'm the monitor: I run the big screen and see the summary. */
+  monitor: boolean;
+  monitorName: string | null;
+  /** Host and monitor only: the private big-screen link token. */
+  screenToken: string | null;
+  teamName: string;
   mySquadId: string | null;
   members: { id: string; name: string }[];
   now: string;
+}
+
+function build(snap: Snapshot, team: { id: string; name: string }[], teamName: string, who: { uid: string | null; host: boolean }): AuctionView {
+  const names = new Map(team.map((m) => [m.id, m.name]));
+  const squads = squadViews(snap, names);
+  const sqById = new Map(squads.map((x) => [x.id, x]));
+  const mine = who.uid ? squads.find((x) => x.captainId === who.uid || x.managerId === who.uid) ?? null : null;
+  const player = snap.lot ? snap.players.find((p) => p.id === snap.lot!.playerId) : undefined;
+  const pName = new Map(snap.players.map((p) => [p.id, p.name]));
+  const monitor = !!who.uid && snap.auction.monitorId === who.uid;
+  const sold = snap.players.filter((p) => p.status === "sold");
+  const summary: AuctionSummary = {
+    sold: sold.length,
+    unsold: snap.players.filter((p) => p.status === "unsold").length,
+    toGo: snap.players.filter((p) => p.status === "pool").length,
+    spent: sold.reduce((n, p) => n + (p.price ?? 0), 0),
+    topBuys: [...sold]
+      .sort((a, b) => (b.price ?? 0) - (a.price ?? 0))
+      .slice(0, 5)
+      .map((p) => ({ player: p.name, squad: sqById.get(p.squadId ?? "")?.name ?? "", color: sqById.get(p.squadId ?? "")?.color ?? "#888", price: p.price ?? 0 })),
+    teams: squads.map((x) => {
+      const bought = x.players.filter((p) => p.status === "sold");
+      const top = [...bought].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
+      return { id: x.id, name: x.name, color: x.color, spent: x.spent, left: x.left, count: x.count, average: bought.length ? Math.round(x.spent / bought.length) : 0, top: top ? `${top.name} (${top.price})` : null };
+    }),
+  };
+  return {
+    auction: { ...snap.auction, screenToken: "" },
+    squads,
+    pool: snap.players.filter((p) => p.status === "pool" && p.id !== snap.lot?.playerId),
+    unsold: snap.players.filter((p) => p.status === "unsold"),
+    lot:
+      snap.lot && player
+        ? {
+            ...snap.lot, player, squadName: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.name ?? null : null,
+            squadColor: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.color ?? null : null, minNext: minNext(snap),
+            secondsLeft: Math.max(0, Math.ceil((Date.parse(snap.lot.endsAt) - Date.now()) / 1000)),
+          }
+        : null,
+    bids: snap.bids.map((b) => ({ squad: sqById.get(b.squadId)?.name ?? "", color: sqById.get(b.squadId)?.color ?? "#888", amount: b.amount, at: b.createdAt })),
+    recent: snap.recent.map((l) => ({
+      id: l.id, player: pName.get(l.playerId) ?? "", squad: l.status === "sold" && l.topSquadId ? sqById.get(l.topSquadId)?.name ?? null : null,
+      color: l.status === "sold" && l.topSquadId ? sqById.get(l.topSquadId)?.color ?? null : null, price: l.status === "sold" ? l.topBid : null, status: l.status, at: l.closedAt,
+    })),
+    summary,
+    host: who.host,
+    monitor,
+    monitorName: snap.auction.monitorId ? names.get(snap.auction.monitorId) ?? null : null,
+    screenToken: who.host || monitor ? snap.auction.screenToken : null,
+    teamName,
+    mySquadId: mine?.id ?? null,
+    members: who.host ? team : [],
+    now: new Date().toISOString(),
+  };
 }
 
 export async function auctionView(id: string): Promise<AuctionView | null> {
@@ -118,32 +188,31 @@ export async function auctionView(id: string): Promise<AuctionView | null> {
   const host = await canHost(snap.auction.teamId);
   if (!host && !team.some((m) => m.id === u.id)) return null;
   if (snap.auction.status === "live" && (await settle(snap))) snap = (await st.snapshot(id))!;
-  const names = new Map(team.map((m) => [m.id, m.name]));
-  const squads = squadViews(snap, names);
-  const sqById = new Map(squads.map((x) => [x.id, x]));
-  const mine = squads.find((x) => x.captainId === u.id || x.managerId === u.id) ?? null;
-  const player = snap.lot ? snap.players.find((p) => p.id === snap!.lot!.playerId) : undefined;
-  const pName = new Map(snap.players.map((p) => [p.id, p.name]));
-  return {
-    auction: snap.auction,
-    squads,
-    pool: snap.players.filter((p) => p.status === "pool" && p.id !== snap!.lot?.playerId),
-    unsold: snap.players.filter((p) => p.status === "unsold"),
-    lot:
-      snap.lot && player
-        ? {
-            ...snap.lot, player, squadName: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.name ?? null : null,
-            squadColor: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.color ?? null : null, minNext: minNext(snap),
-            secondsLeft: Math.max(0, Math.ceil((Date.parse(snap.lot.endsAt) - Date.now()) / 1000)),
-          }
-        : null,
-    bids: snap.bids.map((b) => ({ squad: sqById.get(b.squadId)?.name ?? "", color: sqById.get(b.squadId)?.color ?? "#888", amount: b.amount, at: b.createdAt })),
-    recent: snap.recent.map((l) => ({ player: pName.get(l.playerId) ?? "", squad: l.topSquadId ? sqById.get(l.topSquadId)?.name ?? null : null, price: l.topBid, status: l.status })),
-    host,
-    mySquadId: mine?.id ?? null,
-    members: host ? team : [],
-    now: new Date().toISOString(),
-  };
+  const { teamBasics } = await import("../sessions/store");
+  return build(snap, team, (await teamBasics(snap.auction.teamId))?.name ?? "", { uid: u.id, host });
+}
+
+/** The big screen: read-only, opened from the private link on a TV or projector (no sign-in). */
+export async function screenView(token: string): Promise<(AuctionView & { teamColor: string; teamColor2: string | null }) | null> {
+  const id = await st.idForScreen(token);
+  if (!id) return null;
+  let snap = await st.snapshot(id);
+  if (!snap) return null;
+  if (snap.auction.status === "live" && (await settle(snap))) snap = (await st.snapshot(id))!;
+  const { teamBasics } = await import("../sessions/store");
+  const t = await teamBasics(snap.auction.teamId);
+  const v = build(snap, await members(snap.auction.teamId), t?.name ?? "", { uid: null, host: false });
+  return { ...v, teamColor: t?.color ?? "#2346D8", teamColor2: t?.colorSecondary ?? null };
+}
+
+/** Host: pick who runs the big screen. */
+export async function setMonitor(auctionId: string, userId: string): Promise<Result> {
+  return caught(async () => {
+    const snap = await asHost(auctionId);
+    if (userId && !(await members(snap.auction.teamId)).some((m) => m.id === userId)) return fail("They're not on the team.");
+    await st.updateAuction(auctionId, { monitorId: userId || null });
+    return { ok: true, data: undefined };
+  });
 }
 
 export async function teamAuctions(teamId: string) {

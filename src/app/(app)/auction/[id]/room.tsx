@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, Gavel, Play, Shuffle, Timer, Trophy, Undo2, UserPlus } from "lucide-react";
+import { ArrowLeft, BarChart3, Copy, Gavel, MonitorPlay, Play, Shuffle, Timer, Trophy, Undo2, UserPlus } from "lucide-react";
 import type { AuctionView, SquadView } from "@/lib/auction/service";
 import {
   addGuestAction, bidAction, closeNowAction, deleteAuctionAction, finishAuctionAction, nextPlayerAction, setPlayerAction, setSquadAction, startAuctionAction,
-  undoSaleAction, unsoldBackAction,
+  undoSaleAction, unsoldBackAction, setMonitorAction,
 } from "@/app/auction-actions";
 import { buttonClass, inputClass } from "@/components/ui";
 
@@ -53,7 +53,7 @@ function useTick(on: boolean) {
   }, [on]);
 }
 
-export function AuctionRoom({ initial, teamName }: { initial: AuctionView; teamName: string }) {
+export function AuctionRoom({ initial, teamName, screenUrl, screenQr }: { initial: AuctionView; teamName: string; screenUrl: string | null; screenQr: string | null }) {
   const { v, refresh, skew } = useLive(initial);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +108,10 @@ export function AuctionRoom({ initial, teamName }: { initial: AuctionView; teamN
           The teams are picked. Good luck in the tournament!
         </p>
       )}
+
+      {(v.host || v.monitor) && screenUrl && <BigScreen url={screenUrl} qr={screenQr} monitor={v.monitor} monitorName={v.monitorName} />}
+
+      {(v.host || v.monitor || a.status === "done") && a.status !== "setup" && <Summary v={v} />}
 
       <Squads squads={v.squads} highlight={v.lot?.topSquadId ?? null} />
 
@@ -222,6 +226,33 @@ function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean
             Add
           </button>
         </form>
+      </section>
+
+      <section aria-labelledby="mon-h" className="grid gap-2">
+        <h2 id="mon-h" className="text-lg font-semibold">
+          3. Big screen monitor (optional)
+        </h2>
+        <p className="text-sm text-muted">They run the big screen on a TV or projector and see the full summary.</p>
+        <label htmlFor="monitor" className="sr-only">
+          Monitor
+        </label>
+        <select
+          id="monitor"
+          value={a.monitorId ?? ""}
+          disabled={pending}
+          onChange={(e) => {
+            const id = e.target.value;
+            run(() => setMonitorAction(a.id, id));
+          }}
+          className={`${inputClass} min-h-11 max-w-sm`}
+        >
+          <option value="">No monitor (you run the screen)</option>
+          {v.members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </select>
       </section>
 
       <button type="button" disabled={pending} onClick={() => run(() => startAuctionAction(a.id))} className={buttonClass("primary", "lg", "justify-self-start")}>
@@ -479,6 +510,123 @@ function Squads({ squads, highlight }: { squads: SquadView[]; highlight: string 
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function BigScreen({ url, qr, monitor, monitorName }: { url: string; qr: string | null; monitor: boolean; monitorName: string | null }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <section aria-labelledby="screen-h" className="grid gap-3 rounded-lg border border-border p-4">
+      <h2 id="screen-h" className="flex items-center gap-2 text-lg font-semibold">
+        <MonitorPlay aria-hidden className="size-5" />
+        Big screen
+      </h2>
+      <p className="text-sm text-muted">
+        {monitor ? "You're the monitor. " : monitorName ? `${monitorName} is the monitor. ` : ""}
+        Show the auction live on a TV or projector: the player up, the bids, the clock, every team&apos;s points and a SOLD! moment for each buy.
+      </p>
+      <div className="flex flex-wrap items-start gap-4">
+        {qr && <img src={qr} alt="QR code for the big screen link" width={128} height={128} className="size-32 rounded-md border border-border bg-white p-1" />}
+        <div className="grid min-w-0 flex-1 gap-2">
+          <ol className="grid gap-1 pl-5 text-sm [list-style:decimal]">
+            <li>On the laptop or smart TV connected to the screen, open the link below (no sign-in needed).</li>
+            <li>Or scan the code with a phone and mirror it to the TV (AirPlay or Chromecast).</li>
+            <li>Tap Full screen on the TV page.</li>
+          </ol>
+          <p className="text-xs break-all text-muted">{url}</p>
+          <div className="flex flex-wrap gap-2">
+            <a href={url} target="_blank" rel="noreferrer" className={buttonClass("primary", "sm")}>
+              <MonitorPlay aria-hidden />
+              Open big screen
+            </a>
+            <button
+              type="button"
+              onClick={async () => {
+                await navigator.clipboard?.writeText(url).catch(() => {});
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className={buttonClass("secondary", "sm")}
+            >
+              <Copy aria-hidden />
+              {copied ? "Copied" : "Copy link"}
+            </button>
+          </div>
+          <p className="text-xs text-muted">Anyone with the link can watch, so share it only with the screen.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Summary({ v }: { v: AuctionView }) {
+  const s = v.summary;
+  return (
+    <section aria-labelledby="sum-h" className="grid gap-3 rounded-lg border border-border p-4">
+      <h2 id="sum-h" className="flex items-center gap-2 text-lg font-semibold">
+        <BarChart3 aria-hidden className="size-5" />
+        Summary
+      </h2>
+      <dl className="grid grid-cols-4 gap-2 text-center">
+        {(
+          [
+            ["Sold", s.sold],
+            ["To go", s.toGo],
+            ["Unsold", s.unsold],
+            ["Points spent", s.spent],
+          ] as const
+        ).map(([k, n]) => (
+          <div key={k} className="rounded-md bg-sunken p-2">
+            <dt className="text-[11px] font-semibold text-muted uppercase">{k}</dt>
+            <dd className="font-display text-2xl font-bold tabular">{n}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs text-muted">
+              <th className="py-1 font-semibold">Team</th>
+              <th className="py-1 text-right font-semibold">Players</th>
+              <th className="py-1 text-right font-semibold">Spent</th>
+              <th className="py-1 text-right font-semibold">Left</th>
+              <th className="py-1 text-right font-semibold">Avg</th>
+            </tr>
+          </thead>
+          <tbody>
+            {s.teams.map((t) => (
+              <tr key={t.id} className="border-t border-border">
+                <td className="py-1.5 font-semibold" style={{ color: t.color }}>
+                  {t.name}
+                  {t.top && <span className="block text-xs font-normal text-muted">Top: {t.top}</span>}
+                </td>
+                <td className="py-1.5 text-right tabular">{t.count}</td>
+                <td className="py-1.5 text-right tabular">{t.spent}</td>
+                <td className="py-1.5 text-right tabular">{t.left}</td>
+                <td className="py-1.5 text-right tabular">{t.average || "–"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {s.topBuys.length > 0 && (
+        <div className="grid gap-1">
+          <h3 className="eyebrow">Biggest buys</h3>
+          <ol className="grid gap-0.5 text-sm">
+            {s.topBuys.map((b, i) => (
+              <li key={b.player + i} className="flex items-center gap-2">
+                <span aria-hidden className="size-2 rounded-pill" style={{ background: b.color }} />
+                <span className="font-semibold">{b.player}</span>
+                <span className="text-muted">{b.squad}</span>
+                <span className="ml-auto tabular">{b.price}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
     </section>
   );
 }

@@ -59,13 +59,26 @@ with sync_playwright() as pw:
     expect(host.get_by_text("Guest Gary").first).to_be_visible()
     host.screenshot(path=f"{SHOTS}/auction-setup.png", full_page=True)
     no_sideways(host, "auction setup")
+    # Rahul runs the big screen (the monitor).
+    host.locator("#monitor").select_option(label="Rahul Menon")
+    expect(host.get_by_role("region", name="Big screen", exact=True)).to_contain_text("Rahul Menon is the monitor")
+    screen_url = host.get_by_role("link", name="Open big screen").get_attribute("href")
+    assert "/screen/" in screen_url, screen_url
     host.get_by_role("button", name="Start the auction").click()
     expect(host.get_by_text("Live", exact=True)).to_be_visible()
+
+    # The TV: the private link, no sign-in.
+    tv = b.new_context(viewport={"width": 1920, "height": 1080}).new_page()
+    tv.on("pageerror", lambda e: errors.append("tv " + str(e)[:80]))
+    tv.goto(screen_url.replace("https://clbx.ca", BASE))
+    expect(tv.get_by_text("WINTER CUP AUCTION", exact=False).first).to_be_visible()
+    expect(tv.get_by_text("Here we go")).to_be_visible()
 
     # 2) Rahul watches from his phone.
     login(cap, "Rahul")
     cap.goto(f"{BASE}/auction/{aid}")
     expect(cap.get_by_text("You're bidding for Blue Bombers")).to_be_visible()
+    expect(cap.get_by_role("region", name="Big screen", exact=True)).to_contain_text("You're the monitor")
     expect(cap.get_by_text("Waiting for the next player")).to_be_visible()
 
     # 3) Ade goes up (base 80). Rahul 80, Priya 90, Rahul jumps to 150; Priya sells now.
@@ -81,7 +94,12 @@ with sync_playwright() as pw:
     expect(host.get_by_role("status")).to_contain_text("150 Blue Bombers")
     cap.screenshot(path=f"{SHOTS}/auction-live.png", full_page=True)
     no_sideways(cap, "auction live")
+    expect(tv.get_by_text("Now bidding")).to_be_visible(timeout=5000)
+    expect(tv.get_by_role("region", name="Up now")).to_contain_text("150")
+    tv.screenshot(path=f"{SHOTS}/auction-tv-live.png")
     host.get_by_role("button", name="Sold now").click()
+    expect(tv.get_by_text("SOLD!")).to_be_visible(timeout=5000)
+    tv.screenshot(path=f"{SHOTS}/auction-tv-sold.png")
     expect(host.get_by_text(re.compile("Ade Bello sold to Blue Bombers for 150"))).to_be_visible()
     expect(cap.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("150 left")
 
@@ -112,11 +130,18 @@ with sync_playwright() as pw:
     expect(host.get_by_role("alert").filter(has_text="can bid up to 250")).to_be_visible()
     host.get_by_role("button", name="Pass (unsold)").click()
 
+    # The summary (host and monitor).
+    summary = host.get_by_role("region", name="Summary")
+    expect(summary).to_contain_text("Biggest buys")
+    expect(summary).to_contain_text("Ade Bello")
+
     # 7) Finish: the teams are picked.
     host.get_by_role("button", name="Finish auction").click()
     expect(host.get_by_text("The teams are picked.")).to_be_visible()
     expect(cap.get_by_text("The teams are picked.")).to_be_visible(timeout=10000)
     host.screenshot(path=f"{SHOTS}/auction-done.png", full_page=True)
+    expect(tv.get_by_text("The teams are picked")).to_be_visible(timeout=5000)
+    tv.screenshot(path=f"{SHOTS}/auction-tv-done.png")
     # The tab shows it as finished.
     host.goto(f"{BASE}/t/t-strikers/auction")
     expect(host.get_by_role("link", name=re.compile("Winter Cup auction")).first).to_contain_text("Finished")

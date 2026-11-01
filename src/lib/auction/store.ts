@@ -24,6 +24,10 @@ export interface Auction {
   currentLotId: string | null;
   createdBy: string | null;
   createdAt: string;
+  /** Runs the big screen; sees the full summary. */
+  monitorId: string | null;
+  /** The private big-screen link (/screen/<token>): read-only, no sign-in. */
+  screenToken: string;
 }
 export interface Squad {
   id: string;
@@ -94,6 +98,7 @@ const toAuction = (r: Row): Auction => ({
   id: s(r.id)!, teamId: s(r.team_id)!, title: s(r.title)!, status: r.status as Auction["status"], budget: Number(r.budget), basePrice: Number(r.base_price),
   minIncrement: Number(r.min_increment), bidSeconds: Number(r.bid_seconds), squadMin: Number(r.squad_min ?? 0), squadMax: r.squad_max == null ? null : Number(r.squad_max),
   captainsPlay: !!r.captains_play, currentLotId: s(r.current_lot_id), createdBy: s(r.created_by), createdAt: iso(r.created_at)!,
+  monitorId: s(r.monitor_id), screenToken: s(r.screen_token) ?? "",
 });
 const toSquad = (r: Row): Squad => ({ id: s(r.id)!, auctionId: s(r.auction_id)!, name: s(r.name)!, color: s(r.color) ?? "#2346D8", captainId: s(r.captain_id), managerId: s(r.manager_id), sort: Number(r.sort ?? 0) });
 const toPlayer = (r: Row): Player => ({
@@ -149,6 +154,13 @@ export async function snapshot(id: string): Promise<Snapshot | null> {
   return { auction, squads: (sq.data ?? []).map(toSquad), players: (pl.data ?? []).map(toPlayer), lot: l, bids, recent: (recent.data ?? []).map(toLot) };
 }
 
+export async function idForScreen(token: string): Promise<string | null> {
+  if (!/^[0-9a-f]{32}$/i.test(token)) return null;
+  if (!LIVE) return mem.auctions.find((a) => a.screenToken === token)?.id ?? null;
+  const { data } = await (await admin()).from("auctions").select("id").eq("screen_token", token).maybeSingle();
+  return data ? String((data as Row).id) : null;
+}
+
 export async function auctionsFor(teamId: string): Promise<Auction[]> {
   if (!LIVE) return mem.auctions.filter((a) => a.teamId === teamId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const { data } = await (await admin()).from("auctions").select("*").eq("team_id", teamId).order("created_at", { ascending: false }).limit(20);
@@ -157,9 +169,9 @@ export async function auctionsFor(teamId: string): Promise<Auction[]> {
 
 // ---- writes ---------------------------------------------------------------
 
-export async function createAuction(a: Omit<Auction, "id" | "createdAt" | "currentLotId" | "status">, squads: Omit<Squad, "id" | "auctionId">[], players: Omit<Player, "id" | "auctionId">[]) {
+export async function createAuction(a: Omit<Auction, "id" | "createdAt" | "currentLotId" | "status" | "monitorId" | "screenToken">, squads: Omit<Squad, "id" | "auctionId">[], players: Omit<Player, "id" | "auctionId">[]) {
   const id = randomUUID();
-  const auction: Auction = { ...a, id, status: "setup", currentLotId: null, createdAt: new Date().toISOString() };
+  const auction: Auction = { ...a, id, status: "setup", currentLotId: null, createdAt: new Date().toISOString(), monitorId: null, screenToken: randomUUID().replace(/-/g, "") };
   const sq = squads.map((x) => ({ ...x, id: randomUUID(), auctionId: id }));
   const pl = players.map((x) => ({ ...x, id: randomUUID(), auctionId: id }));
   if (!LIVE) {
