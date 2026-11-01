@@ -188,6 +188,10 @@ with sync_playwright() as pw:
     expect(ph.get_by_text("The teams are set")).to_be_visible()
     no_sideways(ph, "big screen on a phone")
     ph.screenshot(path=f"{SHOTS}/auction-phone-done.png", full_page=True)
+    # Back from the big screen goes to the auction room.
+    host.goto(screen_url.replace("https://clbx.ca", BASE))
+    host.get_by_role("button", name="Back").click()
+    host.wait_for_url(f"{BASE}/auction/{aid}")
     # The tab shows it as finished.
     host.goto(f"{BASE}/t/t-strikers/auction")
     expect(host.get_by_role("link", name=re.compile("Winter Cup auction")).first).to_contain_text("Finished")

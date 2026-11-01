@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Coins, Expand, Gavel, Layers, Shirt as ShirtIcon, Timer, Users } from "lucide-react";
+import { ChevronLeft, Coins, Expand, Gavel, Layers, Shirt as ShirtIcon, Timer, Users } from "lucide-react";
 import type { AuctionView, PlayerView, SquadView } from "@/lib/auction/service";
 
 /*
@@ -231,6 +231,20 @@ export function AuctionScreen({ token, initial, crestUrl }: { token: string; ini
     };
   }, []);
 
+  // Leave the big screen: out of full screen first, then back to where you came from
+  // (or to the auction room if the screen was opened straight from its link).
+  const goBack = async () => {
+    try {
+      (screen.orientation as unknown as { unlock?: () => void })?.unlock?.();
+      if (document.fullscreenElement) await document.exitFullscreen();
+    } catch {
+      /* not supported here */
+    }
+    const fromHere = document.referrer && new URL(document.referrer).origin === location.origin;
+    if (fromHere && history.length > 1) history.back();
+    else location.href = `/auction/${v.auction.id}`;
+  };
+
   const goFull = async () => {
     try {
       await document.documentElement.requestFullscreen?.();
@@ -264,6 +278,15 @@ export function AuctionScreen({ token, initial, crestUrl }: { token: string; ini
 
         {/* Header: LIVE, the title around the crest (or the tournament poster), the count. */}
         <header className="absolute inset-x-0 top-0 h-[250px]">
+          <button
+            type="button"
+            onClick={() => void goBack()}
+            className="au-btn absolute top-[30px] left-[36px] z-10 inline-flex items-center gap-[6px] rounded-full border-[2px] py-[7px] pr-[22px] pl-[12px] text-[24px] font-semibold"
+            style={{ borderColor: LINE, background: PANEL }}
+          >
+            <ChevronLeft aria-hidden className="size-[28px]" />
+            Back
+          </button>
           <div className="absolute top-[34px] left-[230px]">
             {a.status === "live" ? (
               <span className="inline-flex items-center gap-[12px] rounded-full border-[3px] px-[22px] py-[6px] text-[28px] au-hd uppercase" style={{ borderColor: RED, background: "rgba(40,4,8,.75)", boxShadow: `0 0 22px ${glow(RED, 0.55)}` }}>
