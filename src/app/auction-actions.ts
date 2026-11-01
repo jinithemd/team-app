@@ -65,3 +65,6 @@ export async function setSquadLogoAction(auctionId: string, squadId: string, dat
 export async function setPlayerPhotoAction(auctionId: string, playerId: string, dataUrl: string | null): Promise<Out> {
   return out(await svc.setPlayerPhoto(auctionId, playerId, dataUrl));
 }
+export async function setBannerAction(auctionId: string, which: "banner" | "sponsors", dataUrl: string | null): Promise<Out> {
+  return out(await svc.setBanner(auctionId, which, dataUrl));
+}

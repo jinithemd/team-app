@@ -17,8 +17,14 @@ Locator.click = _settled_click
 BASE = "http://localhost:3000"
 LOGO = "/tmp/claude-0/test-squad-logo.png"
 PHOTO = "/tmp/claude-0/test-player-photo.jpg"
+POSTER = "/tmp/claude-0/test-poster.jpg"
+SPONS = "/tmp/claude-0/test-sponsors.png"
 im = Image.new("RGB", (400, 400), "#C0283F"); ImageDraw.Draw(im).ellipse([60, 60, 340, 340], fill="white"); im.save(LOGO)
 im = Image.new("RGB", (600, 800), "#3B6E8F"); ImageDraw.Draw(im).ellipse([180, 120, 420, 360], fill="#E8C39E"); im.save(PHOTO)
+im = Image.new("RGB", (2400, 600), "#13213D"); ImageDraw.Draw(im).rectangle([100, 100, 2300, 500], fill="#E8A80C"); im.save(POSTER)
+im = Image.new("RGB", (1600, 200), "white"); d = ImageDraw.Draw(im)
+for i in range(4): d.rectangle([60 + i * 390, 40, 360 + i * 390, 160], fill=["#C0283F", "#1F6FB2", "#2E9E4E", "#8A5A00"][i])
+im.save(SPONS)
 SHOTS = "/tmp/claude-0"
 errors = []
 
@@ -76,6 +82,11 @@ with sync_playwright() as pw:
     expect(host.get_by_role("region", name="Big screen", exact=True)).to_contain_text("Rahul Menon is the monitor")
     screen_url = host.get_by_role("link", name="Open big screen").get_attribute("href")
     assert "/screen/" in screen_url, screen_url
+    # Banners: a poster on top, sponsors at the bottom.
+    host.locator("input[type=file][aria-label='Tournament poster']").set_input_files(POSTER)
+    expect(host.get_by_role("img", name="Tournament poster")).to_be_visible()
+    host.locator("input[type=file][aria-label='Sponsors banner']").set_input_files(SPONS)
+    expect(host.get_by_role("img", name="Sponsors banner")).to_be_visible()
     host.get_by_role("button", name="Start the auction").click()
     expect(host.get_by_text("Live", exact=True)).to_be_visible()
 
@@ -85,6 +96,10 @@ with sync_playwright() as pw:
     tv.goto(screen_url.replace("https://clbx.ca", BASE))
     expect(tv.get_by_text("WINTER CUP AUCTION", exact=False).first).to_be_visible()
     expect(tv.get_by_text("Here we go")).to_be_visible()
+    for name in ("Tournament poster", "Sponsors"):
+        el = tv.get_by_role("img", name=name, exact=True)
+        expect(el).to_be_visible()
+        tv.wait_for_function("(el) => el.complete && el.naturalWidth > 0", arg=el.element_handle())
 
     # 2) Rahul watches from his phone.
     login(cap, "Rahul")

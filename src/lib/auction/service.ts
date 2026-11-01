@@ -48,7 +48,7 @@ async function rosterInfo(teamId: string): Promise<Map<string, { position: strin
   return out;
 }
 
-const imgUrl = (auctionId: string, kind: "squad" | "player", id: string, v: string, token?: string) =>
+const imgUrl = (auctionId: string, kind: "squad" | "player" | "banner" | "sponsors", id: string, v: string, token?: string) =>
   `/api/auction/img/${auctionId}/${kind}/${id}?v=${encodeURIComponent(v)}${token ? `&t=${token}` : ""}`;
 
 // ---------------------------------------------------------------------------
@@ -145,6 +145,8 @@ export interface AuctionView {
   monitorName: string | null;
   /** Host and monitor only: the private big-screen link token. */
   screenToken: string | null;
+  bannerUrl: string | null;
+  sponsorBannerUrl: string | null;
   teamName: string;
   mySquadId: string | null;
   members: { id: string; name: string }[];
@@ -199,6 +201,8 @@ function build(snap: Snapshot, team: { id: string; name: string }[], teamName: s
     monitor,
     monitorName: snap.auction.monitorId ? names.get(snap.auction.monitorId) ?? null : null,
     screenToken: who.host || monitor ? snap.auction.screenToken : null,
+    bannerUrl: snap.auction.bannerAt ? imgUrl(snap.auction.id, "banner", snap.auction.id, snap.auction.bannerAt, token) : null,
+    sponsorBannerUrl: snap.auction.sponsorBannerAt ? imgUrl(snap.auction.id, "sponsors", snap.auction.id, snap.auction.sponsorBannerAt, token) : null,
     teamName,
     mySquadId: mine?.id ?? null,
     members: who.host ? team : [],
@@ -519,7 +523,7 @@ export async function setPlayerPhoto(auctionId: string, playerId: string, dataUr
 }
 
 /** The image route: team members (signed in) or the big screen (its private link). */
-export async function auctionImage(auctionId: string, kind: "squad" | "player", id: string, token: string | null): Promise<string | null> {
+export async function auctionImage(auctionId: string, kind: "squad" | "player" | "banner" | "sponsors", id: string, token: string | null): Promise<string | null> {
   if (!/^[0-9a-f-]{36}$/i.test(auctionId) || !/^[0-9a-f-]{36}$/i.test(id)) return null;
   let ok = false;
   if (token) ok = (await st.idForScreen(token)) === auctionId;
@@ -529,4 +533,14 @@ export async function auctionImage(auctionId: string, kind: "squad" | "player", 
     if (u && snap) ok = (await canHost(snap.auction.teamId)) || (await members(snap.auction.teamId)).some((m) => m.id === u.id);
   }
   return ok ? st.image(auctionId, kind, id) : null;
+}
+
+/** Host: the big-screen banners (tournament poster on top, sponsors at the bottom), or null to remove. */
+export async function setBanner(auctionId: string, which: "banner" | "sponsors", dataUrl: string | null): Promise<Result> {
+  return caught(async () => {
+    await asHost(auctionId);
+    if (dataUrl && (!IMG.test(dataUrl) || dataUrl.length > 1_500_000)) return fail("Use a PNG or JPG under 1 MB.");
+    await st.setBanner(auctionId, which, dataUrl);
+    return { ok: true, data: undefined };
+  });
 }

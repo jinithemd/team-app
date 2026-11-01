@@ -199,6 +199,12 @@ export function AuctionScreen({ token, initial }: { token: string; initial: Scre
         )}
       </header>
 
+      {v.bannerUrl && (
+        <div className="relative z-10 flex h-[clamp(56px,10vh,150px)] shrink-0 justify-center au-paper border-t border-[color:var(--ink)]/10">
+          <img src={v.bannerUrl} alt="Tournament poster" className="h-full w-full object-contain" />
+        </div>
+      )}
+
       {a.status === "done" ? (
         <Final v={v} />
       ) : (
@@ -210,6 +216,13 @@ export function AuctionScreen({ token, initial }: { token: string; initial: Scre
             ))}
           </section>
         </main>
+      )}
+
+      {v.sponsorBannerUrl && (
+        <div className="relative z-10 flex h-[clamp(44px,7vh,110px)] shrink-0 items-center justify-center gap-[1em] au-paper border-b border-[color:var(--ink)]/10 px-[clamp(16px,2.5vw,48px)]">
+          <span className="hidden shrink-0 text-[0.8em] font-semibold tracking-[0.12em] text-[color:var(--ink)]/50 uppercase sm:inline">Sponsors</span>
+          <img src={v.sponsorBannerUrl} alt="Sponsors" className="h-full min-w-0 flex-1 object-contain py-[0.4em]" />
+        </div>
       )}
 
       <footer className="relative z-10 flex items-center gap-[1.2em] overflow-hidden au-paper px-[clamp(16px,2.5vw,48px)] py-[0.7em] text-[1em] whitespace-nowrap">

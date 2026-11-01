@@ -6,7 +6,7 @@ import { ArrowLeft, BarChart3, Copy, Gavel, MonitorPlay, Play, Shuffle, Timer, T
 import type { AuctionView, SquadView } from "@/lib/auction/service";
 import {
   addGuestAction, bidAction, closeNowAction, deleteAuctionAction, finishAuctionAction, nextPlayerAction, setPlayerAction, setSquadAction, startAuctionAction,
-  undoSaleAction, unsoldBackAction, setMonitorAction, setSquadLogoAction, setPlayerPhotoAction,
+  undoSaleAction, unsoldBackAction, setMonitorAction, setSquadLogoAction, setPlayerPhotoAction, setBannerAction,
 } from "@/app/auction-actions";
 import { buttonClass, inputClass } from "@/components/ui";
 
@@ -285,6 +285,17 @@ function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean
             </option>
           ))}
         </select>
+      </section>
+
+      <section aria-labelledby="ban-h" className="grid gap-2">
+        <h2 id="ban-h" className="text-lg font-semibold">
+          4. Big screen banners (optional)
+        </h2>
+        <p className="text-sm text-muted">A tournament poster across the top and your sponsors along the bottom. Wide images work best.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <BannerPick label="Tournament poster" hint="Top of the screen" src={v.bannerUrl} disabled={pending} onPick={(d) => run(() => setBannerAction(a.id, "banner", d))} />
+          <BannerPick label="Sponsors banner" hint="Bottom of the screen" src={v.sponsorBannerUrl} disabled={pending} onPick={(d) => run(() => setBannerAction(a.id, "sponsors", d))} />
+        </div>
       </section>
 
       <button type="button" disabled={pending} onClick={() => run(() => startAuctionAction(a.id))} className={buttonClass("primary", "lg", "justify-self-start")}>
@@ -745,5 +756,69 @@ function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label
       />
       {err && <span className="text-[10px] text-danger">{err}</span>}
     </span>
+  );
+}
+
+/** Shrinks a wide banner in the browser (keeps its shape), so uploads stay small. */
+async function toWide(file: File, maxW = 1920, maxH = 640): Promise<string> {
+  const url = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const k = Math.min(1, maxW / img.width, maxH / img.height);
+  const c = document.createElement("canvas");
+  c.width = Math.round(img.width * k);
+  c.height = Math.round(img.height * k);
+  c.getContext("2d")!.drawImage(img, 0, 0, c.width, c.height);
+  const png = file.type === "image/png" ? c.toDataURL("image/png") : "";
+  return png && png.length < 1_400_000 ? png : c.toDataURL("image/jpeg", 0.85);
+}
+
+function BannerPick({ label, hint, src, onPick, disabled }: { label: string; hint: string; src: string | null; onPick: (dataUrl: string | null) => void; disabled?: boolean }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <div className="grid gap-1.5 rounded-lg border border-border p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-semibold">{label}</span>
+        <span className="text-xs text-muted">{hint}</span>
+      </div>
+      <button
+        type="button"
+        aria-label={`Choose ${label.toLowerCase()}`}
+        disabled={disabled}
+        onClick={() => input.current?.click()}
+        className="grid h-20 place-items-center overflow-hidden rounded-md border border-dashed border-border bg-sunken text-sm text-muted focus-visible:outline-2 focus-visible:outline-focus"
+      >
+        {src ? <img src={src} alt={label} className="size-full object-contain" /> : "Add an image"}
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="sr-only"
+        tabIndex={-1}
+        aria-label={label}
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          if (!/^image\/(png|jpeg|webp)$/.test(f.type)) return setErr("Use a PNG or JPG.");
+          setErr(null);
+          onPick(await toWide(f));
+        }}
+      />
+      {err && <span className="text-xs text-danger">{err}</span>}
+      {src && (
+        <button type="button" disabled={disabled} onClick={() => onPick(null)} className="justify-self-start text-sm text-muted underline">
+          Remove
+        </button>
+      )}
+    </div>
   );
 }
