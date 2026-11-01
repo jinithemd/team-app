@@ -7,13 +7,14 @@ import { signOutAction, updatePreferencesAction } from "@/app/actions";
 import { PageHeader, TeamCrest, buttonClass } from "@/components/ui";
 import { ProfilePhoto } from "@/components/profile-photo";
 import { photoUrl } from "@/lib/data/store";
+import { isOwner } from "@/lib/admin/stats";
 
 export const metadata: Metadata = { title: "Account" };
 
 export default async function AccountPage() {
   const [user0, hats] = await Promise.all([getSessionUser(), listMyHats()]);
   const user = user0!;
-  const myPhoto = await photoImage(user.id);
+  const [myPhoto, owner] = await Promise.all([photoImage(user.id), isOwner(user.email, user.id)]);
   const name = `${user.firstName} ${user.lastName}`;
   return (
     <main id="main" className="gutter mx-auto grid max-w-2xl gap-6 py-6">
@@ -70,6 +71,11 @@ export default async function AccountPage() {
           <Link href="/calendar/subscribe" className="text-team-ink">
             Add to your phone&apos;s calendar
           </Link>
+          {owner && (
+            <Link href="/admin" className="font-semibold text-team-ink">
+              Owner dashboard
+            </Link>
+          )}
         </div>
       </section>
 
