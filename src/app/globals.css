@@ -40,6 +40,9 @@
     text-transform: uppercase;
     letter-spacing: 0.02em;
   }
+  /* Status-bar space for screen headers; a Back bar above them takes it instead. */
+  :root { --sat: env(safe-area-inset-top, 0px); }
+  :root:has([data-backbar]) { --sat: 0px; }
   .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
   .gutter {
     padding-left: max(16px, env(safe-area-inset-left, 0px));

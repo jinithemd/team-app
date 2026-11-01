@@ -17,7 +17,7 @@ export default async function SponsorChatPage({ params }: { params: Promise<{ te
   return (
     <div data-team={teamId} className="min-h-full">
       <style dangerouslySetInnerHTML={{ __html: teamThemeCss(teamId, look.color, look.colorSecondary) }} />
-      <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(env(safe-area-inset-top,0px)+20px)] pb-4 text-on-team">
+      <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(var(--sat)+20px)] pb-4 text-on-team">
         <div className="mx-auto max-w-3xl">
           <p className="text-sm opacity-90">Sponsor chat</p>
           <h1 className="font-display text-2xl leading-tight font-bold break-words uppercase">{chat.teamName}</h1>

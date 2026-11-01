@@ -12,7 +12,7 @@ export default async function ClubLayout({ children, params }: { children: React
   return (
     <div data-team={c.club.id} className="min-h-full">
       <style dangerouslySetInnerHTML={{ __html: teamThemeCss(c.club.id, c.club.color, c.club.colorSecondary) }} />
-      <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(env(safe-area-inset-top,0px)+20px)] pb-4 text-on-team">
+      <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(var(--sat)+20px)] pb-4 text-on-team">
         <div className="mx-auto flex max-w-3xl items-center gap-3">
           {c.club.logo ? (
             <img src={c.club.logo} alt="" className="size-12 shrink-0 rounded-lg bg-bg object-contain p-0.5" />

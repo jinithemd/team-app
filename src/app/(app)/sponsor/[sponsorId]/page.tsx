@@ -27,7 +27,7 @@ export default async function SponsorView({ params, searchParams }: { params: Pr
   return (
     <div data-team={themeId} className="min-h-full">
       <style dangerouslySetInnerHTML={{ __html: teamThemeCss(themeId, color, color2) }} />
-      <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(env(safe-area-inset-top,0px)+20px)] pb-5 text-on-team">
+      <header className="gutter border-b-4 border-team-2 bg-team pt-[calc(var(--sat)+20px)] pb-5 text-on-team">
         <div className="mx-auto grid max-w-3xl gap-3">
           <div className="flex items-center gap-3">
             <SponsorMark s={v.sponsor} big />

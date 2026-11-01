@@ -20,7 +20,7 @@ export default async function TournamentLayout({ params, children }: { params: P
   const tableLabel = t.format === "knockout" ? "Bracket" : t.format === "groups_knockout" ? "Groups & bracket" : "Table";
   return (
     <div className="min-h-full">
-      <header className="gutter border-b border-border bg-surface pt-[calc(env(safe-area-inset-top,0px)+16px)] pb-4">
+      <header className="gutter border-b border-border bg-surface pt-[calc(var(--sat)+16px)] pb-4">
         <div className="mx-auto grid max-w-3xl gap-3">
           <Link href="/tournaments" className="inline-flex min-h-8 items-center gap-1 justify-self-start text-sm font-semibold text-team-ink">
             <ArrowLeft aria-hidden className="size-4" />

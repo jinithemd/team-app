@@ -3,6 +3,7 @@ import { getSessionUser, listMyTeams, listPendingRsvps, unreadChatCount } from "
 import { PrimaryNav } from "@/components/nav";
 import { TeamThemeStyle } from "@/components/team-theme-style";
 import { AppPush } from "@/components/app-bridge";
+import { BackBar } from "@/components/back-bar";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
@@ -20,7 +21,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <TeamThemeStyle teams={teams} enabled={user.useTeamColors} />
       <AppPush />
       <PrimaryNav pendingCount={pending.length} chatCount={unread} />
-      <div className="min-w-0 flex-1 pb-[calc(64px+env(safe-area-inset-bottom,0px))] lg:pb-0">{children}</div>
+      <div className="min-w-0 flex-1 pb-[calc(64px+env(safe-area-inset-bottom,0px))] lg:pb-0">
+        <BackBar skipTeam />
+        {children}
+      </div>
     </div>
   );
 }
