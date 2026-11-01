@@ -6,7 +6,7 @@ import { ArrowLeft, BarChart3, Copy, Gavel, MonitorPlay, Play, Shuffle, Timer, T
 import type { AuctionView, SquadView } from "@/lib/auction/service";
 import {
   addGuestAction, bidAction, closeNowAction, deleteAuctionAction, finishAuctionAction, nextPlayerAction, setPlayerAction, setSquadAction, startAuctionAction,
-  undoSaleAction, unsoldBackAction, setMonitorAction,
+  undoSaleAction, unsoldBackAction, setMonitorAction, setSquadLogoAction, setPlayerPhotoAction,
 } from "@/app/auction-actions";
 import { buttonClass, inputClass } from "@/components/ui";
 
@@ -182,32 +182,64 @@ function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean
         <p className="text-sm text-muted">Give your best players a higher base price. Remove anyone who isn&apos;t playing.</p>
         <ul className="grid gap-1.5">
           {inPool.map((p) => (
-            <li key={p.id} className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5">
-              <span className="min-w-0 flex-1 truncate font-semibold">
-                {p.name}
-                {!p.userId && <span className="text-xs font-normal text-muted"> · guest</span>}
-              </span>
-              <label className="sr-only" htmlFor={`base-${p.id}`}>
-                Base price for {p.name}
-              </label>
-              <span className="w-20 shrink-0">
-                <input
-                  id={`base-${p.id}`}
-                  type="number"
-                  min={0}
-                  defaultValue={p.basePrice}
-                  onBlur={(e) => {
-                    if (e.target.value !== String(p.basePrice)) run(() => setPlayerAction(a.id, p.id, { basePrice: e.target.value }));
-                  }}
-                  className={`${inputClass} min-h-9 text-right tabular`}
+            <li key={p.id} className="grid gap-2 rounded-md border border-border p-2.5">
+              <div className="flex items-center gap-2.5">
+                <PhotoButton
+                  label={`Photo for ${p.name}`}
+                  src={p.photoUrl}
+                  fallback={initials(p.name)}
+                  disabled={pending}
+                  onPick={(url) => run(() => setPlayerPhotoAction(a.id, p.id, url))}
                 />
-              </span>
-              <button type="button" disabled={pending} onClick={() => run(() => setPlayerAction(a.id, p.id, { remove: true }))} aria-label={`Remove ${p.name}`} className="min-h-9 px-2 text-xs font-semibold text-danger">
-                Remove
-              </button>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-semibold">
+                    {p.name}
+                    {p.jersey && <span className="font-normal text-muted"> #{p.jersey}</span>}
+                  </span>
+                  {!p.userId && <span className="block text-xs text-muted">Guest</span>}
+                </span>
+                <button type="button" disabled={pending} onClick={() => run(() => setPlayerAction(a.id, p.id, { remove: true }))} aria-label={`Remove ${p.name}`} className="min-h-9 px-2 text-xs font-semibold text-danger">
+                  Remove
+                </button>
+              </div>
+              <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
+                <label className="grid gap-0.5 text-xs font-semibold text-muted">
+                  Position
+                  <input
+                    list="auction-positions"
+                    aria-label={`Position for ${p.name}`}
+                    defaultValue={p.position ?? ""}
+                    placeholder="e.g. Midfield"
+                    maxLength={30}
+                    onBlur={(e) => {
+                      if (e.target.value !== (p.position ?? "")) run(() => setPlayerAction(a.id, p.id, { position: e.target.value }));
+                    }}
+                    className={`${inputClass} min-h-9 text-sm font-normal text-fg`}
+                  />
+                </label>
+                <label className="grid gap-0.5 text-xs font-semibold text-muted">
+                  Base price
+                  <input
+                    id={`base-${p.id}`}
+                    aria-label={`Base price for ${p.name}`}
+                    type="number"
+                    min={0}
+                    defaultValue={p.basePrice}
+                    onBlur={(e) => {
+                      if (e.target.value !== String(p.basePrice)) run(() => setPlayerAction(a.id, p.id, { basePrice: e.target.value }));
+                    }}
+                    className={`${inputClass} min-h-9 text-right text-sm font-normal text-fg tabular`}
+                  />
+                </label>
+              </div>
             </li>
           ))}
         </ul>
+        <datalist id="auction-positions">
+          {["Goalkeeper", "Defence", "Midfield", "Forward", "Winger", "Striker"].map((x) => (
+            <option key={x} value={x} />
+          ))}
+        </datalist>
         <form
           className="flex gap-2"
           onSubmit={(e) => {
@@ -270,6 +302,10 @@ function SquadSetup({ auctionId, sq, members, run, pending }: { auctionId: strin
   const dirty = name !== sq.name || cap !== (sq.captainId ?? "") || man !== (sq.managerId ?? "");
   return (
     <li className="grid gap-2 rounded-lg border-2 p-3" style={{ borderColor: sq.color }}>
+      <div className="flex items-center gap-3">
+        <PhotoButton label={`Logo for ${sq.name}`} src={sq.logoUrl} fallback={<Shirt color={sq.color} />} disabled={pending} onPick={(url) => run(() => setSquadLogoAction(auctionId, sq.id, url))} square />
+        <span className="text-xs text-muted">{sq.logoUrl ? "Tap the logo to change it." : "Tap to add a team logo."}</span>
+      </div>
       <label className="grid gap-1 text-xs font-semibold">
         Team name
         <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} className={`${inputClass} min-h-10 text-sm font-semibold`} />
@@ -323,10 +359,17 @@ function Live({ v, run, pending, skew }: { v: AuctionView; run: Run; pending: bo
       {lot ? (
         <section aria-label="Up now" className="grid gap-3 rounded-xl border-2 p-4" style={{ borderColor: lot.squadColor ?? "var(--border)" }}>
           <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="eyebrow">Up now</p>
-              <p className="font-display text-4xl leading-none font-bold break-words uppercase">{lot.player.name}</p>
-              <p className="mt-1 text-sm text-muted">Base price {lot.player.basePrice}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-lg bg-sunken font-display text-2xl font-bold text-muted">
+                {lot.player.photoUrl ? <img src={lot.player.photoUrl} alt="" className="size-full object-cover" /> : initials(lot.player.name)}
+              </span>
+              <div className="min-w-0">
+                <p className="eyebrow">Up now</p>
+                <p className="font-display text-4xl leading-none font-bold break-words uppercase">{lot.player.name}</p>
+                <p className="mt-1 text-sm text-muted">
+                  {[lot.player.position, lot.player.jersey ? `#${lot.player.jersey}` : null, `base price ${lot.player.basePrice}`].filter(Boolean).join(", ")}
+                </p>
+              </div>
             </div>
             <div className={`grid shrink-0 justify-items-center rounded-lg px-3 py-2 ${left <= 5 ? "bg-danger text-on-danger" : "bg-sunken"}`} aria-label={`${left} seconds left`}>
               <Timer aria-hidden className="size-4" />
@@ -482,9 +525,10 @@ function Squads({ squads, highlight }: { squads: SquadView[]; highlight: string 
       <ul className="grid gap-3 sm:grid-cols-2">
         {squads.map((sq) => (
           <li key={sq.id} aria-label={sq.name} className={`grid content-start gap-2 rounded-lg border-2 p-3 ${highlight === sq.id ? "shadow-card" : ""}`} style={{ borderColor: sq.color }}>
-            <div className="flex items-baseline justify-between gap-2">
-              <p className="font-semibold" style={{ color: sq.color }}>
-                {sq.name}
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex min-w-0 items-center gap-2 font-semibold" style={{ color: sq.color }}>
+                {sq.logoUrl ? <img src={sq.logoUrl} alt="" className="size-7 shrink-0 rounded object-contain" /> : <Shirt color={sq.color} size={22} />}
+                <span className="truncate">{sq.name}</span>
               </p>
               <p className="text-sm tabular">
                 <strong>{sq.left}</strong> <span className="text-muted">left</span>
@@ -628,5 +672,78 @@ function Summary({ v }: { v: AuctionView }) {
         </div>
       )}
     </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+export const initials = (n: string) =>
+  n
+    .split(/\s+/)
+    .filter((w) => /^[\p{L}\d]/u.test(w))
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase();
+
+export function Shirt({ color, size = 28 }: { color: string; size?: number }) {
+  return (
+    <svg aria-hidden viewBox="0 0 64 60" width={size} height={size} className="shrink-0">
+      <path d="M22 4 12 8 2 20l8 9 6-5v32h32V24l6 5 8-9L52 8 42 4c-1.5 5-5.5 8-10 8s-8.5-3-10-8Z" fill={color} stroke="rgba(0,0,0,.25)" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** Shrinks a picked image to a square in the browser, so uploads stay small. */
+async function toSquare(file: File, size = 320): Promise<string> {
+  const url = await new Promise<string>((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result));
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  const c = document.createElement("canvas");
+  c.width = c.height = size;
+  const ctx = c.getContext("2d")!;
+  const s = Math.min(img.width, img.height);
+  ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, size, size);
+  return file.type === "image/png" ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.85);
+}
+
+function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label: string; src: string | null; fallback: React.ReactNode; onPick: (dataUrl: string) => void; disabled?: boolean; square?: boolean }) {
+  const input = useRef<HTMLInputElement>(null);
+  const [err, setErr] = useState<string | null>(null);
+  return (
+    <span className="grid shrink-0 justify-items-center gap-0.5">
+      <button
+        type="button"
+        aria-label={label}
+        disabled={disabled}
+        onClick={() => input.current?.click()}
+        className={`grid size-12 place-items-center overflow-hidden border border-border bg-sunken text-sm font-bold text-muted focus-visible:outline-2 focus-visible:outline-focus ${square ? "rounded-md" : "rounded-full"}`}
+      >
+        {src ? <img src={src} alt="" className={`size-full ${square ? "object-contain" : "object-cover"}`} /> : fallback}
+      </button>
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="sr-only"
+        tabIndex={-1}
+        aria-label={label}
+        onChange={async (e) => {
+          const f = e.target.files?.[0];
+          e.target.value = "";
+          if (!f) return;
+          if (!/^image\/(png|jpeg|webp)$/.test(f.type)) return setErr("PNG or JPG");
+          setErr(null);
+          onPick(await toSquare(f));
+        }}
+      />
+      {err && <span className="text-[10px] text-danger">{err}</span>}
+    </span>
   );
 }

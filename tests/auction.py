@@ -1,6 +1,7 @@
 # Sample-data build: a player auction. Priya (Strikers captain) sets up two teams, she and Rahul
 # captain them, and they bid live from two phones. Checks the clock, budgets, pass/unsold, undo.
 import re, time
+from PIL import Image, ImageDraw
 import _waits  # noqa: F401
 from playwright.sync_api import sync_playwright, expect, Locator
 
@@ -14,6 +15,10 @@ def _settled_click(self, *a, **k):
 Locator.click = _settled_click
 
 BASE = "http://localhost:3000"
+LOGO = "/tmp/claude-0/test-squad-logo.png"
+PHOTO = "/tmp/claude-0/test-player-photo.jpg"
+im = Image.new("RGB", (400, 400), "#C0283F"); ImageDraw.Draw(im).ellipse([60, 60, 340, 340], fill="white"); im.save(LOGO)
+im = Image.new("RGB", (600, 800), "#3B6E8F"); ImageDraw.Draw(im).ellipse([180, 120, 420, 360], fill="#E8C39E"); im.save(PHOTO)
 SHOTS = "/tmp/claude-0"
 errors = []
 
@@ -48,10 +53,17 @@ with sync_playwright() as pw:
     cards.nth(0).get_by_label("Captain").select_option(label="Priya Raman")
     cards.nth(0).get_by_role("button", name=re.compile("^Save")).click()
     expect(host.locator("li[aria-label=\'Team Red\']")).to_contain_text("Captain Priya Raman")
-    cards.nth(1).locator("input").first.fill("Blue Bombers")
+    cards.nth(1).get_by_label("Team name").fill("Blue Bombers")
     cards.nth(1).get_by_label("Captain").select_option(label="Rahul Menon")
     cards.nth(1).get_by_role("button", name=re.compile("^Save")).click()
     expect(host.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("Captain Rahul Menon")
+    # Team Red's logo, Ade's photo; his position comes from the roster.
+    host.locator("input[type=file][aria-label='Logo for Team Red']").set_input_files(LOGO)
+    expect(host.get_by_role("button", name="Logo for Team Red").locator("img")).to_be_visible()
+    host.locator("input[type=file][aria-label='Photo for Ade Bello']").set_input_files(PHOTO)
+    expect(host.get_by_role("button", name="Photo for Ade Bello").locator("img")).to_be_visible()
+    expect(host.get_by_label("Position for Ade Bello")).to_have_value("Defence")
+    host.get_by_label("Position for Sam Okafor").fill("Goalkeeper"); host.get_by_label("Position for Sam Okafor").blur()
     # Ade's a star: base 80. Tom isn't playing.
     host.get_by_label("Base price for Ade Bello").fill("80"); host.get_by_label("Base price for Ade Bello").blur()
     host.get_by_role("button", name="Remove Tom", exact=False).first.click()
@@ -96,6 +108,11 @@ with sync_playwright() as pw:
     no_sideways(cap, "auction live")
     expect(tv.get_by_text("On the block")).to_be_visible(timeout=5000)
     expect(tv.get_by_role("region", name="Up now")).to_contain_text("150")
+    expect(tv.get_by_role("region", name="Up now")).to_contain_text("Defence")
+    card_img = tv.get_by_role("region", name="Up now").locator("img").first
+    expect(card_img).to_be_visible()
+    assert tv.evaluate("(el) => el.naturalWidth", card_img.element_handle()) > 0, "player photo didn't load on the TV"
+    expect(tv.locator("article[aria-label='Team Red'] img")).to_be_visible()
     tv.screenshot(path=f"{SHOTS}/auction-tv-live.png")
     ph0 = b.new_context(viewport={"width": 390, "height": 844}).new_page()
     ph0.goto(screen_url.replace("https://clbx.ca", BASE))

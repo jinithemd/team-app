@@ -24,7 +24,7 @@ export async function createAuctionAction(teamId: string, _: FormState, f: FormD
 export async function setSquadAction(auctionId: string, squadId: string, input: { name: string; captainId: string; managerId: string }): Promise<Out> {
   return out(await svc.setSquad(auctionId, squadId, input));
 }
-export async function setPlayerAction(auctionId: string, playerId: string, op: { basePrice?: string; remove?: boolean }): Promise<Out> {
+export async function setPlayerAction(auctionId: string, playerId: string, op: { basePrice?: string; remove?: boolean; position?: string }): Promise<Out> {
   return out(await svc.setPlayer(auctionId, playerId, op));
 }
 export async function addGuestAction(auctionId: string, name: string, basePrice: string): Promise<Out> {
@@ -58,4 +58,10 @@ export async function deleteAuctionAction(auctionId: string): Promise<Out> {
 }
 export async function setMonitorAction(auctionId: string, userId: string): Promise<Out> {
   return out(await svc.setMonitor(auctionId, userId));
+}
+export async function setSquadLogoAction(auctionId: string, squadId: string, dataUrl: string | null): Promise<Out> {
+  return out(await svc.setSquadLogo(auctionId, squadId, dataUrl));
+}
+export async function setPlayerPhotoAction(auctionId: string, playerId: string, dataUrl: string | null): Promise<Out> {
+  return out(await svc.setPlayerPhoto(auctionId, playerId, dataUrl));
 }

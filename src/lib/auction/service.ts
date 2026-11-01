@@ -33,14 +33,33 @@ async function members(teamId: string): Promise<{ id: string; name: string }[]> 
   return ids.map((id) => ({ id, name: who.get(id)?.name ?? "Player" })).sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/** Positions and shirt numbers from the team roster, for the player cards. */
+async function rosterInfo(teamId: string): Promise<Map<string, { position: string | null; jersey: string | null }>> {
+  const out = new Map<string, { position: string | null; jersey: string | null }>();
+  const { LIVE } = await import("../mode");
+  if (!LIVE) {
+    const { db } = await import("../data/store");
+    for (const r of db.roster.filter((x) => x.teamId === teamId && x.userId)) out.set(r.userId!, { position: r.position ?? null, jersey: r.jersey ?? null });
+    return out;
+  }
+  const { adminClient } = await import("../supabase/server");
+  const { data } = await adminClient().from("roster_members").select("user_id, position, jersey").eq("team_id", teamId).not("user_id", "is", null);
+  for (const r of data ?? []) out.set(String(r.user_id), { position: r.position ?? null, jersey: r.jersey ?? null });
+  return out;
+}
+
+const imgUrl = (auctionId: string, kind: "squad" | "player", id: string, v: string, token?: string) =>
+  `/api/auction/img/${auctionId}/${kind}/${id}?v=${encodeURIComponent(v)}${token ? `&t=${token}` : ""}`;
+
 // ---------------------------------------------------------------------------
 // numbers
 // ---------------------------------------------------------------------------
 
 export interface SquadView extends Squad {
+  logoUrl: string | null;
   captainName: string | null;
   managerName: string | null;
-  players: Player[];
+  players: PlayerView[];
   spent: number;
   left: number;
   count: number;
@@ -48,7 +67,14 @@ export interface SquadView extends Squad {
   full: boolean;
 }
 
-function squadViews(snap: Snapshot, names: Map<string, string>): SquadView[] {
+export type PlayerView = Player & { photoUrl: string | null };
+
+function playerView(p: Player, auctionId: string, pv: Map<string, string>, token?: string): PlayerView {
+  const v = p.photoAt ?? (p.userId ? pv.get(p.userId) : undefined);
+  return { ...p, photoUrl: v ? imgUrl(auctionId, "player", p.id, v, token) : null };
+}
+
+function squadViews(snap: Snapshot, names: Map<string, string>, pv: Map<string, string> = new Map(), token?: string): SquadView[] {
   const a = snap.auction;
   return snap.squads.map((sq) => {
     const players = snap.players.filter((p) => p.squadId === sq.id && (p.status === "sold" || p.status === "captain"));
@@ -59,8 +85,8 @@ function squadViews(snap: Snapshot, names: Map<string, string>): SquadView[] {
     // Keep enough to fill the minimum squad at base price after this player.
     const reserve = Math.max(0, a.squadMin - count - 1) * a.basePrice;
     return {
-      ...sq, captainName: sq.captainId ? names.get(sq.captainId) ?? null : null, managerName: sq.managerId ? names.get(sq.managerId) ?? null : null,
-      players: players.sort((x, y) => (y.status === "captain" ? 1 : 0) - (x.status === "captain" ? 1 : 0) || (y.price ?? 0) - (x.price ?? 0)),
+      ...sq, logoUrl: sq.logoAt ? imgUrl(a.id, "squad", sq.id, sq.logoAt, token) : null, captainName: sq.captainId ? names.get(sq.captainId) ?? null : null, managerName: sq.managerId ? names.get(sq.managerId) ?? null : null,
+      players: players.map((p) => playerView(p, a.id, pv, token)).sort((x, y) => (y.status === "captain" ? 1 : 0) - (x.status === "captain" ? 1 : 0) || (y.price ?? 0) - (x.price ?? 0)),
       spent, left, count, maxBid: full ? 0 : Math.max(0, left - reserve), full,
     };
   });
@@ -107,9 +133,9 @@ export interface AuctionSummary {
 export interface AuctionView {
   auction: Auction;
   squads: SquadView[];
-  pool: Player[];
-  unsold: Player[];
-  lot: (st.Lot & { player: Player; squadName: string | null; squadColor: string | null; minNext: number; secondsLeft: number }) | null;
+  pool: PlayerView[];
+  unsold: PlayerView[];
+  lot: (st.Lot & { player: PlayerView; squadName: string | null; squadColor: string | null; minNext: number; secondsLeft: number }) | null;
   bids: { squad: string; color: string; amount: number; at: string }[];
   recent: { id: string; player: string; squad: string | null; color: string | null; price: number | null; status: string; at: string | null }[];
   summary: AuctionSummary;
@@ -125,9 +151,10 @@ export interface AuctionView {
   now: string;
 }
 
-function build(snap: Snapshot, team: { id: string; name: string }[], teamName: string, who: { uid: string | null; host: boolean }): AuctionView {
+function build(snap: Snapshot, team: { id: string; name: string }[], teamName: string, who: { uid: string | null; host: boolean }, pv: Map<string, string>, token?: string): AuctionView {
   const names = new Map(team.map((m) => [m.id, m.name]));
-  const squads = squadViews(snap, names);
+  const squads = squadViews(snap, names, pv, token);
+  const pview = (p: Player) => playerView(p, snap.auction.id, pv, token);
   const sqById = new Map(squads.map((x) => [x.id, x]));
   const mine = who.uid ? squads.find((x) => x.captainId === who.uid || x.managerId === who.uid) ?? null : null;
   const player = snap.lot ? snap.players.find((p) => p.id === snap.lot!.playerId) : undefined;
@@ -152,12 +179,12 @@ function build(snap: Snapshot, team: { id: string; name: string }[], teamName: s
   return {
     auction: { ...snap.auction, screenToken: "" },
     squads,
-    pool: snap.players.filter((p) => p.status === "pool" && p.id !== snap.lot?.playerId),
-    unsold: snap.players.filter((p) => p.status === "unsold"),
+    pool: snap.players.filter((p) => p.status === "pool" && p.id !== snap.lot?.playerId).map(pview),
+    unsold: snap.players.filter((p) => p.status === "unsold").map(pview),
     lot:
       snap.lot && player
         ? {
-            ...snap.lot, player, squadName: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.name ?? null : null,
+            ...snap.lot, player: pview(player), squadName: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.name ?? null : null,
             squadColor: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.color ?? null : null, minNext: minNext(snap),
             secondsLeft: Math.max(0, Math.ceil((Date.parse(snap.lot.endsAt) - Date.now()) / 1000)),
           }
@@ -189,7 +216,8 @@ export async function auctionView(id: string): Promise<AuctionView | null> {
   if (!host && !team.some((m) => m.id === u.id)) return null;
   if (snap.auction.status === "live" && (await settle(snap))) snap = (await st.snapshot(id))!;
   const { teamBasics } = await import("../sessions/store");
-  return build(snap, team, (await teamBasics(snap.auction.teamId))?.name ?? "", { uid: u.id, host });
+  const pv = await st.profilePhotoVersions(snap.players.map((p) => p.userId).filter((x): x is string => !!x));
+  return build(snap, team, (await teamBasics(snap.auction.teamId))?.name ?? "", { uid: u.id, host }, pv);
 }
 
 /** The big screen: read-only, opened from the private link on a TV or projector (no sign-in). */
@@ -201,7 +229,8 @@ export async function screenView(token: string): Promise<(AuctionView & { teamCo
   if (snap.auction.status === "live" && (await settle(snap))) snap = (await st.snapshot(id))!;
   const { teamBasics } = await import("../sessions/store");
   const t = await teamBasics(snap.auction.teamId);
-  const v = build(snap, await members(snap.auction.teamId), t?.name ?? "", { uid: null, host: false });
+  const pv = await st.profilePhotoVersions(snap.players.map((p) => p.userId).filter((x): x is string => !!x));
+  const v = build(snap, await members(snap.auction.teamId), t?.name ?? "", { uid: null, host: false }, pv, token);
   return { ...v, teamColor: t?.color ?? "#2346D8", teamColor2: t?.colorSecondary ?? null };
 }
 
@@ -264,10 +293,14 @@ export async function createAuction(teamId: string, input: AuctionInput): Promis
   if (!fe.budget && !fe.basePrice && !fe.squadMin && smin * base > budget) fe.squadMin = `A full minimum team at base price costs ${smin * base}, more than the budget.`;
   if (Object.keys(fe).length) return fail("Check the highlighted fields.", fe);
   const team = await members(teamId);
+  const info = await rosterInfo(teamId);
   const id = await st.createAuction(
     { teamId, title, budget, basePrice: base, minIncrement: inc, bidSeconds: secs, squadMin: smin, squadMax: smax, captainsPlay: input.captainsPlay, createdBy: u.id },
-    Array.from({ length: n }, (_, i) => ({ name: `Team ${SQUAD_COLOURS[i][0]}`, color: SQUAD_COLOURS[i][1], captainId: null, managerId: null, sort: i })),
-    team.map((m, i) => ({ userId: m.id, name: m.name, basePrice: base, status: "pool" as const, squadId: null, price: null, sort: i })),
+    Array.from({ length: n }, (_, i) => ({ name: `Team ${SQUAD_COLOURS[i][0]}`, color: SQUAD_COLOURS[i][1], captainId: null, managerId: null, sort: i, logoAt: null })),
+    team.map((m, i) => ({
+      userId: m.id, name: m.name, basePrice: base, status: "pool" as const, squadId: null, price: null, sort: i, photoAt: null,
+      position: info.get(m.id)?.position ?? null, jersey: info.get(m.id)?.jersey ?? null,
+    })),
   );
   return { ok: true, data: { id } };
 }
@@ -313,7 +346,7 @@ export async function setSquad(auctionId: string, squadId: string, input: { name
   });
 }
 
-export async function setPlayer(auctionId: string, playerId: string, op: { basePrice?: string; remove?: boolean }): Promise<Result> {
+export async function setPlayer(auctionId: string, playerId: string, op: { basePrice?: string; remove?: boolean; position?: string }): Promise<Result> {
   return caught(async () => {
     const snap = await asHost(auctionId);
     const p = snap.players.find((x) => x.id === playerId);
@@ -321,6 +354,10 @@ export async function setPlayer(auctionId: string, playerId: string, op: { baseP
     if (op.remove) {
       if (p.status === "sold" || p.status === "captain" || snap.lot?.playerId === p.id) return fail("They're already on a team.");
       await st.removePlayer(p.id);
+      return { ok: true, data: undefined };
+    }
+    if (op.position !== undefined) {
+      await st.updatePlayer(p.id, { position: op.position.trim().slice(0, 30) || null });
       return { ok: true, data: undefined };
     }
     const v = Number(String(op.basePrice ?? "").replace(/[,\s]/g, ""));
@@ -339,7 +376,7 @@ export async function addGuest(auctionId: string, name: string, basePrice: strin
     if (snap.players.some((p) => p.name.toLowerCase() === n.toLowerCase())) return fail(`${n} is already in.`);
     const v = basePrice.trim() ? Number(basePrice) : snap.auction.basePrice;
     if (!Number.isInteger(v) || v < 0 || v > snap.auction.budget) return fail("Base price from 0 up to the budget.");
-    await st.addPlayers(auctionId, [{ userId: null, name: n, basePrice: v, status: "pool", squadId: null, price: null, sort: snap.players.length }]);
+    await st.addPlayers(auctionId, [{ userId: null, name: n, basePrice: v, status: "pool", squadId: null, price: null, sort: snap.players.length, photoAt: null, position: null, jersey: null }]);
     return { ok: true, data: undefined };
   });
 }
@@ -451,4 +488,45 @@ export async function deleteAuction(auctionId: string): Promise<Result<{ teamId:
     await st.deleteAuction(auctionId);
     return { ok: true, data: { teamId: snap.auction.teamId } };
   });
+}
+
+// ---------------------------------------------------------------------------
+// pictures
+// ---------------------------------------------------------------------------
+
+const IMG = /^data:image\/(png|jpeg|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
+
+/** Host: a team logo (or null to remove it). */
+export async function setSquadLogo(auctionId: string, squadId: string, dataUrl: string | null): Promise<Result> {
+  return caught(async () => {
+    const snap = await asHost(auctionId);
+    if (!snap.squads.some((x) => x.id === squadId)) return fail("That team isn't in this auction.");
+    if (dataUrl && (!IMG.test(dataUrl) || dataUrl.length > 400_000)) return fail("Use a PNG, JPG or SVG under 300 KB.");
+    await st.setSquadLogo(squadId, dataUrl);
+    return { ok: true, data: undefined };
+  });
+}
+
+/** Host: a player's photo for the auction (or null to go back to their profile photo). */
+export async function setPlayerPhoto(auctionId: string, playerId: string, dataUrl: string | null): Promise<Result> {
+  return caught(async () => {
+    const snap = await asHost(auctionId);
+    if (!snap.players.some((x) => x.id === playerId)) return fail("That player isn't in this auction.");
+    if (dataUrl && (!IMG.test(dataUrl) || dataUrl.length > 400_000)) return fail("Use a PNG or JPG under 300 KB.");
+    await st.setPlayerPhoto(playerId, dataUrl);
+    return { ok: true, data: undefined };
+  });
+}
+
+/** The image route: team members (signed in) or the big screen (its private link). */
+export async function auctionImage(auctionId: string, kind: "squad" | "player", id: string, token: string | null): Promise<string | null> {
+  if (!/^[0-9a-f-]{36}$/i.test(auctionId) || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  let ok = false;
+  if (token) ok = (await st.idForScreen(token)) === auctionId;
+  if (!ok) {
+    const u = await me();
+    const snap = u ? await st.snapshot(auctionId) : null;
+    if (u && snap) ok = (await canHost(snap.auction.teamId)) || (await members(snap.auction.teamId)).some((m) => m.id === u.id);
+  }
+  return ok ? st.image(auctionId, kind, id) : null;
 }

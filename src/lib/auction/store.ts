@@ -37,6 +37,8 @@ export interface Squad {
   captainId: string | null;
   managerId: string | null;
   sort: number;
+  /** When the logo last changed (null = no logo). The image itself loads separately. */
+  logoAt: string | null;
 }
 export interface Player {
   id: string;
@@ -48,6 +50,10 @@ export interface Player {
   squadId: string | null;
   price: number | null;
   sort: number;
+  /** When a photo was added for the auction (else the profile photo is used, if any). */
+  photoAt: string | null;
+  position: string | null;
+  jersey: string | null;
 }
 export interface Lot {
   id: string;
@@ -100,10 +106,12 @@ const toAuction = (r: Row): Auction => ({
   captainsPlay: !!r.captains_play, currentLotId: s(r.current_lot_id), createdBy: s(r.created_by), createdAt: iso(r.created_at)!,
   monitorId: s(r.monitor_id), screenToken: s(r.screen_token) ?? "",
 });
-const toSquad = (r: Row): Squad => ({ id: s(r.id)!, auctionId: s(r.auction_id)!, name: s(r.name)!, color: s(r.color) ?? "#2346D8", captainId: s(r.captain_id), managerId: s(r.manager_id), sort: Number(r.sort ?? 0) });
+const toSquad = (r: Row): Squad => ({
+  id: s(r.id)!, auctionId: s(r.auction_id)!, name: s(r.name)!, color: s(r.color) ?? "#2346D8", captainId: s(r.captain_id), managerId: s(r.manager_id), sort: Number(r.sort ?? 0), logoAt: iso(r.logo_at),
+});
 const toPlayer = (r: Row): Player => ({
   id: s(r.id)!, auctionId: s(r.auction_id)!, userId: s(r.user_id), name: s(r.name)!, basePrice: Number(r.base_price), status: r.status as Player["status"],
-  squadId: s(r.squad_id), price: r.price == null ? null : Number(r.price), sort: Number(r.sort ?? 0),
+  squadId: s(r.squad_id), price: r.price == null ? null : Number(r.price), sort: Number(r.sort ?? 0), photoAt: iso(r.photo_at), position: s(r.position), jersey: s(r.jersey),
 });
 const toLot = (r: Row): Lot => ({
   id: s(r.id)!, auctionId: s(r.auction_id)!, playerId: s(r.player_id)!, status: r.status as Lot["status"], topBid: r.top_bid == null ? null : Number(r.top_bid),
@@ -114,6 +122,10 @@ const toBid = (r: Row): Bid => ({ id: s(r.id)!, lotId: s(r.lot_id)!, squadId: s(
 const snake = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`), v]));
 
 // ---- reads ----------------------------------------------------------------
+
+// Images are left out of the once-a-second reads; they load through /api/auction/img.
+const SQUAD_COLS = "id, auction_id, name, color, captain_id, manager_id, sort, logo_at";
+const PLAYER_COLS = "id, auction_id, user_id, name, base_price, status, squad_id, price, sort, photo_at, position, jersey";
 
 export interface Snapshot {
   auction: Auction;
@@ -144,8 +156,8 @@ export async function snapshot(id: string): Promise<Snapshot | null> {
   if (!a) return null;
   const auction = toAuction(a);
   const [sq, pl, lot, recent] = await Promise.all([
-    sb.from("auction_squads").select("*").eq("auction_id", id).order("sort"),
-    sb.from("auction_players").select("*").eq("auction_id", id).order("sort").order("name"),
+    sb.from("auction_squads").select(SQUAD_COLS).eq("auction_id", id).order("sort"),
+    sb.from("auction_players").select(PLAYER_COLS).eq("auction_id", id).order("sort").order("name"),
     auction.currentLotId ? sb.from("auction_lots").select("*").eq("id", auction.currentLotId).maybeSingle() : Promise.resolve({ data: null }),
     sb.from("auction_lots").select("*").eq("auction_id", id).neq("status", "open").order("closed_at", { ascending: false }).limit(6),
   ]);
@@ -303,4 +315,67 @@ export async function deleteAuction(id: string) {
     return;
   }
   check((await (await admin()).from("auctions").delete().eq("id", id)).error, "delete auction");
+}
+
+// ---- images ---------------------------------------------------------------
+
+const memImg = ((globalThis as unknown as { __clbxAuctionImg?: Map<string, string> }).__clbxAuctionImg ??= new Map<string, string>());
+
+export async function setSquadLogo(id: string, dataUrl: string | null) {
+  const at = dataUrl ? new Date().toISOString() : null;
+  if (!LIVE) {
+    if (dataUrl) memImg.set(`squad:${id}`, dataUrl);
+    else memImg.delete(`squad:${id}`);
+    Object.assign(mem.squads.find((x) => x.id === id) ?? {}, { logoAt: at });
+    return;
+  }
+  check((await (await admin()).from("auction_squads").update({ logo: dataUrl, logo_at: at }).eq("id", id)).error, "save logo");
+}
+
+export async function setPlayerPhoto(id: string, dataUrl: string | null) {
+  const at = dataUrl ? new Date().toISOString() : null;
+  if (!LIVE) {
+    if (dataUrl) memImg.set(`player:${id}`, dataUrl);
+    else memImg.delete(`player:${id}`);
+    Object.assign(mem.players.find((x) => x.id === id) ?? {}, { photoAt: at });
+    return;
+  }
+  check((await (await admin()).from("auction_players").update({ photo: dataUrl, photo_at: at }).eq("id", id)).error, "save photo");
+}
+
+/** A team logo, or a player's auction photo falling back to their profile photo. */
+export async function image(auctionId: string, kind: "squad" | "player", id: string): Promise<string | null> {
+  if (!LIVE) {
+    if (kind === "squad") return mem.squads.some((x) => x.id === id && x.auctionId === auctionId) ? memImg.get(`squad:${id}`) ?? null : null;
+    const p = mem.players.find((x) => x.id === id && x.auctionId === auctionId);
+    if (!p) return null;
+    if (memImg.get(`player:${id}`)) return memImg.get(`player:${id}`)!;
+    if (!p.userId) return null;
+    return (globalThis as unknown as { __clbxPhotos?: Map<string, string> }).__clbxPhotos?.get(p.userId) ?? null;
+  }
+  const sb = await admin();
+  if (kind === "squad") {
+    const { data } = await sb.from("auction_squads").select("logo").eq("id", id).eq("auction_id", auctionId).maybeSingle();
+    return s((data as Row | null)?.logo);
+  }
+  const { data } = await sb.from("auction_players").select("photo, user_id").eq("id", id).eq("auction_id", auctionId).maybeSingle();
+  if (!data) return null;
+  if ((data as Row).photo) return s((data as Row).photo);
+  if (!(data as Row).user_id) return null;
+  const { data: prof } = await sb.from("profiles").select("avatar_path").eq("id", String((data as Row).user_id)).maybeSingle();
+  return s((prof as Row | null)?.avatar_path);
+}
+
+/** Profile photo versions, so the card can show a member's photo when there's no auction photo. */
+export async function profilePhotoVersions(userIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!userIds.length) return out;
+  if (!LIVE) {
+    const photos = (globalThis as unknown as { __clbxPhotos?: Map<string, string> }).__clbxPhotos;
+    for (const id of userIds) if (photos?.has(id)) out.set(id, String(photos.get(id)!.length));
+    return out;
+  }
+  const { data } = await (await admin()).from("profiles").select("id, updated_at").in("id", userIds).not("avatar_path", "is", null);
+  for (const r of (data ?? []) as Row[]) out.set(String(r.id), String(Date.parse(String(r.updated_at))));
+  return out;
 }

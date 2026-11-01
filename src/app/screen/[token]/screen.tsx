@@ -82,6 +82,15 @@ function Shirt({ color, size = "2.6em" }: { color: string; size?: string }) {
   );
 }
 
+/** A team's logo if it has one, otherwise its shirt. */
+function Mark({ color, logoUrl, size = "2.6em" }: { color: string; logoUrl?: string | null; size?: string }) {
+  return logoUrl ? (
+    <img src={logoUrl} alt="" className="shrink-0 rounded-[0.2em] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,.45)]" style={{ width: size, height: size }} />
+  ) : (
+    <Shirt color={color} size={size} />
+  );
+}
+
 export function AuctionScreen({ token, initial }: { token: string; initial: ScreenView }) {
   const [v, setV] = useState(initial);
   const [skew, setSkew] = useState(0);
@@ -244,16 +253,27 @@ function Stage({ v, left, frac, soldShow }: { v: ScreenView; left: number; frac:
         <div className="grid gap-[1.6em]">
           <div className="flex items-center gap-[clamp(14px,2vw,40px)]">
             <div
-              className="grid aspect-[3/4] w-[clamp(84px,13vw,240px)] shrink-0 place-items-center rounded-[clamp(10px,1.1vw,22px)] border-[clamp(3px,0.3vw,6px)] font-display text-[clamp(2.6rem,6vw,7.5rem)] leading-none font-bold shadow-[0_18px_40px_rgba(0,0,0,.45)]"
+              className="relative grid aspect-[3/4] w-[clamp(96px,15vw,280px)] shrink-0 place-items-center overflow-hidden rounded-[clamp(10px,1.1vw,22px)] border-[clamp(3px,0.3vw,6px)] font-display text-[clamp(2.6rem,6vw,7.5rem)] leading-none font-bold shadow-[0_18px_40px_rgba(0,0,0,.45)]"
               style={{ borderColor: GOLD, background: `linear-gradient(170deg, ${GOLD}33, transparent 60%), ${PITCH_DEEP}`, color: GOLD }}
             >
-              {initials(lot.player.name)}
+              {lot.player.photoUrl ? <img src={lot.player.photoUrl} alt="" className="absolute inset-0 size-full object-cover" /> : initials(lot.player.name)}
+              {lot.player.jersey && (
+                <span className="absolute top-[0.12em] left-[0.18em] font-display text-[0.42em] leading-none font-bold" style={{ color: GOLD, textShadow: "0 2px 6px rgba(0,0,0,.7)" }}>
+                  {lot.player.jersey}
+                </span>
+              )}
+              {lot.player.position && (
+                <span className="absolute inset-x-0 bottom-0 truncate px-[0.3em] py-[0.12em] text-center font-display text-[0.24em] leading-tight font-bold uppercase" style={{ background: GOLD, color: PITCH_DEEP }}>
+                  {lot.player.position}
+                </span>
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[1.2em] text-[color:var(--chalk)]/70">On the block</p>
               <p className="font-display text-[clamp(2.6rem,6.2vw,8rem)] leading-[0.86] font-bold break-words uppercase">{lot.player.name}</p>
               <p className="mt-[0.4em] text-[1.25em]">
-                Base price <strong className="font-display text-[1.25em] tabular" style={{ color: GOLD }}>{lot.player.basePrice}</strong>
+                {lot.player.position && <span className="text-[color:var(--chalk)]/80">{lot.player.position}, </span>}
+                base price <strong className="font-display text-[1.25em] tabular" style={{ color: GOLD }}>{lot.player.basePrice}</strong>
               </p>
             </div>
             <Clock left={left} frac={frac} />
@@ -266,7 +286,7 @@ function Stage({ v, left, frac, soldShow }: { v: ScreenView; left: number; frac:
                   {lot.topBid}
                 </span>
                 <span className="flex items-center gap-[0.4em] font-display text-[clamp(1.6rem,3.2vw,4rem)] leading-none font-bold uppercase">
-                  <Shirt color={tint!} size="1.1em" />
+                  <Mark color={tint!} logoUrl={v.squads.find((x) => x.id === lot.topSquadId)?.logoUrl} size="1.1em" />
                   {lot.squadName}
                 </span>
               </>
@@ -311,6 +331,7 @@ function Stage({ v, left, frac, soldShow }: { v: ScreenView; left: number; frac:
       {soldShow && soldShow.status === "sold" && (
         <div className="au-show pointer-events-none absolute inset-0 grid place-items-center" style={{ background: "rgba(4,16,10,.92)" }}>
           <div className="au-stamp grid justify-items-center gap-[0.25em] rounded-[0.5em] border-[0.35em] px-[1em] py-[0.4em] text-center" style={{ borderColor: soldShow.color ?? GOLD, color: soldShow.color ?? GOLD, background: PITCH_DEEP }}>
+            {v.squads.find((x) => x.name === soldShow.squad)?.logoUrl && <Mark color={soldShow.color ?? GOLD} logoUrl={v.squads.find((x) => x.name === soldShow.squad)?.logoUrl} size="clamp(3rem,6vw,7rem)" />}
             <span className="font-display text-[clamp(4rem,11vw,13rem)] leading-[0.82] font-bold tracking-[0.04em]">SOLD</span>
             <span className="font-display text-[clamp(1.4rem,3vw,3.6rem)] leading-none font-bold text-[color:var(--chalk)] uppercase">{soldShow.player}</span>
             <span className="text-[clamp(1rem,1.8vw,2.2rem)] font-semibold text-[color:var(--chalk)]">
@@ -353,7 +374,7 @@ function Board({ sq, budget, leading }: { sq: SquadView; budget: number; leading
       }}
     >
       <div className="flex items-center gap-[0.7em]">
-        <Shirt color={sq.color} />
+        <Mark color={sq.color} logoUrl={sq.logoUrl} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-[1.75em] leading-none font-bold uppercase">{sq.name}</p>
           <p className="truncate text-[0.9em] text-[color:var(--chalk)]/65">
@@ -410,7 +431,7 @@ function Final({ v }: { v: AuctionView }) {
             style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${sq.color} 38%, transparent), rgba(0,0,0,.35) 45%)` }}
           >
             <div className="flex items-center gap-[0.7em]">
-              <Shirt color={sq.color} size="3.2em" />
+              <Mark color={sq.color} logoUrl={sq.logoUrl} size="3.2em" />
               <div className="min-w-0">
                 <p className="font-display text-[2em] leading-none font-bold break-words uppercase">{sq.name}</p>
                 <p className="text-[0.9em] text-[color:var(--chalk)]/70">
