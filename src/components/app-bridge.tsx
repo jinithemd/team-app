@@ -56,6 +56,9 @@ export function AppPush() {
   const router = useRouter();
   useEffect(() => {
     if (!inApp()) return;
+    // Android needs Firebase built into the app for notifications; asking without it closes the
+    // app. Builds that have it add "ClbxPush" to the user agent (capacitor.config.ts).
+    if (appPlatform() === "android" && !navigator.userAgent.includes("ClbxPush")) return;
     const subs: { remove: () => void }[] = [];
     (async () => {
       const { PushNotifications } = await import("@capacitor/push-notifications");

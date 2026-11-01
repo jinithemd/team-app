@@ -1,4 +1,8 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { existsSync } from "node:fs";
+
+// Android push needs Firebase (google-services.json). The site only asks for notifications in builds that have it.
+const androidPush = existsSync("android/app/google-services.json") || !!process.env.CLBX_ANDROID_PUSH;
 
 /*
  * The Clbx phone apps (App Store and Google Play). They open the live site, clbx.ca, inside
@@ -19,8 +23,8 @@ const config: CapacitorConfig = {
   },
   appendUserAgent: "ClbxApp",
   backgroundColor: "#06080D",
-  ios: { contentInset: "never", limitsNavigationsToAppBoundDomains: false },
-  android: { allowMixedContent: false },
+  ios: { contentInset: "never", limitsNavigationsToAppBoundDomains: false, appendUserAgent: "ClbxApp ClbxPush" },
+  android: { allowMixedContent: false, appendUserAgent: androidPush ? "ClbxApp ClbxPush" : "ClbxApp" },
   plugins: {
     SplashScreen: { launchShowDuration: 1500, launchAutoHide: true, backgroundColor: "#06080D", showSpinner: false },
     PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
