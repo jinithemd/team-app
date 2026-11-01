@@ -361,7 +361,21 @@ export async function setBanner(auctionId: string, which: "banner" | "sponsors",
 }
 
 /** A team logo, a player's photo (falling back to their profile photo), or a banner. */
-export async function image(auctionId: string, kind: "squad" | "player" | "banner" | "sponsors", id: string): Promise<string | null> {
+export async function image(auctionId: string, kind: "squad" | "player" | "banner" | "sponsors" | "crest", id: string): Promise<string | null> {
+  if (kind === "crest") {
+    // The club's crest, for the middle of the big screen's header.
+    if (!LIVE) {
+      const au = mem.auctions.find((x) => x.id === auctionId);
+      const { db } = await import("../data/store");
+      return (au && db.teams.find((t) => t.id === au.teamId)?.settings.crest) || null;
+    }
+    const sb = await admin();
+    const { data: au } = await sb.from("auctions").select("team_id").eq("id", auctionId).maybeSingle();
+    if (!au) return null;
+    const { data: t } = await sb.from("teams").select("logo_path").eq("id", String((au as Row).team_id)).maybeSingle();
+    const v = s((t as Row | null)?.logo_path);
+    return v && v.startsWith("data:image/") ? v : null;
+  }
   if (kind === "banner" || kind === "sponsors") {
     if (!LIVE) return memImg.get(`${kind}:${auctionId}`) ?? null;
     const { data } = await (await admin()).from("auctions").select(kind === "banner" ? "banner" : "sponsor_banner").eq("id", auctionId).maybeSingle();

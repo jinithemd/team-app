@@ -1,41 +1,52 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Expand, Gavel } from "lucide-react";
-import type { AuctionView, SquadView } from "@/lib/auction/service";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Coins, Expand, Gavel, Layers, Shirt as ShirtIcon, Timer, Users } from "lucide-react";
+import type { AuctionView, PlayerView, SquadView } from "@/lib/auction/service";
 
 /*
  * The big screen: the auction on a TV or projector for the whole team and the fans.
- * A daylight pitch (bright grass, white chalk lines) with white broadcast panels on top:
- * the player up as a big card, each team as a board with its shirt or logo and a points bar,
- * and a rubber SOLD stamp in the buying team's colour. Read-only, refreshes every second, keeps the screen awake.
- * Fits a TV (landscape) and a phone held upright.
+ * A night-stadium broadcast look (floodlights, dark sky, a strip of lit grass) with neon-lime
+ * accents and glowing cards in each team's colour.
+ *
+ * It's drawn on a fixed 1920×1080 stage and scaled to fit, so a TV, a laptop and a phone all
+ * show the same picture. On a phone held upright the stage is turned sideways (landscape), and
+ * Full screen also asks the phone to lock to landscape where it can.
+ *
+ * While a player is up: their profile card, the bid, the clock, and every team's points.
+ * Between players and at the end: every team's squad, slot by slot.
  */
 
 type ScreenView = AuctionView & { teamColor: string; teamColor2: string | null };
+type Recent = AuctionView["recent"][number];
 
-const GRASS = "#2E9E4E";
-const GRASS_DARK = "#24853F";
-const CHALK = "#FFFFFF";
-const INK = "#13213D";
-const GOLD = "#E8A80C";
-const GOLD_INK = "#8A5A00";
-const RED = "#D93A3F";
-// Kept for the player card's frame.
-const PITCH_DEEP = "#13213D";
+const W = 1920;
+const H = 1080;
+const LIME = "#B8F42C";
+const LIME_DEEP = "#7CC316";
+const SKY = "#060A14";
+const PANEL = "rgba(12,18,30,.86)";
+const LINE = "rgba(255,255,255,.12)";
+const DIM = "rgba(255,255,255,.62)";
+const RED = "#FF3B4A";
 
 const STYLE = `
-.au-root { --ink: ${INK}; --chalk: ${CHALK}; --gold: ${GOLD}; font-size: clamp(13px, min(1.15vw, 2.1vh), 30px); }
-@keyframes au-stamp { 0% { transform: rotate(-14deg) scale(2.6); opacity: 0 } 14% { transform: rotate(-14deg) scale(.94); opacity: 1 } 20%, 100% { transform: rotate(-14deg) scale(1) } }
-@keyframes au-show { 0%, 90% { opacity: 1 } 100% { opacity: 0 } }
-@keyframes au-bump { 0% { transform: scale(1.14) } 100% { transform: scale(1) } }
+.au-root { font-family: Inter, system-ui, sans-serif; color: #fff; }
+.au-hd { font-family: Barlow, "Barlow Condensed", Inter, sans-serif; font-style: italic; font-weight: 800; letter-spacing: -0.01em; }
+.au-cap { letter-spacing: .22em; text-transform: uppercase; font-weight: 600; }
+.au-num { font-variant-numeric: tabular-nums; }
+@keyframes au-stamp { 0% { transform: scale(2.4) rotate(-8deg); opacity: 0 } 16% { transform: scale(.95) rotate(-8deg); opacity: 1 } 24%, 100% { transform: scale(1) rotate(-8deg) } }
+@keyframes au-show { 0%, 92% { opacity: 1 } 100% { opacity: 0 } }
+@keyframes au-bump { 0% { transform: scale(1.12) } 100% { transform: scale(1) } }
+@keyframes au-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+@keyframes au-glow { 0%, 100% { box-shadow: 0 0 0 2px var(--c), 0 0 26px 2px var(--c) } 50% { box-shadow: 0 0 0 2px var(--c), 0 0 46px 8px var(--c) } }
 .au-stamp { animation: au-stamp 6s cubic-bezier(.2,.9,.3,1.2) forwards }
 .au-show { animation: au-show 6s linear forwards }
-.au-bump { animation: au-bump .5s ease-out }
-.au-paper { background-color: #FFFFFF }
-.au-light { color: #FFFFFF }
-.au-pill:hover { background-color: rgba(19,33,61,.06) }
-@media (prefers-reduced-motion: reduce) { .au-stamp, .au-bump { animation: none; transform: rotate(-14deg) } .au-bump { transform: none } }
+.au-bump { animation: au-bump .45s ease-out }
+.au-dot { animation: au-pulse 1.2s ease-in-out infinite }
+.au-lead { animation: au-glow 1.6s ease-in-out infinite }
+.au-btn:hover { background-color: rgba(255,255,255,.12) }
+@media (prefers-reduced-motion: reduce) { .au-stamp, .au-bump, .au-dot, .au-lead { animation: none } .au-stamp { transform: rotate(-8deg) } }
 `;
 
 const initials = (n: string) =>
@@ -47,64 +58,126 @@ const initials = (n: string) =>
     .join("")
     .toUpperCase();
 
-/** Chalk markings: halfway line, centre circle, the two boxes. Sits behind everything. */
-function Pitch() {
-  return (
-    <svg aria-hidden className="pointer-events-none absolute inset-0 size-full" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">
-      <defs>
-        <radialGradient id="au-flood-l" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(80 -60) rotate(40) scale(900 700)">
-          <stop stopColor="#FFF6D6" stopOpacity=".35" />
-          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-        </radialGradient>
-        <radialGradient id="au-flood-r" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1520 -60) rotate(140) scale(900 700)">
-          <stop stopColor="#FFF6D6" stopOpacity=".25" />
-          <stop offset="1" stopColor="#FFFFFF" stopOpacity="0" />
-        </radialGradient>
-        <pattern id="au-mow" width="200" height="900" patternUnits="userSpaceOnUse">
-          <rect width="100" height="900" fill={GRASS_DARK} fillOpacity=".55" />
-        </pattern>
-      </defs>
-      <rect width="1600" height="900" fill="url(#au-mow)" />
-      <g fill="none" stroke={CHALK} strokeOpacity=".55" strokeWidth="5">
-        <rect x="40" y="40" width="1520" height="820" />
-        <line x1="800" y1="40" x2="800" y2="860" />
-        <circle cx="800" cy="450" r="130" />
-        <rect x="40" y="230" width="220" height="440" />
-        <rect x="1340" y="230" width="220" height="440" />
-        <rect x="40" y="345" width="80" height="210" />
-        <rect x="1480" y="345" width="80" height="210" />
-      </g>
-      <circle cx="800" cy="450" r="8" fill={CHALK} fillOpacity=".6" />
-      <rect width="1600" height="900" fill="url(#au-flood-l)" />
-      <rect width="1600" height="900" fill="url(#au-flood-r)" />
-    </svg>
-  );
-}
+const glow = (c: string, a = 0.55) => `color-mix(in srgb, ${c} ${Math.round(a * 100)}%, transparent)`;
+const clock = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
-function Shirt({ color, size = "2.6em" }: { color: string; size?: string }) {
+// ---------------------------------------------------------------------------
+// Pieces
+// ---------------------------------------------------------------------------
+
+function Shirt({ color, size = 56 }: { color: string; size?: number }) {
   return (
-    <svg aria-hidden viewBox="0 0 64 60" style={{ width: size, height: size }} className="shrink-0 drop-shadow-[0_2px_4px_rgba(19,33,61,.25)]">
-      <path d="M22 4 12 8 2 20l8 9 6-5v32h32V24l6 5 8-9L52 8 42 4c-1.5 5-5.5 8-10 8s-8.5-3-10-8Z" fill={color} stroke="rgba(19,33,61,.35)" strokeWidth="2" strokeLinejoin="round" />
+    <svg aria-hidden viewBox="0 0 64 60" width={size} height={size} className="shrink-0" style={{ filter: `drop-shadow(0 0 10px ${glow(color, 0.6)})` }}>
+      <path d="M22 4 12 8 2 20l8 9 6-5v32h32V24l6 5 8-9L52 8 42 4c-1.5 5-5.5 8-10 8s-8.5-3-10-8Z" fill={color} stroke="rgba(0,0,0,.35)" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M22 4c1.5 5 5.5 8 10 8s8.5-3 10-8" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="2" />
     </svg>
   );
 }
 
 /** A team's logo if it has one, otherwise its shirt. */
-function Mark({ color, logoUrl, size = "2.6em" }: { color: string; logoUrl?: string | null; size?: string }) {
+function Mark({ color, logoUrl, size = 56 }: { color: string; logoUrl?: string | null; size?: number }) {
   return logoUrl ? (
-    <img src={logoUrl} alt="" className="shrink-0 rounded-[0.2em] object-contain drop-shadow-[0_2px_6px_rgba(0,0,0,.45)]" style={{ width: size, height: size }} />
+    <img src={logoUrl} alt="" width={size} height={size} className="shrink-0 rounded-[10px] object-contain" style={{ width: size, height: size, filter: `drop-shadow(0 0 10px ${glow(color, 0.5)})` }} />
   ) : (
     <Shirt color={color} size={size} />
   );
 }
 
-export function AuctionScreen({ token, initial }: { token: string; initial: ScreenView }) {
+/** Floodlights, crowd, a strip of lit grass. Sits behind everything. */
+function Stadium() {
+  const bank = (x: number) => (
+    <g transform={`translate(${x} 70)`}>
+      <circle cx="70" cy="40" r="190" fill="url(#au-flood)" />
+      <rect x="0" y="0" width="140" height="80" rx="10" fill="#1A2233" />
+      {Array.from({ length: 12 }, (_, i) => (
+        <circle key={i} cx={22 + (i % 4) * 32} cy={18 + Math.floor(i / 4) * 22} r="10" fill="#FFFFFF" />
+      ))}
+      <rect x="64" y="80" width="12" height="260" fill="#111827" />
+    </g>
+  );
+  return (
+    <svg aria-hidden className="pointer-events-none absolute inset-0" width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+      <defs>
+        <radialGradient id="au-flood">
+          <stop stopColor="#FFFFFF" stopOpacity=".55" />
+          <stop offset=".35" stopColor="#CFE3FF" stopOpacity=".18" />
+          <stop offset="1" stopColor="#CFE3FF" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="au-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#0B1730" />
+          <stop offset=".45" stopColor={SKY} />
+          <stop offset=".72" stopColor="#07140C" />
+          <stop offset="1" stopColor="#0E3A18" />
+        </linearGradient>
+        <linearGradient id="au-grass" x1="0" y1="0" x2="0" y2="1">
+          <stop stopColor="#1B6B2C" stopOpacity="0" />
+          <stop offset=".35" stopColor="#1E7A31" stopOpacity=".75" />
+          <stop offset="1" stopColor="#2A9A3E" />
+        </linearGradient>
+        <pattern id="au-mow" width="240" height="400" patternUnits="userSpaceOnUse">
+          <rect width="120" height="400" fill="#000" fillOpacity=".14" />
+        </pattern>
+        <pattern id="au-crowd" width="14" height="10" patternUnits="userSpaceOnUse">
+          <circle cx="4" cy="5" r="2.2" fill="#9FB4D8" fillOpacity=".16" />
+          <circle cx="11" cy="2" r="1.6" fill="#E9C46A" fillOpacity=".08" />
+        </pattern>
+        <radialGradient id="au-vig" cx=".5" cy=".5" r=".75">
+          <stop offset=".6" stopColor="#000" stopOpacity="0" />
+          <stop offset="1" stopColor="#000" stopOpacity=".55" />
+        </radialGradient>
+      </defs>
+      <rect width={W} height={H} fill="url(#au-sky)" />
+      <path d={`M0 330 Q ${W / 2} 250 ${W} 330 L ${W} 470 Q ${W / 2} 420 0 470 Z`} fill="url(#au-crowd)" />
+      <rect y="680" width={W} height="400" fill="url(#au-grass)" />
+      <rect y="680" width={W} height="400" fill="url(#au-mow)" opacity=".8" />
+      {bank(40)}
+      {bank(W - 180)}
+      <rect width={W} height={H} fill="url(#au-vig)" />
+    </svg>
+  );
+}
+
+function Slash({ flip }: { flip?: boolean }) {
+  return <span aria-hidden className="inline-block h-[34px] w-[40px] shrink-0" style={{ background: LIME, transform: `skewX(${flip ? 24 : -24}deg)`, boxShadow: `0 0 18px ${glow(LIME, 0.7)}` }} />;
+}
+
+function Pill({ children, color = LIME }: { children: React.ReactNode; color?: string }) {
+  return (
+    <span className="inline-flex items-center rounded-full px-[18px] py-[4px] text-[26px] font-semibold" style={{ background: color, color: "#0A1408", boxShadow: `0 0 16px ${glow(color, 0.45)}` }}>
+      {children}
+    </span>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The screen
+// ---------------------------------------------------------------------------
+
+export function AuctionScreen({ token, initial, crestUrl }: { token: string; initial: ScreenView; crestUrl: string | null }) {
   const [v, setV] = useState(initial);
   const [skew, setSkew] = useState(0);
   const [, tick] = useState(0);
-  const [soldShow, setSoldShow] = useState<AuctionView["recent"][number] | null>(null);
+  const [soldShow, setSoldShow] = useState<Recent | null>(null);
   const lastSeen = useRef<string | null>(initial.recent[0]?.id ?? null);
   const [full, setFull] = useState(false);
+  const [fit, setFit] = useState<{ s: number; turn: boolean } | null>(null);
+
+  // Scale the 1920×1080 stage to the window; turn it sideways on a phone held upright.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const turn = h > w * 1.05;
+      setFit({ turn, s: turn ? Math.min(h / W, w / H) : Math.min(w / W, h / H) });
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    screen.orientation?.addEventListener?.("change", measure);
+    return () => {
+      window.removeEventListener("resize", measure);
+      screen.orientation?.removeEventListener?.("change", measure);
+    };
+  }, []);
 
   useEffect(() => {
     setSkew(Date.parse(initial.now) - Date.now());
@@ -158,327 +231,482 @@ export function AuctionScreen({ token, initial }: { token: string; initial: Scre
     };
   }, []);
 
+  const goFull = async () => {
+    try {
+      await document.documentElement.requestFullscreen?.();
+      // Phones (Android) can be held to landscape once full screen; elsewhere the stage turns itself.
+      await (screen.orientation as unknown as { lock?: (o: string) => Promise<void> })?.lock?.("landscape");
+    } catch {
+      /* not supported here */
+    }
+  };
+
   const a = v.auction;
   const lot = v.lot;
   const left = lot ? Math.max(0, Math.ceil((Date.parse(lot.endsAt) - (Date.now() + skew)) / 1000)) : 0;
-  const frac = lot ? Math.min(1, left / Math.max(1, a.bidSeconds)) : 0;
+  const teamsSize = a.squadMax ? (a.squadMax === a.squadMin ? `${a.squadMax}` : `${a.squadMin}–${a.squadMax}`) : `${a.squadMin}+`;
+  const bottom = (v.sponsorBannerUrl ? 92 : 0) + 58;
+  const mainH = H - 334 - bottom - 22;
 
   return (
-    <div
-      className="au-root fixed inset-0 flex flex-col overflow-x-hidden overflow-y-auto text-[color:var(--ink)] lg:overflow-hidden"
-      style={{ background: `linear-gradient(180deg, #38B25A 0%, ${GRASS} 45%, ${GRASS_DARK} 100%)` }}
-    >
+    <div className="au-root fixed inset-0 overflow-hidden" style={{ background: "#02040A" }}>
       <style dangerouslySetInnerHTML={{ __html: STYLE }} />
-      <Pitch />
+      <div
+        className="absolute top-1/2 left-1/2 overflow-hidden"
+        style={{
+          width: W,
+          height: H,
+          transform: fit ? `translate(-50%, -50%) rotate(${fit.turn ? 90 : 0}deg) scale(${fit.s})` : "translate(-50%, -50%)",
+          visibility: fit ? "visible" : "hidden",
+        }}
+      >
+        <Stadium />
 
-      <header className="relative z-10 flex items-center gap-[1em] au-paper px-[clamp(16px,2.5vw,48px)] py-[clamp(10px,1.6vh,22px)] shadow-[0_4px_18px_rgba(19,33,61,.18)]">
-        <span className="grid size-[3em] shrink-0 place-items-center rounded-full" style={{ background: GOLD, color: INK }}>
-          <Gavel aria-hidden style={{ width: "1.6em", height: "1.6em" }} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate font-display text-[2.6em] leading-[0.95] font-bold uppercase">{a.title}</h1>
-          <p className="truncate text-[0.95em] text-[color:var(--ink)]/65">
-            {v.teamName}, {a.budget} points a team
-          </p>
+        {/* Header: LIVE, the title around the crest (or the tournament poster), the count. */}
+        <header className="absolute inset-x-0 top-0 h-[250px]">
+          <div className="absolute top-[34px] left-[230px]">
+            {a.status === "live" ? (
+              <span className="inline-flex items-center gap-[12px] rounded-full border-[3px] px-[22px] py-[6px] text-[28px] au-hd uppercase" style={{ borderColor: RED, background: "rgba(40,4,8,.75)", boxShadow: `0 0 22px ${glow(RED, 0.55)}` }}>
+                <span className="au-dot size-[16px] rounded-full" style={{ background: RED }} />
+                Live auction
+              </span>
+            ) : a.status === "done" ? (
+              <span className="inline-flex rounded-full border-[3px] px-[22px] py-[6px] text-[28px] au-hd uppercase" style={{ borderColor: LIME, color: LIME }}>
+                Full time
+              </span>
+            ) : (
+              <span className="inline-flex rounded-full border-[3px] border-white/40 px-[22px] py-[6px] text-[28px] au-hd uppercase">Starting soon</span>
+            )}
+          </div>
+          <div className="absolute top-[34px] right-[230px] flex items-center gap-[14px]">
+            <span className="rounded-full border-[2px] px-[22px] py-[7px] text-[26px] font-semibold au-num" style={{ borderColor: LINE, background: PANEL }}>
+              {a.status === "done" ? `${v.summary.sold} sold · ${v.summary.unsold} unsold` : `${v.summary.sold} sold · ${v.summary.toGo} to go`}
+            </span>
+            {!full && (
+              <button type="button" onClick={() => void goFull()} className="au-btn inline-flex items-center gap-[10px] rounded-full border-[2px] px-[20px] py-[7px] text-[24px] font-semibold" style={{ borderColor: LINE }}>
+                <Expand aria-hidden className="size-[24px]" />
+                Full screen
+              </button>
+            )}
+          </div>
+          <Title title={a.title} crestUrl={crestUrl} posterUrl={v.bannerUrl} color={v.teamColor} />
+        </header>
+
+        {/* What the auction is: players a team, points each, how many teams. */}
+        <div className="absolute top-[258px] left-1/2 flex -translate-x-1/2 items-center gap-[34px] rounded-full border-[2px] px-[40px] py-[10px] text-[27px] whitespace-nowrap" style={{ borderColor: LINE, background: PANEL }}>
+          <span className="inline-flex items-center gap-[12px]">
+            <Users aria-hidden className="size-[30px]" style={{ color: LIME }} />
+            {teamsSize} players / team
+          </span>
+          <span className="h-[30px] w-[2px] bg-white/20" />
+          <span className="inline-flex items-center gap-[12px]">
+            <Coins aria-hidden className="size-[30px]" style={{ color: LIME }} />
+            {a.budget.toLocaleString()} points each
+          </span>
+          <span className="h-[30px] w-[2px] bg-white/20" />
+          <span className="inline-flex items-center gap-[12px]">
+            <Layers aria-hidden className="size-[30px]" style={{ color: LIME }} />
+            {v.squads.length} teams
+          </span>
+          <span className="h-[30px] w-[2px] bg-white/20" />
+          <span className="max-w-[420px] truncate text-white/70">{v.teamName}</span>
         </div>
-        {a.status === "live" && (
-          <span className="inline-flex shrink-0 items-center gap-[0.45em] rounded-full px-[0.9em] py-[0.25em] font-display text-[1.2em] font-bold au-light uppercase" style={{ background: RED }}>
-            <span className="live-dot size-[0.55em] rounded-full au-paper" />
-            Live
+
+        <main className="absolute inset-x-[48px] top-[334px]" style={{ bottom: bottom + 22 }}>
+          {lot && a.status === "live" ? <LiveLot v={v} left={left} h={mainH} /> : <Squads v={v} h={mainH} />}
+        </main>
+
+        {v.sponsorBannerUrl && (
+          <div className="absolute inset-x-0 flex h-[92px] items-center gap-[26px] border-t-[2px] px-[60px]" style={{ bottom: 58, borderColor: LINE, background: "rgba(255,255,255,.96)" }}>
+            <span className="au-cap shrink-0 text-[20px]" style={{ color: "#3A4A2A" }}>
+              Sponsors
+            </span>
+            <img src={v.sponsorBannerUrl} alt="Sponsors" className="h-full min-w-0 flex-1 object-contain py-[10px]" />
+          </div>
+        )}
+
+        <Ticker v={v} />
+
+        {soldShow && soldShow.status === "sold" && <SoldOverlay sold={soldShow} v={v} />}
+      </div>
+    </div>
+  );
+}
+
+/** "WINTER CUP" [crest] "AUCTION", with lime slashes, like a broadcast title card. */
+function Title({ title, crestUrl, posterUrl, color }: { title: string; crestUrl: string | null; posterUrl: string | null; color: string }) {
+  const words = title.trim().split(/\s+/);
+  const last = words[words.length - 1] ?? "";
+  const [l, r] = words.length > 1 && /^auction$/i.test(last) ? [words.slice(0, -1).join(" "), last] : [title, "Auction"];
+  const size = (s: string) => (s.length <= 8 ? 104 : s.length <= 12 ? 86 : s.length <= 18 ? 66 : 50);
+  return (
+    <div className="absolute inset-x-0 top-[80px] flex items-center justify-center gap-[26px]">
+      <div className="flex min-w-0 flex-1 items-center justify-end gap-[20px]">
+        <Slash />
+        <h1 className="truncate au-hd leading-none uppercase" style={{ fontSize: size(l), textShadow: "0 4px 18px rgba(0,0,0,.6)" }}>
+          {l}
+        </h1>
+      </div>
+      <div className="relative grid h-[170px] shrink-0 place-items-center" style={{ width: posterUrl ? 400 : 170 }}>
+        <span aria-hidden className="absolute inset-[-30px] rounded-full" style={{ background: `radial-gradient(closest-side, ${glow(LIME, 0.28)}, transparent)` }} />
+        {posterUrl ? (
+          <img src={posterUrl} alt="Tournament poster" className="relative max-h-full max-w-full rounded-[12px] object-contain" style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,.6))" }} />
+        ) : crestUrl ? (
+          <img src={crestUrl} alt="" className="relative size-full object-contain" style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,.6))" }} />
+        ) : (
+          <span className="relative grid size-[150px] place-items-center rounded-full border-[5px]" style={{ borderColor: LIME, background: `radial-gradient(circle at 35% 30%, ${color}, #0B1220 75%)`, boxShadow: `0 0 34px ${glow(LIME, 0.45)}` }}>
+            <Gavel aria-hidden className="size-[74px]" style={{ color: LIME }} />
           </span>
         )}
-        {!full && (
-          <button
-            type="button"
-            onClick={() => void document.documentElement.requestFullscreen?.().catch(() => {})}
-            className="hidden shrink-0 items-center gap-[0.4em] rounded-full border border-[color:var(--ink)]/25 px-[0.9em] py-[0.35em] text-[0.85em] font-semibold au-pill focus-visible:outline-2 focus-visible:outline-[color:var(--ink)] sm:inline-flex"
-          >
-            <Expand aria-hidden style={{ width: "1em", height: "1em" }} />
-            Full screen
-          </button>
-        )}
-      </header>
-
-      {v.bannerUrl && (
-        <div className="relative z-10 flex h-[clamp(56px,10vh,150px)] shrink-0 justify-center au-paper border-t border-[color:var(--ink)]/10">
-          <img src={v.bannerUrl} alt="Tournament poster" className="h-full w-full object-contain" />
-        </div>
-      )}
-
-      {a.status === "done" ? (
-        <Final v={v} />
-      ) : (
-        <main className="relative z-10 grid flex-1 grid-cols-1 gap-[clamp(14px,2vw,40px)] px-[clamp(16px,2.5vw,48px)] py-[clamp(12px,2vh,28px)] lg:min-h-0 lg:grid-cols-[minmax(0,1.55fr)_minmax(0,1fr)]">
-          <Stage v={v} left={left} frac={frac} soldShow={soldShow} />
-          <section aria-label="Teams" className="grid content-start gap-[0.8em] lg:min-h-0 lg:overflow-hidden">
-            {v.squads.map((sq) => (
-              <Board key={sq.id} sq={sq} budget={a.budget} leading={lot?.topSquadId === sq.id} />
-            ))}
-          </section>
-        </main>
-      )}
-
-      {v.sponsorBannerUrl && (
-        <div className="relative z-10 flex h-[clamp(44px,7vh,110px)] shrink-0 items-center justify-center gap-[1em] au-paper border-b border-[color:var(--ink)]/10 px-[clamp(16px,2.5vw,48px)]">
-          <span className="hidden shrink-0 text-[0.8em] font-semibold tracking-[0.12em] text-[color:var(--ink)]/50 uppercase sm:inline">Sponsors</span>
-          <img src={v.sponsorBannerUrl} alt="Sponsors" className="h-full min-w-0 flex-1 object-contain py-[0.4em]" />
-        </div>
-      )}
-
-      <footer className="relative z-10 flex items-center gap-[1.2em] overflow-hidden au-paper px-[clamp(16px,2.5vw,48px)] py-[0.7em] text-[1em] whitespace-nowrap">
-        <span className="shrink-0 font-display text-[1.15em] font-bold" style={{ color: GOLD_INK }}>
-          {v.summary.sold} sold, {v.summary.toGo} to go
-        </span>
-        <span className="h-[1.2em] w-px shrink-0 bg-[color:var(--ink)]/20" />
-        {v.recent.length === 0 ? (
-          <span className="text-[color:var(--ink)]/55">The first sale shows up here</span>
-        ) : (
-          v.recent.map((r) => (
-            <span key={r.id} className="inline-flex shrink-0 items-center gap-[0.45em]">
-              {r.color ? <Shirt color={r.color} size="1.2em" /> : <span className="size-[0.55em] rounded-full bg-[color:var(--ink)]/25" />}
-              <strong className="font-semibold">{r.player}</strong>
-              <span className="text-[color:var(--ink)]/60">{r.status === "sold" ? `${r.squad}, ${r.price}` : "unsold"}</span>
-            </span>
-          ))
-        )}
-        <span className="ml-auto shrink-0 font-display font-bold text-[color:var(--ink)]/45">clbx.ca</span>
-      </footer>
+      </div>
+      <div className="flex min-w-0 flex-1 items-center gap-[20px]">
+        <p className="truncate au-hd leading-none uppercase" style={{ fontSize: size(r), textShadow: "0 4px 18px rgba(0,0,0,.6)" }}>
+          {r}
+        </p>
+        <Slash flip />
+      </div>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
+// While a player is up
+// ---------------------------------------------------------------------------
 
-function Stage({ v, left, frac, soldShow }: { v: ScreenView; left: number; frac: number; soldShow: AuctionView["recent"][number] | null }) {
-  const a = v.auction;
-  const lot = v.lot;
-  const tint = lot?.squadColor ?? null;
+function LiveLot({ v, left, h }: { v: ScreenView; left: number; h: number }) {
+  const lot = v.lot!;
+  const p = lot.player;
+  const tint = lot.squadColor;
+  const leader = v.squads.find((x) => x.id === lot.topSquadId);
+  const hot = left <= 5;
+  const bidH = h > 620 ? 250 : 200;
+  const nameSize = p.name.length > 18 ? 72 : p.name.length > 12 ? 84 : 96;
+  const listH = h - 72 - (v.bids.length > 1 ? 50 : 0);
   return (
-    <section
-      aria-label="Up now"
-      className="relative grid min-h-[60vh] content-center overflow-hidden rounded-[1.4em] border-t-[0.5em] au-paper p-[clamp(18px,2.5vw,48px)] shadow-[0_14px_40px_rgba(10,40,20,.35)] lg:min-h-0"
-      style={{ borderTopColor: tint ?? GOLD, background: tint ? `linear-gradient(170deg, color-mix(in srgb, ${tint} 10%, white), white 55%)` : "white" }}
-    >
-      {a.status === "setup" ? (
-        <div className="grid justify-items-center gap-[0.6em] text-center">
-          <p className="font-display text-[1.6em] font-bold" style={{ color: GOLD_INK }}>
-            Starting soon
-          </p>
-          <p className="font-display text-[clamp(3rem,7vw,9rem)] leading-[0.85] font-bold uppercase">Auction night</p>
-          <p className="text-[1.3em] text-[color:var(--ink)]/70">
-            {v.pool.length} players, {v.squads.length} teams, {a.budget} points each
-          </p>
-        </div>
-      ) : lot ? (
-        <div className="grid gap-[1.6em]">
-          <div className="flex items-center gap-[clamp(14px,2vw,40px)]">
-            <div
-              className="relative grid aspect-[3/4] w-[clamp(96px,15vw,280px)] shrink-0 place-items-center overflow-hidden rounded-[clamp(10px,1.1vw,22px)] border-[clamp(3px,0.3vw,6px)] font-display text-[clamp(2.6rem,6vw,7.5rem)] leading-none font-bold shadow-[0_14px_30px_rgba(19,33,61,.3)]"
-              style={{ borderColor: GOLD, background: `linear-gradient(170deg, ${GOLD}55, transparent 60%), ${PITCH_DEEP}`, color: GOLD }}
-            >
-              {lot.player.photoUrl ? <img src={lot.player.photoUrl} alt="" className="absolute inset-0 size-full object-cover" /> : initials(lot.player.name)}
-              {lot.player.jersey && (
-                <span className="absolute top-[0.12em] left-[0.18em] font-display text-[0.42em] leading-none font-bold" style={{ color: GOLD, textShadow: "0 2px 6px rgba(0,0,0,.7)" }}>
-                  {lot.player.jersey}
-                </span>
-              )}
-              {lot.player.position && (
-                <span className="absolute inset-x-0 bottom-0 truncate px-[0.3em] py-[0.12em] text-center font-display text-[0.24em] leading-tight font-bold uppercase" style={{ background: GOLD, color: PITCH_DEEP }}>
-                  {lot.player.position}
-                </span>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-[1.2em] text-[color:var(--ink)]/65">On the block</p>
-              <p className="font-display text-[clamp(2.6rem,6.2vw,8rem)] leading-[0.86] font-bold break-words uppercase">{lot.player.name}</p>
-              <p className="mt-[0.4em] text-[1.25em]">
-                {lot.player.position && <span className="text-[color:var(--ink)]/75">{lot.player.position}, </span>}
-                base price <strong className="font-display text-[1.25em] tabular" style={{ color: GOLD_INK }}>{lot.player.basePrice}</strong>
-              </p>
-            </div>
-            <Clock left={left} frac={frac} />
-          </div>
-
-          <div key={lot.bids} className="au-bump flex flex-wrap items-center gap-x-[0.6em] gap-y-[0.3em] rounded-[1em] px-[1em] py-[0.6em]" style={{ background: tint ?? "rgba(19,33,61,.06)", color: tint ? "#FFFFFF" : INK }}>
-            {lot.topBid != null ? (
-              <>
-                <span className="font-display text-[clamp(3.4rem,8vw,10rem)] leading-[0.85] font-bold tabular" style={{ color: "#FFFFFF", textShadow: "0 4px 0 rgba(0,0,0,.25)" }}>
-                  {lot.topBid}
-                </span>
-                <span className="flex items-center gap-[0.4em] font-display text-[clamp(1.6rem,3.2vw,4rem)] leading-none font-bold uppercase">
-                  <Mark color={tint!} logoUrl={v.squads.find((x) => x.id === lot.topSquadId)?.logoUrl} size="1.1em" />
-                  {lot.squadName}
-                </span>
-              </>
+    <div className="grid h-full grid-cols-[1080px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-[34px]">
+      <section aria-label="Up now" className="grid min-h-0 grid-rows-[minmax(0,1fr)_auto] gap-[22px]">
+        {/* Player profile */}
+        <div className="relative flex min-h-0 overflow-hidden rounded-[28px] border-[3px]" style={{ borderColor: LIME, background: `linear-gradient(110deg, #10301A 0%, ${PANEL} 46%)`, boxShadow: `0 0 34px ${glow(LIME, 0.35)}, inset 0 0 60px rgba(0,0,0,.4)` }}>
+          <span aria-hidden className="absolute inset-y-0 left-0 w-[230px]" style={{ background: `repeating-linear-gradient(115deg, ${glow(LIME, 0.55)} 0 14px, transparent 14px 46px)`, maskImage: "linear-gradient(90deg, #000, transparent)" }} />
+          <div className="relative w-[360px] shrink-0">
+            {p.photoUrl ? (
+              <img src={p.photoUrl} alt="" className="absolute inset-0 size-full object-cover object-top" style={{ maskImage: "linear-gradient(90deg, #000 70%, transparent)" }} />
             ) : (
-              <span className="font-display text-[clamp(1.6rem,3.4vw,4.2rem)] leading-none font-bold">
-                Opening bid <span className="tabular" style={{ color: GOLD_INK }}>{lot.minNext}</span>
+              <span className="absolute inset-0 grid place-items-center au-hd text-[150px]" style={{ color: LIME, textShadow: `0 0 30px ${glow(LIME, 0.5)}` }}>
+                {initials(p.name)}
+              </span>
+            )}
+            {p.jersey && (
+              <span className="absolute top-[14px] left-[18px] au-hd text-[64px] leading-none" style={{ color: LIME, textShadow: "0 3px 12px rgba(0,0,0,.8)" }}>
+                {p.jersey}
               </span>
             )}
           </div>
-
-          {v.bids.length > 1 && (
-            <ol aria-label="Earlier bids" className="flex flex-wrap gap-x-[1.2em] gap-y-[0.3em] text-[1.15em] text-[color:var(--ink)]/70">
-              {v.bids.slice(1, 6).map((b, i) => (
-                <li key={b.at + i} className="inline-flex items-center gap-[0.35em]">
-                  <Shirt color={b.color} size="1em" />
-                  {b.squad} <span className="font-display font-bold tabular">{b.amount}</span>
-                </li>
-              ))}
-            </ol>
-          )}
-        </div>
-      ) : (
-        <div className="grid justify-items-center gap-[0.5em] text-center">
-          {v.recent[0] ? (
-            <>
-              <p className="text-[1.3em] text-[color:var(--ink)]/65">{v.recent[0].status === "sold" ? "Just signed" : "No takers for"}</p>
-              <p className="font-display text-[clamp(2.8rem,6.5vw,8rem)] leading-[0.86] font-bold uppercase">{v.recent[0].player}</p>
-              {v.recent[0].status === "sold" && (
-                <p className="flex items-center gap-[0.4em] text-[1.6em]">
-                  <Shirt color={v.recent[0].color ?? "#888"} size="1.2em" />
-                  {v.recent[0].squad}, <strong className="font-display text-[1.3em] tabular" style={{ color: GOLD_INK }}>{v.recent[0].price}</strong>
-                </p>
+          <div className="relative grid min-w-0 flex-1 content-center gap-[20px] py-[26px] pr-[40px] pl-[18px]">
+            <p className="au-cap text-[24px]" style={{ color: DIM }}>
+              Current player
+            </p>
+            <p className="au-hd leading-[0.9] break-words uppercase" style={{ fontSize: nameSize, textShadow: "0 4px 16px rgba(0,0,0,.6)" }}>
+              {p.name}
+            </p>
+            <div className="flex flex-wrap gap-[14px]">
+              {p.position && (
+                <Pill>
+                  Position:&nbsp;<strong className="font-bold">{p.position}</strong>
+                </Pill>
               )}
-            </>
-          ) : (
-            <p className="font-display text-[clamp(3rem,7vw,9rem)] leading-[0.85] font-bold uppercase">Here we go</p>
-          )}
-          <p className="mt-[0.6em] text-[1.15em] text-[color:var(--ink)]/55">Next player coming up</p>
-        </div>
-      )}
-
-      {soldShow && soldShow.status === "sold" && (
-        <div className="au-show pointer-events-none absolute inset-0 grid place-items-center" style={{ background: "rgba(255,255,255,.95)" }}>
-          <div className="au-stamp grid justify-items-center gap-[0.25em] rounded-[0.5em] border-[0.35em] px-[1em] py-[0.4em] text-center" style={{ borderColor: soldShow.color ?? GOLD, color: soldShow.color ?? GOLD, background: "#FFFFFF" }}>
-            {v.squads.find((x) => x.name === soldShow.squad)?.logoUrl && <Mark color={soldShow.color ?? GOLD} logoUrl={v.squads.find((x) => x.name === soldShow.squad)?.logoUrl} size="clamp(3rem,6vw,7rem)" />}
-            <span className="font-display text-[clamp(4rem,11vw,13rem)] leading-[0.82] font-bold tracking-[0.04em]">SOLD</span>
-            <span className="font-display text-[clamp(1.4rem,3vw,3.6rem)] leading-none font-bold text-[color:var(--ink)] uppercase">{soldShow.player}</span>
-            <span className="text-[clamp(1rem,1.8vw,2.2rem)] font-semibold text-[color:var(--ink)]">
-              {soldShow.squad}, <span className="font-display font-bold tabular" style={{ color: GOLD_INK }}>{soldShow.price}</span>
-            </span>
+              <Pill>
+                Base:&nbsp;<strong className="font-bold au-num">{p.basePrice} pts</strong>
+              </Pill>
+              {p.jersey && (
+                <span className="inline-flex items-center gap-[8px] rounded-full border-[2px] px-[18px] py-[4px] text-[26px]" style={{ borderColor: LINE }}>
+                  <ShirtIcon aria-hidden className="size-[24px]" style={{ color: LIME }} />#{p.jersey}
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      )}
-    </section>
-  );
-}
 
-function Clock({ left, frac }: { left: number; frac: number }) {
-  const r = 44;
-  const c = 2 * Math.PI * r;
-  const hot = left <= 5;
-  return (
-    <div className="relative shrink-0" style={{ width: "clamp(64px,9vw,190px)", aspectRatio: "1" }} aria-label={`${left} seconds left`}>
-      <svg viewBox="0 0 100 100" className="size-full -rotate-90">
-        <circle cx="50" cy="50" r={r} fill="#FFFFFF" stroke="rgba(19,33,61,.1)" strokeWidth="7" />
-        <circle cx="50" cy="50" r={r} fill="none" stroke={hot ? RED : GOLD} strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - frac)} style={{ transition: "stroke-dashoffset .25s linear" }} />
-      </svg>
-      <span className="absolute inset-0 grid place-content-center font-display text-[clamp(1.6rem,4vw,5rem)] leading-none font-bold tabular" style={{ color: hot ? RED : INK }}>
-        {left}
-      </span>
+        {/* Bid, bidder, clock */}
+        <div className="grid grid-cols-[290px_minmax(0,1fr)_300px] gap-[22px]" style={{ height: bidH }}>
+          <div key={lot.bids} className="au-bump grid content-center justify-items-center rounded-[24px] border-[2px] text-center" style={{ borderColor: LINE, background: PANEL }}>
+            <p className="au-cap text-[24px]" style={{ color: DIM }}>
+              {lot.topBid != null ? "Current bid" : "Opening bid"}
+            </p>
+            <p className="au-hd au-num leading-none whitespace-nowrap" style={{ color: LIME, textShadow: `0 0 28px ${glow(LIME, 0.55)}` }}>
+              <span className="text-[100px]">{lot.topBid ?? lot.minNext}</span> <span className="text-[44px]">pts</span>
+            </p>
+          </div>
+          <div className="grid min-w-0 content-center justify-items-center gap-[16px] overflow-hidden rounded-[24px] border-[2px] px-[20px] text-center" style={{ borderColor: LINE, background: PANEL }}>
+            <p className="au-cap text-[24px]" style={{ color: DIM }}>
+              Highest bidder
+            </p>
+            {leader && tint ? (
+              <span className="flex w-full min-w-0 items-center justify-center gap-[14px] rounded-[18px] border-[3px] px-[16px] py-[10px]" style={{ borderColor: tint, background: `linear-gradient(90deg, ${glow(tint, 0.35)}, rgba(0,0,0,.4))`, boxShadow: `0 0 26px ${glow(tint, 0.55)}` }}>
+                <Mark color={tint} logoUrl={leader.logoUrl} size={52} />
+                <span className="min-w-0 truncate au-hd leading-[1.1] uppercase" style={{ fontSize: leader.name.length > 16 ? 30 : leader.name.length > 11 ? 38 : 46 }}>{leader.name}</span>
+              </span>
+            ) : (
+              <span className="au-hd text-[44px] text-white/50 uppercase">No bids yet</span>
+            )}
+          </div>
+          <div
+            className="grid content-center justify-items-center rounded-[24px] border-[3px]"
+            style={{ borderColor: hot ? RED : LIME, background: hot ? "rgba(60,6,12,.85)" : `linear-gradient(160deg, ${glow(LIME, 0.3)}, ${PANEL})`, boxShadow: `0 0 30px ${glow(hot ? RED : LIME, 0.5)}` }}
+            aria-label={`${left} seconds left`}
+          >
+            <p className="au-cap text-[22px]" style={{ color: DIM }}>
+              Time left
+            </p>
+            <p className="flex items-center gap-[10px] au-hd au-num text-[78px] leading-none whitespace-nowrap" style={{ color: hot ? RED : LIME }}>
+              <Timer aria-hidden className="size-[54px]" strokeWidth={2.6} />
+              {clock(left)}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Teams */}
+      <section aria-label="Teams" className="relative flex min-h-0 flex-col rounded-[28px] border-[2px] px-[22px] pt-[50px] pb-[22px]" style={{ borderColor: LINE, background: "rgba(8,12,22,.7)" }}>
+        <span className="absolute top-[-26px] left-[22px] inline-flex rounded-[14px] border-[3px] px-[30px] py-[4px] au-hd text-[36px] uppercase" style={{ borderColor: LIME, color: LIME, background: "#0B1A0E", transform: "skewX(-12deg)", boxShadow: `0 0 18px ${glow(LIME, 0.45)}` }}>
+          Teams
+        </span>
+        <div className="grid min-h-0 content-start gap-[14px]" style={{ gridTemplateColumns: "minmax(0,1fr)", gridAutoRows: `${Math.min(122, Math.floor((listH - 14 * (v.squads.length - 1)) / v.squads.length))}px` }}>
+          {v.squads.map((sq) => (
+            <TeamRow key={sq.id} sq={sq} max={v.auction.squadMax ?? v.auction.squadMin} leading={lot.topSquadId === sq.id} />
+          ))}
+        </div>
+        {v.bids.length > 1 && (
+          <ol aria-label="Earlier bids" className="mt-[16px] flex flex-wrap gap-x-[22px] gap-y-[6px] text-[22px] text-white/65">
+            {v.bids.slice(1, 5).map((b, i) => (
+              <li key={b.at + i} className="inline-flex items-center gap-[8px]">
+                <Shirt color={b.color} size={24} />
+                {b.squad} <span className="au-hd au-num text-white">{b.amount}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
     </div>
   );
 }
 
-function Board({ sq, budget, leading }: { sq: SquadView; budget: number; leading: boolean }) {
-  const pct = Math.max(0, Math.min(100, (sq.left / Math.max(1, budget)) * 100));
+function TeamRow({ sq, max, leading }: { sq: SquadView; max: number; leading: boolean }) {
   return (
     <article
       aria-label={sq.name}
-      className="relative grid min-h-0 content-start gap-[0.45em] overflow-hidden rounded-[1em] border px-[1em] py-[0.75em] transition-shadow"
-      style={{
-        borderColor: leading ? GOLD : "transparent",
-        borderLeft: `0.45em solid ${sq.color}`,
-        background: "#FFFFFF",
-        boxShadow: leading ? `0 0 0 0.16em ${GOLD}, 0 10px 30px rgba(10,40,20,.35)` : "0 8px 22px rgba(10,40,20,.25)",
-      }}
+      className={`flex min-h-0 items-center gap-[18px] rounded-[18px] border-[3px] px-[22px] ${leading ? "au-lead" : ""}`}
+      style={{ ["--c" as string]: glow(sq.color, 0.7), borderColor: sq.color, background: `linear-gradient(90deg, ${glow(sq.color, leading ? 0.4 : 0.22)}, rgba(6,10,18,.92) 60%)`, boxShadow: `0 0 18px ${glow(sq.color, 0.35)}` }}
     >
-      <div className="flex items-center gap-[0.7em]">
-        <Mark color={sq.color} logoUrl={sq.logoUrl} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-[1.75em] leading-none font-bold uppercase">{sq.name}</p>
-          <p className="truncate text-[0.9em] text-[color:var(--ink)]/60">
-            {sq.captainName ? `Captain ${sq.captainName}` : "No captain yet"}, {sq.count} {sq.count === 1 ? "player" : "players"}
-            {sq.full ? ", full" : ""}
-          </p>
-        </div>
-        <p className="shrink-0 text-right">
-          <span className="block font-display text-[2em] leading-none font-bold tabular" style={{ color: INK }}>
-            {sq.left}
+      <Mark color={sq.color} logoUrl={sq.logoUrl} size={62} />
+      <div className="min-w-0 flex-1">
+        <p className="truncate au-hd text-[40px] leading-none uppercase">{sq.name}</p>
+        <p className="mt-[6px] flex items-center gap-[8px] text-[21px] text-white/70">
+          <Users aria-hidden className="size-[22px] shrink-0" />
+          <span className="truncate">
+            {sq.count} / {max} players{sq.captainName ? ` · Capt. ${sq.captainName}` : ""}
           </span>
-          <span className="text-[0.75em] text-[color:var(--ink)]/55">points left</span>
         </p>
       </div>
-      <div className="h-[0.35em] overflow-hidden rounded-full bg-[color:var(--ink)]/10" aria-hidden>
-        <div className="h-full rounded-full" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${sq.color}, ${GOLD})` }} />
-      </div>
-      {sq.players.length > 0 && (
-        <p className="line-clamp-2 text-[0.95em] leading-snug">
-          {sq.players.map((p, i) => (
-            <span key={p.id}>
-              {i > 0 && <span className="text-[color:var(--ink)]/30"> / </span>}
-              {p.name}
-              {p.status === "captain" ? <span className="text-[color:var(--ink)]/55"> (C)</span> : <span className="font-display font-bold tabular" style={{ color: GOLD_INK }}> {p.price}</span>}
-            </span>
-          ))}
-        </p>
-      )}
+      <span className="h-[54px] w-[2px] shrink-0 bg-white/25" />
+      <p className="w-[190px] shrink-0 text-right whitespace-nowrap">
+        <span className="au-hd au-num text-[50px] leading-none" style={{ color: LIME }}>
+          {sq.left.toLocaleString()}
+        </span>{" "}
+        <span className="text-[22px] text-white/75">pts left</span>
+      </p>
     </article>
   );
 }
 
-function Final({ v }: { v: AuctionView }) {
+// ---------------------------------------------------------------------------
+// Between players, before the start, and at the end: every squad, slot by slot
+// ---------------------------------------------------------------------------
+
+function Squads({ v, h }: { v: ScreenView; h: number }) {
+  const a = v.auction;
+  const last = v.recent[0];
   const top = v.summary.topBuys[0];
+  const n = Math.max(1, v.squads.length);
+  const cols = n <= 4 ? n : Math.ceil(n / 2);
+  const rowsOfCards = n <= 4 ? 1 : 2;
+  const slots = Math.max(a.squadMax ?? a.squadMin, ...v.squads.map((s) => s.players.length), 1);
+  const cardH = Math.floor((h - 172 - (rowsOfCards - 1) * 18) / rowsOfCards);
+  const listH = cardH - (rowsOfCards > 1 ? 150 : 176);
+  const rowH = Math.max(24, Math.min(64, Math.floor(listH / slots)));
+  const small = rowH < 44;
+
   return (
-    <main className="relative z-10 grid flex-1 content-start gap-[1.2em] px-[clamp(16px,2.5vw,48px)] py-[clamp(12px,2vh,28px)] lg:min-h-0">
-      <div className="grid gap-[0.3em]">
-        <p className="font-display text-[clamp(2.6rem,6vw,7rem)] leading-[0.86] font-bold au-light uppercase" style={{ textShadow: "0 3px 0 rgba(10,40,20,.35)" }}>The teams are set</p>
-        {top && (
-          <p className="flex flex-wrap items-center gap-x-[0.4em] justify-self-start rounded-[0.8em] au-paper px-[1em] py-[0.3em] text-[1.3em] shadow-[0_6px_18px_rgba(10,40,20,.25)]">
-            Record signing: <strong>{top.player}</strong> to {top.squad} for{" "}
-            <strong className="font-display text-[1.3em] tabular" style={{ color: GOLD_INK }}>
-              {top.price}
-            </strong>
-          </p>
+    <div className="grid h-full grid-rows-[150px_1fr] gap-[22px]">
+      {/* The banner across the top: what just happened, or what's next */}
+      <div className="relative flex items-center gap-[30px] overflow-hidden rounded-[26px] border-[3px] px-[40px]" style={{ borderColor: LIME, background: `linear-gradient(110deg, #10301A, ${PANEL} 55%)`, boxShadow: `0 0 30px ${glow(LIME, 0.3)}` }}>
+        <span aria-hidden className="absolute inset-y-0 left-0 w-[160px]" style={{ background: `repeating-linear-gradient(115deg, ${glow(LIME, 0.5)} 0 12px, transparent 12px 40px)`, maskImage: "linear-gradient(90deg, #000, transparent)" }} />
+        {a.status === "done" ? (
+          <>
+            <p className="relative au-hd text-[84px] leading-none uppercase" style={{ textShadow: `0 0 26px ${glow(LIME, 0.35)}` }}>
+              The teams are set
+            </p>
+            {top && (
+              <p className="relative ml-auto text-right text-[28px] text-white/80">
+                <span className="au-cap block text-[20px]" style={{ color: LIME }}>
+                  Record signing
+                </span>
+                <strong className="text-white">{top.player}</strong> to {top.squad} for <span className="au-hd au-num text-[40px]" style={{ color: LIME }}>{top.price}</span>
+              </p>
+            )}
+          </>
+        ) : a.status === "setup" ? (
+          <p className="relative au-hd text-[84px] leading-none uppercase">Auction night · starting soon</p>
+        ) : last ? (
+          <>
+            <div className="relative">
+              <p className="au-cap text-[22px]" style={{ color: DIM }}>
+                {last.status === "sold" ? "Just signed" : "No takers for"}
+              </p>
+              <p className="au-hd text-[70px] leading-none uppercase">{last.player}</p>
+            </div>
+            {last.status === "sold" && last.color && (
+              <span className="relative inline-flex items-center gap-[14px] rounded-[18px] border-[3px] px-[24px] py-[10px]" style={{ borderColor: last.color, boxShadow: `0 0 22px ${glow(last.color, 0.5)}` }}>
+                <Shirt color={last.color} size={50} />
+                <span className="au-hd text-[44px] uppercase">{last.squad}</span>
+                <span className="au-hd au-num text-[52px]" style={{ color: LIME }}>
+                  {last.price} pts
+                </span>
+              </span>
+            )}
+            <p className="relative ml-auto au-cap text-[24px]" style={{ color: LIME }}>
+              Next player coming up
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="relative au-hd text-[84px] leading-none uppercase">Here we go</p>
+            <p className="relative ml-auto au-cap text-[24px]" style={{ color: LIME }}>
+              First player coming up
+            </p>
+          </>
         )}
       </div>
-      <div className="grid gap-[1em] lg:min-h-0" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 15em), 1fr))" }}>
+
+      <section aria-label="Teams" className="grid min-h-0 gap-[18px]" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, alignItems: "start" }}>
         {v.squads.map((sq) => (
-          <article
-            key={sq.id}
-            aria-label={sq.name}
-            className="grid content-start gap-[0.7em] overflow-hidden rounded-[1.2em] border-t-[0.5em] au-paper p-[1.1em] shadow-[0_12px_30px_rgba(10,40,20,.3)]"
-            style={{ borderTopColor: sq.color }}
-          >
-            <div className="flex items-center gap-[0.7em]">
-              <Mark color={sq.color} logoUrl={sq.logoUrl} size="3.2em" />
-              <div className="min-w-0">
-                <p className="font-display text-[2em] leading-none font-bold break-words uppercase">{sq.name}</p>
-                <p className="text-[0.9em] text-[color:var(--ink)]/65">
-                  Spent <span className="font-display font-bold tabular" style={{ color: GOLD_INK }}>{sq.spent}</span> of {v.auction.budget}
-                </p>
-              </div>
-            </div>
-            <ul className="grid gap-[0.15em] border-t border-[color:var(--ink)]/10 pt-[0.6em]">
-              {sq.players.map((p) => (
-                <li key={p.id} className="flex items-baseline justify-between gap-[0.6em] text-[1.15em]">
-                  <span className="min-w-0 truncate">
-                    {p.name}
-                    {p.status === "captain" && <span className="text-[color:var(--ink)]/55"> (C)</span>}
-                  </span>
-                  {p.status === "sold" && (
-                    <span className="shrink-0 font-display font-bold tabular" style={{ color: GOLD_INK }}>
-                      {p.price}
-                    </span>
-                  )}
-                </li>
-              ))}
-              {sq.players.length === 0 && <li className="text-[color:var(--ink)]/55">No players</li>}
-            </ul>
-          </article>
+          <SquadCard key={sq.id} sq={sq} slots={slots} rowH={rowH} small={small || cols > 4} maxH={cardH} />
         ))}
+      </section>
+    </div>
+  );
+}
+
+function SquadCard({ sq, slots, rowH, small, maxH }: { sq: SquadView; slots: number; rowH: number; small: boolean; maxH: number }) {
+  const rows: (PlayerView | null)[] = [...sq.players, ...Array.from({ length: Math.max(0, slots - sq.players.length) }, () => null)];
+  return (
+    <article
+      aria-label={sq.name}
+      className="flex min-h-0 flex-col overflow-hidden rounded-[22px] border-[3px]"
+      style={{ maxHeight: maxH, borderColor: sq.color, background: `linear-gradient(180deg, ${glow(sq.color, 0.3)}, rgba(6,10,18,.94) 32%)`, boxShadow: `0 0 26px ${glow(sq.color, 0.4)}` }}
+    >
+      <div className="flex items-center gap-[14px] px-[18px] pt-[14px] pb-[10px]">
+        <Mark color={sq.color} logoUrl={sq.logoUrl} size={small ? 46 : 64} />
+        <div className="min-w-0 flex-1">
+          <p className={`truncate au-hd leading-none uppercase ${small ? "text-[28px]" : "text-[38px]"}`}>{sq.name}</p>
+          <p className="mt-[4px] flex items-center gap-[6px] text-[19px] text-white/70">
+            <Users aria-hidden className="size-[20px]" />
+            {sq.count} / {slots} players
+          </p>
+        </div>
+        <p className="shrink-0 border-l-[2px] border-white/20 pl-[14px] text-right leading-none">
+          <span className={`block au-hd au-num ${small ? "text-[34px]" : "text-[46px]"}`} style={{ color: LIME }}>
+            {sq.left.toLocaleString()}
+          </span>
+          <span className="text-[18px] text-white/70">pts left</span>
+        </p>
       </div>
-    </main>
+      <ol className="min-h-0 overflow-hidden border-t-[2px] border-white/10 bg-black/25">
+        {rows.map((p, i) => (
+          <li key={p?.id ?? `open-${i}`} className="flex items-center gap-[12px] border-b border-white/[.07] px-[16px]" style={{ height: rowH }}>
+            <span className="w-[22px] shrink-0 text-[18px] text-white/50 au-num">{i + 1}</span>
+            {p ? (
+              <>
+                <span className="grid shrink-0 place-items-center overflow-hidden rounded-full border-[2px] bg-[#1A2436] text-[14px] font-bold" style={{ width: rowH - 12, height: rowH - 12, borderColor: glow(sq.color, 0.8) }}>
+                  {p.photoUrl ? <img src={p.photoUrl} alt="" className="size-full object-cover" /> : initials(p.name)}
+                </span>
+                <span className={`min-w-0 flex-1 truncate font-semibold ${small ? "text-[19px]" : "text-[23px]"}`}>
+                  {p.name}
+                  {p.status === "captain" && <span className="text-white/55"> (C)</span>}
+                </span>
+                {p.status === "sold" && (
+                  <span className="shrink-0 rounded-full border-[2px] px-[12px] au-hd au-num text-[22px]" style={{ borderColor: RED, background: "rgba(80,8,14,.7)" }}>
+                    {p.price}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <span aria-hidden className="grid shrink-0 place-items-center rounded-full border-[2px] border-dashed border-white/45 text-[18px] text-white/70" style={{ width: rowH - 14, height: rowH - 14 }}>
+                  +
+                </span>
+                <span className={`flex-1 ${small ? "text-[18px]" : "text-[21px]"}`} style={{ color: "#9DB4FF" }}>
+                  Open slot
+                </span>
+              </>
+            )}
+          </li>
+        ))}
+      </ol>
+      <p className="flex items-center justify-center gap-[10px] border-t-[2px] border-white/10 py-[8px] text-[21px]">
+        <Coins aria-hidden className="size-[22px] text-white/60" />
+        Total spent: <span className="au-hd au-num text-[30px]" style={{ color: LIME }}>{sq.spent}</span> pts
+      </p>
+    </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+
+function Ticker({ v }: { v: ScreenView }) {
+  return (
+    <footer className="absolute inset-x-0 bottom-0 flex h-[58px] items-center gap-[26px] overflow-hidden border-t-[2px] px-[60px] whitespace-nowrap" style={{ borderColor: glow(LIME, 0.5), background: "rgba(4,8,14,.95)" }}>
+      <span className="shrink-0 au-hd text-[28px] uppercase" style={{ color: LIME }}>
+        Latest
+      </span>
+      {v.recent.length === 0 ? (
+        <span className="text-[22px] text-white/55">The first sale shows up here</span>
+      ) : (
+        v.recent.map((r) => (
+          <span key={r.id} className="inline-flex shrink-0 items-center gap-[10px] text-[22px]">
+            {r.color ? <Shirt color={r.color} size={26} /> : <span className="size-[10px] rounded-full bg-white/30" />}
+            <strong className="font-semibold">{r.player}</strong>
+            <span className="text-white/60">{r.status === "sold" ? `${r.squad}, ${r.price}` : "unsold"}</span>
+          </span>
+        ))
+      )}
+      <span className="ml-auto shrink-0 au-hd text-[26px] text-white/45">clbx.ca</span>
+    </footer>
+  );
+}
+
+function SoldOverlay({ sold, v }: { sold: Recent; v: ScreenView }) {
+  const color = sold.color ?? LIME;
+  const sq = v.squads.find((x) => x.name === sold.squad);
+  const p = sq?.players.find((x) => x.name === sold.player);
+  return (
+    <div className="au-show pointer-events-none absolute inset-0 grid place-items-center" style={{ background: "radial-gradient(circle, rgba(6,10,20,.88), rgba(2,4,10,.97))" }}>
+      <div className="au-stamp grid justify-items-center gap-[18px] rounded-[30px] border-[8px] px-[90px] py-[40px] text-center" style={{ borderColor: color, background: "rgba(6,10,18,.92)", boxShadow: `0 0 80px ${glow(color, 0.65)}` }}>
+        <div className="flex items-center gap-[30px]">
+          {p?.photoUrl && <img src={p.photoUrl} alt="" className="size-[170px] rounded-full border-[6px] object-cover" style={{ borderColor: color }} />}
+          <span className="au-hd text-[230px] leading-[0.8] tracking-[0.04em]" style={{ color, textShadow: `0 0 50px ${glow(color, 0.7)}` }}>
+            SOLD
+          </span>
+        </div>
+        <span className="au-hd text-[72px] leading-none uppercase">{sold.player}</span>
+        <span className="flex items-center gap-[18px] text-[40px] font-semibold">
+          <Mark color={color} logoUrl={sq?.logoUrl} size={64} />
+          {sold.squad}
+          <span className="au-hd au-num text-[60px]" style={{ color: LIME }}>
+            {sold.price} pts
+          </span>
+        </span>
+      </div>
+    </div>
   );
 }

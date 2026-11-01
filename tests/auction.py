@@ -94,8 +94,9 @@ with sync_playwright() as pw:
     tv = b.new_context(viewport={"width": 1920, "height": 1080}).new_page()
     tv.on("pageerror", lambda e: errors.append("tv " + str(e)[:80]))
     tv.goto(screen_url.replace("https://clbx.ca", BASE))
-    expect(tv.get_by_text("WINTER CUP AUCTION", exact=False).first).to_be_visible()
+    expect(tv.get_by_text("WINTER CUP", exact=False).first).to_be_visible()
     expect(tv.get_by_text("Here we go")).to_be_visible()
+    tv.screenshot(path=f"{SHOTS}/auction-tv-start.png")
     for name in ("Tournament poster", "Sponsors"):
         el = tv.get_by_role("img", name=name, exact=True)
         expect(el).to_be_visible()
@@ -121,7 +122,7 @@ with sync_playwright() as pw:
     expect(host.get_by_role("status")).to_contain_text("150 Blue Bombers")
     cap.screenshot(path=f"{SHOTS}/auction-live.png", full_page=True)
     no_sideways(cap, "auction live")
-    expect(tv.get_by_text("On the block")).to_be_visible(timeout=5000)
+    expect(tv.get_by_text("Current player")).to_be_visible(timeout=5000)
     expect(tv.get_by_role("region", name="Up now")).to_contain_text("150")
     expect(tv.get_by_role("region", name="Up now")).to_contain_text("Defence")
     card_img = tv.get_by_role("region", name="Up now").locator("img").first
@@ -131,7 +132,7 @@ with sync_playwright() as pw:
     tv.screenshot(path=f"{SHOTS}/auction-tv-live.png")
     ph0 = b.new_context(viewport={"width": 390, "height": 844}).new_page()
     ph0.goto(screen_url.replace("https://clbx.ca", BASE))
-    expect(ph0.get_by_text("On the block")).to_be_visible()
+    expect(ph0.get_by_text("Current player")).to_be_visible()
     no_sideways(ph0, "big screen live on a phone")
     ph0.screenshot(path=f"{SHOTS}/auction-phone-live.png", full_page=True)
     host.get_by_role("button", name="Sold now").click()
@@ -149,6 +150,7 @@ with sync_playwright() as pw:
     cap.get_by_role("region", name="Up now").get_by_role("button", name="50", exact=True).click()
     expect(cap.get_by_text(re.compile("Sam Okafor sold to Blue Bombers for 50"))).to_be_visible(timeout=20000)
     expect(cap.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("100 left")
+    tv.wait_for_timeout(6500); tv.screenshot(path=f"{SHOTS}/auction-tv-between.png")
 
     # 5) Pass on someone, undo the last sale, bring the unsold back.
     host.get_by_label("Choose who goes next").select_option(label="Jordan Blake (50)")

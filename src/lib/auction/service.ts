@@ -48,7 +48,7 @@ async function rosterInfo(teamId: string): Promise<Map<string, { position: strin
   return out;
 }
 
-const imgUrl = (auctionId: string, kind: "squad" | "player" | "banner" | "sponsors", id: string, v: string, token?: string) =>
+const imgUrl = (auctionId: string, kind: "squad" | "player" | "banner" | "sponsors" | "crest", id: string, v: string, token?: string) =>
   `/api/auction/img/${auctionId}/${kind}/${id}?v=${encodeURIComponent(v)}${token ? `&t=${token}` : ""}`;
 
 // ---------------------------------------------------------------------------
@@ -523,7 +523,7 @@ export async function setPlayerPhoto(auctionId: string, playerId: string, dataUr
 }
 
 /** The image route: team members (signed in) or the big screen (its private link). */
-export async function auctionImage(auctionId: string, kind: "squad" | "player" | "banner" | "sponsors", id: string, token: string | null): Promise<string | null> {
+export async function auctionImage(auctionId: string, kind: "squad" | "player" | "banner" | "sponsors" | "crest", id: string, token: string | null): Promise<string | null> {
   if (!/^[0-9a-f-]{36}$/i.test(auctionId) || !/^[0-9a-f-]{36}$/i.test(id)) return null;
   let ok = false;
   if (token) ok = (await st.idForScreen(token)) === auctionId;
@@ -543,4 +543,12 @@ export async function setBanner(auctionId: string, which: "banner" | "sponsors",
     await st.setBanner(auctionId, which, dataUrl);
     return { ok: true, data: undefined };
   });
+}
+
+/** The club crest for the big screen's header (looked up once when the screen opens). */
+export async function screenCrestUrl(token: string): Promise<string | null> {
+  const id = await st.idForScreen(token);
+  if (!id) return null;
+  const img = await st.image(id, "crest", id).catch(() => null);
+  return img ? imgUrl(id, "crest", id, String(img.length), token) : null;
 }
