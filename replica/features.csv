@@ -91,3 +91,10 @@ Sponsor view: main events and results only,sponsors,should,no,no,"fixtures, resu
 Share an announcement with sponsors,sponsors,could,no,no,tick when sending a message
 Sponsor chat room shared with the whole team,sponsors,should,no,yes,"sponsors see First L.; captains can switch it off; closes when the deal ends"
 Team invite link (share in WhatsApp; QR code; optional approval; reset),roster,must,partial,yes,"/join/<token>; sign up from the link and join as a player; roles never given by link; token in its own table readable only with roster permission"
+In-app help and contact form (reply within a day),support,must,no,no,fixes.md #1; TeamSnap support complaints 13 reviews/3 sources
+Club chooses who pays the online payment fee,payments,should,no,no,fixes.md #2; fee complaints 8 reviews/3 sources
+Drop-out alert to captains within 48h of an event,events,should,no,no,fixes.md #3; thin (1 review) but cheap
+Email-only members get every notice with one-tap answers (audit),notifications,must,no,partial,fixes.md #4; forced-on-members 5 reviews/2 sources
+"Sign-up lists on events (snacks, ref, driver)",events,could,no,no,fixes.md #5; thin
+Calendar week/month view and visible add-to-calendar,schedule,should,no,partial,fixes.md #6; schedule 7 reviews/4 sources
+Kit colour on events and reminders,events,could,no,no,fixes.md #7; thin
