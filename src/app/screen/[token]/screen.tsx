@@ -541,7 +541,7 @@ function Hand({ sq, standard, leading, max, small }: { sq: SquadView; standard: 
           ))
         )}
         <span className="ml-auto shrink-0 self-end text-[20px] au-dim au-num">
-          {sq.count}/{max}
+          {max ? `${sq.count}/${max}` : `${sq.count} ${sq.count === 1 ? "player" : "players"}`}
         </span>
       </div>
     </article>

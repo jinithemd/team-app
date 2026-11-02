@@ -794,9 +794,9 @@ function BannerPick({ label, hint, src, onPick, disabled }: { label: string; hin
         aria-label={`Choose ${label.toLowerCase()}`}
         disabled={disabled}
         onClick={() => input.current?.click()}
-        className="grid h-20 place-items-center overflow-hidden rounded-md border border-dashed border-border bg-sunken text-sm text-muted focus-visible:outline-2 focus-visible:outline-focus"
+        className="flex h-24 items-center justify-center overflow-hidden rounded-md border border-dashed border-border bg-sunken p-2 text-sm text-muted focus-visible:outline-2 focus-visible:outline-focus"
       >
-        {src ? <img src={src} alt={label} className="size-full object-contain" /> : "Add an image"}
+        {src ? <img src={src} alt={label} className="max-h-full max-w-full object-contain" /> : "Add an image"}
       </button>
       <input
         ref={input}
