@@ -325,13 +325,13 @@ export function AuctionScreen({ token, initial, crestUrl }: { token: string; ini
         {/* A faint card-table weave */}
         <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[.07]" style={{ backgroundImage: "repeating-linear-gradient(0deg, #fff 0 1px, transparent 1px 6px), repeating-linear-gradient(90deg, #fff 0 1px, transparent 1px 6px)" }} />
 
-        <TopBar v={v} crestUrl={crestUrl} full={full} onBack={() => void goBack()} onFull={() => void goFull()} />
+        <TopBar v={v} crestUrl={v.eventLogoUrl ?? crestUrl} full={full} onBack={() => void goBack()} onFull={() => void goFull()} />
 
         <main
           className="absolute top-[124px] left-[60px] origin-top-left"
           style={a.status === "done" ? { width: W - 120, height: H - 124 - sponsorH - 30 } : { width: (W - 120) / fit0(sponsorH), height: 690, transform: `scale(${fit0(sponsorH)})` }}
         >
-          {a.status === "done" ? <FinalTable v={v} /> : lot && a.status === "live" ? <OnTheBlock v={v} left={left} /> : <Waiting v={v} crestUrl={crestUrl} />}
+          {a.status === "done" ? <FinalTable v={v} /> : lot && a.status === "live" ? <OnTheBlock v={v} left={left} /> : <Waiting v={v} crestUrl={v.eventLogoUrl ?? crestUrl} />}
         </main>
 
         {a.status !== "done" && <Hands v={v} bottom={sponsorH} />}
@@ -359,7 +359,7 @@ function TopBar({ v, crestUrl, full, onBack, onFull }: { v: ScreenView; crestUrl
         <ChevronLeft aria-hidden className="size-[28px]" />
         Back
       </button>
-      {crestUrl ? <img src={crestUrl} alt="" className="size-[64px] shrink-0 object-contain" /> : null}
+      {crestUrl ? <img src={crestUrl} alt="Event logo" className="size-[80px] shrink-0 object-contain" /> : null}
       <div className="min-w-0 flex-1">
         <h1 className="truncate au-hd text-[52px] leading-none uppercase">{a.title}</h1>
         <p className="mt-[4px] truncate text-[22px] au-dim">

@@ -289,10 +289,11 @@ function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean
 
       <section aria-labelledby="ban-h" className="grid gap-2">
         <h2 id="ban-h" className="text-lg font-semibold">
-          4. Big screen banners (optional)
+          4. Big screen logo and banners (optional)
         </h2>
-        <p className="text-sm text-muted">A tournament poster across the top and your sponsors along the bottom. Wide images work best.</p>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <p className="text-sm text-muted">Your event logo, a tournament poster across the top and your sponsors along the bottom. Without a logo, the club crest is used.</p>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <BannerPick label="Event logo" hint="Top bar and card deck" src={v.eventLogoUrl} disabled={pending} onPick={(d) => run(() => setBannerAction(a.id, "logo", d))} />
           <BannerPick label="Tournament poster" hint="Top of the screen" src={v.bannerUrl} disabled={pending} onPick={(d) => run(() => setBannerAction(a.id, "banner", d))} />
           <BannerPick label="Sponsors banner" hint="Bottom of the screen" src={v.sponsorBannerUrl} disabled={pending} onPick={(d) => run(() => setBannerAction(a.id, "sponsors", d))} />
         </div>

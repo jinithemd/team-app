@@ -5,8 +5,8 @@ const DATA_URL = /^data:(image\/(?:png|jpeg|webp|svg\+xml))(;base64)?,(.*)$/s;
 
 export async function GET(req: Request, { params }: { params: Promise<{ aid: string; kind: string; id: string }> }) {
   const { aid, kind, id } = await params;
-  if (!["squad", "player", "banner", "sponsors", "crest"].includes(kind)) return new Response(null, { status: 404 });
-  const url = await auctionImage(aid, kind as "squad" | "player" | "banner" | "sponsors" | "crest", id, new URL(req.url).searchParams.get("t")).catch(() => null);
+  if (!["squad", "player", "banner", "sponsors", "crest", "logo"].includes(kind)) return new Response(null, { status: 404 });
+  const url = await auctionImage(aid, kind as "squad" | "player" | "banner" | "sponsors" | "crest" | "logo", id, new URL(req.url).searchParams.get("t")).catch(() => null);
   const m = url ? DATA_URL.exec(url) : null;
   if (!m) return new Response(null, { status: 404, headers: { "Cache-Control": "private, max-age=60" } });
   const [, type, b64, body] = m;

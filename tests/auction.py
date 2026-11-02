@@ -19,12 +19,14 @@ LOGO = "/tmp/claude-0/test-squad-logo.png"
 PHOTO = "/tmp/claude-0/test-player-photo.jpg"
 POSTER = "/tmp/claude-0/test-poster.jpg"
 SPONS = "/tmp/claude-0/test-sponsors.png"
+ELOGO = "/tmp/claude-0/test-event-logo.png"
 im = Image.new("RGB", (400, 400), "#C0283F"); ImageDraw.Draw(im).ellipse([60, 60, 340, 340], fill="white"); im.save(LOGO)
 im = Image.new("RGB", (600, 800), "#3B6E8F"); ImageDraw.Draw(im).ellipse([180, 120, 420, 360], fill="#E8C39E"); im.save(PHOTO)
 im = Image.new("RGB", (2400, 600), "#13213D"); ImageDraw.Draw(im).rectangle([100, 100, 2300, 500], fill="#E8A80C"); im.save(POSTER)
 im = Image.new("RGB", (1600, 200), "white"); d = ImageDraw.Draw(im)
 for i in range(4): d.rectangle([60 + i * 390, 40, 360 + i * 390, 160], fill=["#C0283F", "#1F6FB2", "#2E9E4E", "#8A5A00"][i])
 im.save(SPONS)
+im = Image.new("RGBA", (500, 500), (0, 0, 0, 0)); d = ImageDraw.Draw(im); d.ellipse([20, 20, 480, 480], fill="#F2C556"); d.ellipse([120, 120, 380, 380], fill="#13213D"); im.save(ELOGO)
 SHOTS = "/tmp/claude-0"
 errors = []
 
@@ -83,6 +85,8 @@ with sync_playwright() as pw:
     screen_url = host.get_by_role("link", name="Open big screen").get_attribute("href")
     assert "/screen/" in screen_url, screen_url
     # Banners: a poster on top, sponsors at the bottom.
+    host.locator("input[type=file][aria-label='Event logo']").set_input_files(ELOGO)
+    expect(host.get_by_role("img", name="Event logo")).to_be_visible()
     host.locator("input[type=file][aria-label='Tournament poster']").set_input_files(POSTER)
     expect(host.get_by_role("img", name="Tournament poster")).to_be_visible()
     host.locator("input[type=file][aria-label='Sponsors banner']").set_input_files(SPONS)
@@ -97,7 +101,7 @@ with sync_playwright() as pw:
     expect(tv.get_by_text("WINTER CUP", exact=False).first).to_be_visible()
     expect(tv.get_by_text("Here we go")).to_be_visible()
     tv.screenshot(path=f"{SHOTS}/auction-tv-start.png")
-    for name in ("Tournament poster", "Sponsors"):
+    for name in ("Event logo", "Tournament poster", "Sponsors"):
         el = tv.get_by_role("img", name=name, exact=True)
         expect(el).to_be_visible()
         tv.wait_for_function("(el) => el.complete && el.naturalWidth > 0", arg=el.element_handle())

@@ -30,6 +30,8 @@ export interface Auction {
   screenToken: string;
   /** Big-screen banners (loaded separately): tournament poster on top, sponsors at the bottom. */
   bannerAt: string | null;
+  /** The event's own logo, if one was added (else the club crest is used). */
+  eventLogoAt: string | null;
   sponsorBannerAt: string | null;
 }
 export interface Squad {
@@ -107,7 +109,7 @@ const toAuction = (r: Row): Auction => ({
   id: s(r.id)!, teamId: s(r.team_id)!, title: s(r.title)!, status: r.status as Auction["status"], budget: Number(r.budget), basePrice: Number(r.base_price),
   minIncrement: Number(r.min_increment), bidSeconds: Number(r.bid_seconds), squadMin: Number(r.squad_min ?? 0), squadMax: r.squad_max == null ? null : Number(r.squad_max),
   captainsPlay: !!r.captains_play, currentLotId: s(r.current_lot_id), createdBy: s(r.created_by), createdAt: iso(r.created_at)!,
-  monitorId: s(r.monitor_id), screenToken: s(r.screen_token) ?? "", bannerAt: iso(r.banner_at), sponsorBannerAt: iso(r.sponsor_banner_at),
+  monitorId: s(r.monitor_id), screenToken: s(r.screen_token) ?? "", bannerAt: iso(r.banner_at), sponsorBannerAt: iso(r.sponsor_banner_at), eventLogoAt: iso(r.event_logo_at),
 });
 const toSquad = (r: Row): Squad => ({
   id: s(r.id)!, auctionId: s(r.auction_id)!, name: s(r.name)!, color: s(r.color) ?? "#2346D8", captainId: s(r.captain_id), managerId: s(r.manager_id), sort: Number(r.sort ?? 0), logoAt: iso(r.logo_at),
@@ -128,7 +130,7 @@ const snake = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(
 
 // Images are left out of the once-a-second reads; they load through /api/auction/img.
 const AUCTION_COLS =
-  "id, team_id, title, status, budget, base_price, min_increment, bid_seconds, squad_min, squad_max, captains_play, current_lot_id, created_by, created_at, monitor_id, screen_token, banner_at, sponsor_banner_at";
+  "id, team_id, title, status, budget, base_price, min_increment, bid_seconds, squad_min, squad_max, captains_play, current_lot_id, created_by, created_at, monitor_id, screen_token, banner_at, sponsor_banner_at, event_logo_at";
 const SQUAD_COLS = "id, auction_id, name, color, captain_id, manager_id, sort, logo_at";
 const PLAYER_COLS = "id, auction_id, user_id, name, base_price, status, squad_id, price, sort, photo_at, position, jersey";
 
@@ -186,9 +188,9 @@ export async function auctionsFor(teamId: string): Promise<Auction[]> {
 
 // ---- writes ---------------------------------------------------------------
 
-export async function createAuction(a: Omit<Auction, "id" | "createdAt" | "currentLotId" | "status" | "monitorId" | "screenToken" | "bannerAt" | "sponsorBannerAt">, squads: Omit<Squad, "id" | "auctionId">[], players: Omit<Player, "id" | "auctionId">[]) {
+export async function createAuction(a: Omit<Auction, "id" | "createdAt" | "currentLotId" | "status" | "monitorId" | "screenToken" | "bannerAt" | "sponsorBannerAt" | "eventLogoAt">, squads: Omit<Squad, "id" | "auctionId">[], players: Omit<Player, "id" | "auctionId">[]) {
   const id = randomUUID();
-  const auction: Auction = { ...a, id, status: "setup", currentLotId: null, createdAt: new Date().toISOString(), monitorId: null, screenToken: randomUUID().replace(/-/g, ""), bannerAt: null, sponsorBannerAt: null };
+  const auction: Auction = { ...a, id, status: "setup", currentLotId: null, createdAt: new Date().toISOString(), monitorId: null, screenToken: randomUUID().replace(/-/g, ""), bannerAt: null, sponsorBannerAt: null, eventLogoAt: null };
   const sq = squads.map((x) => ({ ...x, id: randomUUID(), auctionId: id }));
   const pl = players.map((x) => ({ ...x, id: randomUUID(), auctionId: id }));
   if (!LIVE) {
@@ -348,20 +350,20 @@ export async function setPlayerPhoto(id: string, dataUrl: string | null) {
   check((await (await admin()).from("auction_players").update({ photo: dataUrl, photo_at: at }).eq("id", id)).error, "save photo");
 }
 
-export async function setBanner(auctionId: string, which: "banner" | "sponsors", dataUrl: string | null) {
+export async function setBanner(auctionId: string, which: "banner" | "sponsors" | "logo", dataUrl: string | null) {
   const at = dataUrl ? new Date().toISOString() : null;
   if (!LIVE) {
     if (dataUrl) memImg.set(`${which}:${auctionId}`, dataUrl);
     else memImg.delete(`${which}:${auctionId}`);
-    Object.assign(mem.auctions.find((x) => x.id === auctionId) ?? {}, which === "banner" ? { bannerAt: at } : { sponsorBannerAt: at });
+    Object.assign(mem.auctions.find((x) => x.id === auctionId) ?? {}, which === "banner" ? { bannerAt: at } : which === "logo" ? { eventLogoAt: at } : { sponsorBannerAt: at });
     return;
   }
-  const row = which === "banner" ? { banner: dataUrl, banner_at: at } : { sponsor_banner: dataUrl, sponsor_banner_at: at };
+  const row = which === "banner" ? { banner: dataUrl, banner_at: at } : which === "logo" ? { event_logo: dataUrl, event_logo_at: at } : { sponsor_banner: dataUrl, sponsor_banner_at: at };
   check((await (await admin()).from("auctions").update(row).eq("id", auctionId)).error, "save banner");
 }
 
 /** A team logo, a player's photo (falling back to their profile photo), or a banner. */
-export async function image(auctionId: string, kind: "squad" | "player" | "banner" | "sponsors" | "crest", id: string): Promise<string | null> {
+export async function image(auctionId: string, kind: "squad" | "player" | "banner" | "sponsors" | "crest" | "logo", id: string): Promise<string | null> {
   if (kind === "crest") {
     // The club's crest, for the middle of the big screen's header.
     if (!LIVE) {
@@ -376,10 +378,11 @@ export async function image(auctionId: string, kind: "squad" | "player" | "banne
     const v = s((t as Row | null)?.logo_path);
     return v && v.startsWith("data:image/") ? v : null;
   }
-  if (kind === "banner" || kind === "sponsors") {
+  if (kind === "banner" || kind === "sponsors" || kind === "logo") {
     if (!LIVE) return memImg.get(`${kind}:${auctionId}`) ?? null;
-    const { data } = await (await admin()).from("auctions").select(kind === "banner" ? "banner" : "sponsor_banner").eq("id", auctionId).maybeSingle();
-    return s((data as Row | null)?.[kind === "banner" ? "banner" : "sponsor_banner"]);
+    const col = kind === "banner" ? "banner" : kind === "logo" ? "event_logo" : "sponsor_banner";
+    const { data } = await (await admin()).from("auctions").select(col).eq("id", auctionId).maybeSingle();
+    return s((data as Row | null)?.[col]);
   }
   if (!LIVE) {
     if (kind === "squad") return mem.squads.some((x) => x.id === id && x.auctionId === auctionId) ? memImg.get(`squad:${id}`) ?? null : null;
