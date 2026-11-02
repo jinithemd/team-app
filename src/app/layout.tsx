@@ -10,7 +10,7 @@ import "@fontsource/inter/latin-700.css";
 import "@fontsource/barlow-condensed/latin-600.css";
 import "@fontsource/barlow-condensed/latin-700.css";
 import "./globals.css";
-import { getSessionUser } from "@/lib/data";
+import { myLook } from "@/lib/data/look";
 import { APP_NAME, APP_TAGLINE } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -31,8 +31,7 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const user = await getSessionUser();
-  const theme = user?.theme && user.theme !== "system" ? user.theme : undefined;
+  const { theme } = await myLook();
   return (
     <html lang="en-CA" data-theme={theme} suppressHydrationWarning>
       <body>
@@ -41,6 +40,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </Suspense>
         <AppBridge />
         {children}
+        {/* Phone app: take the Clbx splash down as soon as the first screen has arrived. */}
+        <script dangerouslySetInnerHTML={{ __html: "try{window.Capacitor&&Capacitor.Plugins.SplashScreen&&Capacitor.Plugins.SplashScreen.hide({fadeOutDuration:200})}catch(e){}" }} />
       </body>
     </html>
   );

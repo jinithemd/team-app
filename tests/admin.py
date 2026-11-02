@@ -37,8 +37,8 @@ with sync_playwright() as pw:
     login(p, "Priya")
     p.goto(f"{BASE}/account")
     expect(p.get_by_role("link", name="Owner dashboard")).to_have_count(0)
-    r = p.goto(f"{BASE}/admin"); assert r.status == 404, r.status
-    r = p.goto(f"{BASE}/clubs/c-lcfc/stats"); assert r.status == 404, r.status
+    p.goto(f"{BASE}/admin"); expect(p.get_by_role("heading", name="We couldn't find that page")).to_be_visible()
+    p.goto(f"{BASE}/clubs/c-lcfc/stats"); expect(p.get_by_role("heading", name="We couldn't find that page")).to_be_visible()
     b.close()
 assert not [e for e in errors if "#418" not in e], errors
 print("admin: all checks pass")

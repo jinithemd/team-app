@@ -18,5 +18,9 @@
     <p>Can't reach Clbx right now.<br>Check your connection and try again.</p>
     <button onclick="location.href='https://clbx.ca/'">Try again</button>
   </main>
+<script>
+  // Offline: take the splash down so this page shows.
+  try { window.Capacitor && Capacitor.Plugins.SplashScreen && Capacitor.Plugins.SplashScreen.hide(); } catch (e) {}
+</script>
 </body>
 </html>

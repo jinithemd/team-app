@@ -16,6 +16,8 @@ export function AppBridge() {
     document.documentElement.dataset.app = appPlatform();
     const subs: { remove: () => void }[] = [];
     (async () => {
+      // The Clbx splash stays up until the first screen is ready (capacitor.config.ts), instead of a blank screen.
+      void import("@capacitor/splash-screen").then(({ SplashScreen }) => SplashScreen.hide({ fadeOutDuration: 200 })).catch(() => {});
       const { App } = await import("@capacitor/app");
       subs.push(
         await App.addListener("appUrlOpen", ({ url }) => {

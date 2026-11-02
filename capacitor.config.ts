@@ -26,7 +26,8 @@ const config: CapacitorConfig = {
   ios: { contentInset: "never", limitsNavigationsToAppBoundDomains: false, appendUserAgent: "ClbxApp ClbxPush" },
   android: { allowMixedContent: false, appendUserAgent: androidPush ? "ClbxApp ClbxPush" : "ClbxApp" },
   plugins: {
-    SplashScreen: { launchShowDuration: 1500, launchAutoHide: true, backgroundColor: "#06080D", showSpinner: false },
+    // Stays up until the site says its first screen is ready (AppBridge, or the offline page), so there is no blank screen in between.
+    SplashScreen: { launchAutoHide: false, backgroundColor: "#06080D", showSpinner: false },
     PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
   },
 };
