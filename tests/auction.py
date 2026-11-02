@@ -75,8 +75,17 @@ with sync_playwright() as pw:
     # Ade's a star: base 80. Tom isn't playing.
     host.get_by_label("Base price for Ade Bello").fill("80"); host.get_by_label("Base price for Ade Bello").blur()
     host.get_by_role("button", name="Remove Tom", exact=False).first.click()
-    host.fill("#guest", "Guest Gary"); host.get_by_role("button", name="Add", exact=True).click()
+    # A guest with a photo, position and shirt number, all added at once.
+    host.locator("input[type=file][aria-label='Photo for the guest']").set_input_files(PHOTO)
+    host.fill("#guest", "Guest Gary"); host.fill("#guest-position", "Winger"); host.fill("#guest-jersey", "77")
+    host.get_by_role("button", name="Add", exact=True).click()
     expect(host.get_by_text("Guest Gary").first).to_be_visible()
+    expect(host.get_by_label("Position for Guest Gary")).to_have_value("Winger")
+    expect(host.get_by_label("Shirt number for Guest Gary")).to_have_value("77")
+    expect(host.get_by_role("button", name="Photo for Guest Gary").locator("img")).to_be_visible()
+    # Shirt numbers can be set for anyone.
+    host.get_by_label("Shirt number for Sam Okafor").fill("1"); host.get_by_label("Shirt number for Sam Okafor").blur()
+    expect(host.get_by_text("#1", exact=True)).to_be_visible()
     host.screenshot(path=f"{SHOTS}/auction-setup.png", full_page=True)
     no_sideways(host, "auction setup")
     # Rahul runs the big screen (the monitor).

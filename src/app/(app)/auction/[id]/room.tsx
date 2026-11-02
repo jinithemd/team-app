@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, Copy, Gavel, MonitorPlay, Play, Shuffle, Timer, Trophy, Undo2, UserPlus } from "lucide-react";
+import { ArrowLeft, BarChart3, Camera, Copy, Gavel, MonitorPlay, Play, Shuffle, Timer, Trophy, Undo2, UserPlus } from "lucide-react";
 import type { AuctionView, SquadView } from "@/lib/auction/service";
 import {
   addGuestAction, bidAction, closeNowAction, deleteAuctionAction, finishAuctionAction, nextPlayerAction, setPlayerAction, setSquadAction, startAuctionAction,
@@ -157,7 +157,6 @@ type Run = (fn: () => Promise<{ error?: string } | undefined>) => void;
 
 function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean }) {
   const a = v.auction;
-  const [guest, setGuest] = useState("");
   if (!v.host)
     return <p className="rounded-md bg-sunken p-3 text-sm">The auction hasn&apos;t started yet. Keep this page open: it goes live here.</p>;
   const inPool = v.pool;
@@ -202,7 +201,7 @@ function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean
                   Remove
                 </button>
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-2">
+              <div className="grid grid-cols-[minmax(0,1fr)_4rem_6rem] gap-2">
                 <label className="grid gap-0.5 text-xs font-semibold text-muted">
                   Position
                   <input
@@ -215,6 +214,20 @@ function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean
                       if (e.target.value !== (p.position ?? "")) run(() => setPlayerAction(a.id, p.id, { position: e.target.value }));
                     }}
                     className={`${inputClass} min-h-9 text-sm font-normal text-fg`}
+                  />
+                </label>
+                <label className="grid gap-0.5 text-xs font-semibold text-muted">
+                  No.
+                  <input
+                    aria-label={`Shirt number for ${p.name}`}
+                    defaultValue={p.jersey ?? ""}
+                    placeholder="–"
+                    maxLength={3}
+                    inputMode="numeric"
+                    onBlur={(e) => {
+                      if (e.target.value !== (p.jersey ?? "")) run(() => setPlayerAction(a.id, p.id, { jersey: e.target.value }));
+                    }}
+                    className={`${inputClass} min-h-9 text-center text-sm font-normal text-fg tabular`}
                   />
                 </label>
                 <label className="grid gap-0.5 text-xs font-semibold text-muted">
@@ -240,24 +253,7 @@ function Setup({ v, run, pending }: { v: AuctionView; run: Run; pending: boolean
             <option key={x} value={x} />
           ))}
         </datalist>
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const n = guest;
-            setGuest("");
-            run(() => addGuestAction(a.id, n, ""));
-          }}
-        >
-          <label htmlFor="guest" className="sr-only">
-            Add a player who isn&apos;t on the team
-          </label>
-          <input id="guest" value={guest} onChange={(e) => setGuest(e.target.value)} placeholder="Add a guest player" className={`${inputClass} min-h-10`} />
-          <button disabled={pending || !guest.trim()} className={buttonClass("secondary", "md")}>
-            <UserPlus aria-hidden />
-            Add
-          </button>
-        </form>
+        <GuestForm auctionId={a.id} basePrice={a.basePrice} run={run} pending={pending} />
       </section>
 
       <section aria-labelledby="mon-h" className="grid gap-2">
@@ -730,15 +726,20 @@ function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label
   const [err, setErr] = useState<string | null>(null);
   return (
     <span className="grid shrink-0 justify-items-center gap-0.5">
-      <button
-        type="button"
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => input.current?.click()}
-        className={`grid size-12 place-items-center overflow-hidden border border-border bg-sunken text-sm font-bold text-muted focus-visible:outline-2 focus-visible:outline-focus ${square ? "rounded-md" : "rounded-full"}`}
-      >
-        {src ? <img src={src} alt="" className={`size-full ${square ? "object-contain" : "object-cover"}`} /> : fallback}
-      </button>
+      <span className="relative">
+        <button
+          type="button"
+          aria-label={label}
+          disabled={disabled}
+          onClick={() => input.current?.click()}
+          className={`grid size-12 place-items-center overflow-hidden border border-border bg-sunken text-sm font-bold text-muted focus-visible:outline-2 focus-visible:outline-focus ${square ? "rounded-md" : "rounded-full"}`}
+        >
+          {src ? <img src={src} alt="" className={`size-full ${square ? "object-contain" : "object-cover"}`} /> : fallback}
+        </button>
+        <span aria-hidden className="pointer-events-none absolute -right-1 -bottom-1 grid size-5 place-items-center rounded-full border-2 border-bg bg-team text-on-team">
+          <Camera className="size-3" />
+        </span>
+      </span>
       <input
         ref={input}
         type="file"
@@ -821,5 +822,62 @@ function BannerPick({ label, hint, src, onPick, disabled }: { label: string; hin
         </button>
       )}
     </div>
+  );
+}
+
+/** Add someone who isn't on the team: photo, name, position, shirt number and base price in one go. */
+function GuestForm({ auctionId, basePrice, run, pending }: { auctionId: string; basePrice: number; run: Run; pending: boolean }) {
+  const [name, setName] = useState("");
+  const [position, setPosition] = useState("");
+  const [jersey, setJersey] = useState("");
+  const [price, setPrice] = useState("");
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const reset = () => {
+    setName("");
+    setPosition("");
+    setJersey("");
+    setPrice("");
+    setPhoto(null);
+  };
+  return (
+    <form
+      aria-label="Add a guest player"
+      className="grid gap-2 rounded-md border border-dashed border-border p-2.5"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const x = { name, position, jersey, price, photo };
+        reset();
+        setOpen(false);
+        run(() => addGuestAction(auctionId, x.name, x.price, { position: x.position, jersey: x.jersey, photo: x.photo }));
+      }}
+    >
+      <div className="flex items-center gap-2.5">
+        <PhotoButton label="Photo for the guest" src={photo} fallback={<UserPlus aria-hidden className="size-5" />} disabled={pending} onPick={(url) => (setPhoto(url), setOpen(true))} />
+        <label htmlFor="guest" className="sr-only">
+          Guest player&apos;s name
+        </label>
+        <input id="guest" value={name} onChange={(e) => (setName(e.target.value), e.target.value && setOpen(true))} placeholder="Add a guest player" maxLength={80} className={`${inputClass} min-h-10 flex-1`} />
+        <button disabled={pending || !name.trim()} className={buttonClass("secondary", "md")}>
+          Add
+        </button>
+      </div>
+      {open && (
+        <div className="grid grid-cols-[minmax(0,1fr)_4rem_6rem] gap-2">
+          <label className="grid gap-0.5 text-xs font-semibold text-muted">
+            Position
+            <input list="auction-positions" id="guest-position" value={position} onChange={(e) => setPosition(e.target.value)} placeholder="e.g. Midfield" maxLength={30} className={`${inputClass} min-h-9 text-sm font-normal text-fg`} />
+          </label>
+          <label className="grid gap-0.5 text-xs font-semibold text-muted">
+            No.
+            <input id="guest-jersey" value={jersey} onChange={(e) => setJersey(e.target.value)} placeholder="–" maxLength={3} inputMode="numeric" className={`${inputClass} min-h-9 text-center text-sm font-normal text-fg tabular`} />
+          </label>
+          <label className="grid gap-0.5 text-xs font-semibold text-muted">
+            Base price
+            <input id="guest-price" type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} placeholder={String(basePrice)} className={`${inputClass} min-h-9 text-right text-sm font-normal text-fg tabular`} />
+          </label>
+        </div>
+      )}
+    </form>
   );
 }

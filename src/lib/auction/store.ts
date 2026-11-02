@@ -229,9 +229,10 @@ export async function addPlayers(auctionId: string, players: Omit<Player, "id" |
   const pl = players.map((x) => ({ ...x, id: randomUUID(), auctionId }));
   if (!LIVE) {
     mem.players.push(...pl);
-    return;
+    return pl.map((x) => x.id);
   }
   if (pl.length) check((await (await admin()).from("auction_players").insert(pl.map((x) => snake(x)))).error, "add players");
+  return pl.map((x) => x.id);
 }
 
 export async function updatePlayer(id: string, patch: Partial<Player>) {

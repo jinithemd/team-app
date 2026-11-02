@@ -352,7 +352,7 @@ export async function setSquad(auctionId: string, squadId: string, input: { name
   });
 }
 
-export async function setPlayer(auctionId: string, playerId: string, op: { basePrice?: string; remove?: boolean; position?: string }): Promise<Result> {
+export async function setPlayer(auctionId: string, playerId: string, op: { basePrice?: string; remove?: boolean; position?: string; jersey?: string }): Promise<Result> {
   return caught(async () => {
     const snap = await asHost(auctionId);
     const p = snap.players.find((x) => x.id === playerId);
@@ -360,6 +360,12 @@ export async function setPlayer(auctionId: string, playerId: string, op: { baseP
     if (op.remove) {
       if (p.status === "sold" || p.status === "captain" || snap.lot?.playerId === p.id) return fail("They're already on a team.");
       await st.removePlayer(p.id);
+      return { ok: true, data: undefined };
+    }
+    if (op.jersey !== undefined) {
+      const j = op.jersey.trim();
+      if (j && !/^[0-9A-Za-z]{1,3}$/.test(j)) return fail("Shirt number: up to 3 letters or digits.");
+      await st.updatePlayer(p.id, { jersey: j || null });
       return { ok: true, data: undefined };
     }
     if (op.position !== undefined) {
@@ -374,7 +380,7 @@ export async function setPlayer(auctionId: string, playerId: string, op: { baseP
   });
 }
 
-export async function addGuest(auctionId: string, name: string, basePrice: string): Promise<Result> {
+export async function addGuest(auctionId: string, name: string, basePrice: string, extra: { position?: string; jersey?: string; photo?: string | null } = {}): Promise<Result> {
   return caught(async () => {
     const snap = await asHost(auctionId);
     const n = name.trim().slice(0, 80);
@@ -382,7 +388,14 @@ export async function addGuest(auctionId: string, name: string, basePrice: strin
     if (snap.players.some((p) => p.name.toLowerCase() === n.toLowerCase())) return fail(`${n} is already in.`);
     const v = basePrice.trim() ? Number(basePrice) : snap.auction.basePrice;
     if (!Number.isInteger(v) || v < 0 || v > snap.auction.budget) return fail("Base price from 0 up to the budget.");
-    await st.addPlayers(auctionId, [{ userId: null, name: n, basePrice: v, status: "pool", squadId: null, price: null, sort: snap.players.length, photoAt: null, position: null, jersey: null }]);
+    const j = (extra.jersey ?? "").trim();
+    if (j && !/^[0-9A-Za-z]{1,3}$/.test(j)) return fail("Shirt number: up to 3 letters or digits.");
+    const photo = extra.photo ?? null;
+    if (photo && (!IMG.test(photo) || photo.length > 400_000)) return fail("Use a PNG or JPG under 300 KB.");
+    const [id] = await st.addPlayers(auctionId, [
+      { userId: null, name: n, basePrice: v, status: "pool", squadId: null, price: null, sort: snap.players.length, photoAt: null, position: (extra.position ?? "").trim().slice(0, 30) || null, jersey: j || null },
+    ]);
+    if (photo && id) await st.setPlayerPhoto(id, photo);
     return { ok: true, data: undefined };
   });
 }
