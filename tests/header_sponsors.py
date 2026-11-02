@@ -1,5 +1,5 @@
-# Sample-data build: a team's major sponsors (Diamond, Platinum, Gold) show in the team header
-# with their tier badges; the rest are a "+N more" link to the full list.
+# Sample-data build: sponsors show on the team's public page header (top three, highest tier first,
+# each opening its website), and not on the players' team screens.
 import re
 import _waits  # noqa: F401
 from playwright.sync_api import sync_playwright, expect
@@ -13,20 +13,21 @@ def login(p, who):
 with sync_playwright() as pw:
     b = pw.chromium.launch()
     p = b.new_context(viewport={"width": 390, "height": 844}).new_page()
-    login(p, "Dan")
-    p.goto(f"{BASE}/t/t-first/roster")
-    row = p.get_by_label("Major sponsors")
-    expect(row).to_contain_text("Limestone Motors")
-    expect(row).to_contain_text("Diamond")
-    expect(row).to_contain_text("Platinum")
-    p.screenshot(path="/tmp/claude-0/header-sponsors-club.png")
     login(p, "Priya")
     p.goto(f"{BASE}/t/t-strikers/chat")
-    row = p.get_by_label("Major sponsors")
-    expect(row).to_contain_text("Corner Cafe")
-    expect(row).to_contain_text("Gold")
-    expect(row.get_by_role("link", name=re.compile(r"\+2 more sponsors"))).to_be_visible()
+    expect(p.get_by_label("Sponsors", exact=True)).to_have_count(0)
+    p.goto(f"{BASE}/f/t-strikers")
+    row = p.get_by_label("Sponsors", exact=True)
+    chips = row.locator(":scope > a.shadow-sm, :scope > div")
+    expect(chips).to_have_count(3)
+    expect(chips.first).to_contain_text("Gold")
+    site = row.get_by_role("link", name=re.compile("opens their website")).first
+    expect(site).to_have_attribute("href", re.compile(r"^https?://"))
+    expect(site).to_have_attribute("target", "_blank")
     sw = p.evaluate("document.documentElement.scrollWidth"); assert sw <= 391, sw
-    p.screenshot(path="/tmp/claude-0/header-sponsors-team.png")
+    p.screenshot(path="/tmp/claude-0/header-sponsors-public.png")
+    login(p, "Dan")
+    p.goto(f"{BASE}/f/t-first")
+    expect(p.get_by_label("Sponsors", exact=True)).to_contain_text("Limestone Motors")
     b.close()
 print("header_sponsors: all checks pass")

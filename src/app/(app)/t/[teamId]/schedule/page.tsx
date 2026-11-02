@@ -90,7 +90,7 @@ export default async function SchedulePage({
         </section>
       )}
       {team.isStaff && <DropInManager teamId={teamId} />}
-      <SponsorStrip sponsors={sponsors} manageHref={perms.settings ? `/t/${teamId}/sponsors` : undefined} />
+      {perms.settings && <SponsorStrip sponsors={sponsors} manageHref={`/t/${teamId}/sponsors`} />}
     </div>
   );
 }

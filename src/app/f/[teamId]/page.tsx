@@ -7,7 +7,7 @@ import { teamThemeCss } from "@/lib/team-theme";
 import { APP_NAME } from "@/lib/brand";
 import { APP_URL } from "@/lib/data/store";
 import { formatDateBlock, formatTime } from "@/lib/time";
-import { SponsorStrip } from "@/components/sponsor-badge";
+import { HeaderSponsors, SponsorStrip } from "@/components/sponsor-badge";
 import { ShareLink } from "@/components/tournament/share-link";
 import { FollowButton } from "./follow-button";
 import { publicSessions } from "@/lib/sessions/service";
@@ -105,6 +105,7 @@ export default async function FanPageView({ params }: { params: Promise<{ teamId
                 )}
               </div>
             </div>
+            <HeaderSponsors sponsors={v.sponsors} moreHref="#sponsors-h" />
             <div className="flex flex-wrap items-center gap-3">
               <FollowButton teamId={team.id} following={v.following} signedIn={v.signedIn} member={v.isMember} />
               <span className="text-sm opacity-90">

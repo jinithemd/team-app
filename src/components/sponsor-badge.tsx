@@ -1,6 +1,6 @@
 import { Award, Gem, Medal } from "lucide-react";
 import type { PublicSponsor, SponsorTier } from "@/lib/data/types";
-import { TIER_LABEL } from "@/lib/data/types";
+import { SPONSOR_TIERS, TIER_LABEL } from "@/lib/data/types";
 
 // Light metal chips with dark text: readable on light and dark pages (all >= 6:1).
 const TIER_STYLE: Record<SponsorTier, { bg: string; fg: string; ring: string }> = {
@@ -91,26 +91,25 @@ export function SponsorStrip({ sponsors, title = "Our sponsors", manageHref }: {
   );
 }
 
-const MAJOR: SponsorTier[] = ["diamond", "platinum", "gold"];
-
-/** The team's major sponsors (Diamond, Platinum, Gold) as a row of logo chips under the team's details. */
-export function HeaderSponsors({ sponsors, moreHref }: { sponsors: PublicSponsor[]; moreHref: string }) {
-  const major = sponsors.filter((s) => s.tier && MAJOR.includes(s.tier)).slice(0, 4);
-  if (!major.length) return null;
-  const rest = sponsors.length - major.length;
+/** The team's top sponsors (highest tier first, up to three) as logo chips in the public page header. A chip with a website opens it. */
+export function HeaderSponsors({ sponsors, moreHref, max = 3 }: { sponsors: PublicSponsor[]; moreHref: string; max?: number }) {
+  const rank = (t: SponsorTier | null) => (t ? SPONSOR_TIERS.indexOf(t) : SPONSOR_TIERS.length);
+  const top = [...sponsors].sort((a, b) => rank(a.tier) - rank(b.tier)).slice(0, max);
+  if (!top.length) return null;
+  const rest = sponsors.length - top.length;
   return (
-    <div className="relative -mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" aria-label="Major sponsors">
-      {major.map((s) => {
+    <div className="relative flex min-w-0 flex-wrap items-center gap-2" aria-label="Sponsors">
+      {top.map((s) => {
         const chip = (
           <>
             <SponsorMark s={s} small />
-            <span className="max-w-[9rem] truncate text-sm font-semibold">{s.name}</span>
+            <span className="max-w-[10rem] truncate text-sm font-semibold">{s.name}</span>
             <TierBadge tier={s.tier} />
           </>
         );
         const cls = "flex shrink-0 items-center gap-2 rounded-pill bg-bg py-1 pr-1.5 pl-1 text-fg shadow-sm";
         return s.website ? (
-          <a key={s.id} href={s.website} target="_blank" rel="noreferrer sponsored" className={`${cls} hover:bg-surface`}>
+          <a key={s.id} href={s.website} target="_blank" rel="noreferrer sponsored" className={`${cls} hover:bg-surface`} aria-label={`${s.name}, ${s.tier ? TIER_LABEL[s.tier] + " sponsor" : "sponsor"} (opens their website)`}>
             {chip}
           </a>
         ) : (

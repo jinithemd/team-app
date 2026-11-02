@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { auctionsFor } from "@/lib/auction/store";
-import { HeaderSponsors } from "@/components/sponsor-badge";
-import { getSessionUser, getTeam, listTeamSponsors, myPerms } from "@/lib/data";
+import { getSessionUser, getTeam, myPerms } from "@/lib/data";
 import { TeamTabs } from "@/components/nav";
 import { HatBadges } from "@/components/hats";
 import { hatLabels } from "@/lib/data/types";
@@ -15,7 +14,7 @@ export default async function TeamLayout({ children, params }: { children: React
   const { teamId } = await params;
   const [team, user] = await Promise.all([getTeam(teamId), getSessionUser()]);
   if (!team) notFound();
-  const [perms, honours, auctions, sponsors] = await Promise.all([myPerms(teamId), teamHonours(teamId), auctionsFor(teamId).catch(() => []), listTeamSponsors(teamId).catch(() => [])]);
+  const [perms, honours, auctions] = await Promise.all([myPerms(teamId), teamHonours(teamId), auctionsFor(teamId).catch(() => [])]);
   const wins = honours.filter((h) => h.place === "champions").length;
   const seconds = honours.length - wins;
   const subtitle = [team.club?.name, team.level, team.location].filter(Boolean).join(" · ");
@@ -66,9 +65,6 @@ export default async function TeamLayout({ children, params }: { children: React
               )}
             </div>
           </div>
-        </div>
-        <div className="mx-auto max-w-3xl">
-          <HeaderSponsors sponsors={sponsors} moreHref={`/t/${team.id}/schedule#sponsors-h`} />
         </div>
       </header>
       <TeamTabs teamId={team.id} show={{ settings: perms.settings, points: team.settings.pointsEnabled && (team.settings.pointsPublic || perms.staff), auction: perms.staff || perms.events || auctions.length > 0 }} />
