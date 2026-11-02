@@ -142,7 +142,7 @@ export default function Welcome() {
                 Running an internal tournament? Captains bid for players from their phones while the whole club watches it live on a TV or projector.
               </p>
             </div>
-            <img src="/landing/auction.webp" alt="The Clbx auction big screen: a player up for bidding, the current bid, the clock and each team's points" width={1920} height={595} className="w-full rounded-xl ring-1 ring-[rgba(255,255,255,0.1)]" />
+            <img src="/landing/auction.webp" alt="The Clbx auction big screen: a player up for bidding, the current bid, the clock and each team's points" width={1920} height={878} className="w-full rounded-xl ring-1 ring-[rgba(255,255,255,0.1)]" />
           </div>
         </section>
 
@@ -202,7 +202,7 @@ export default function Welcome() {
 
         <section aria-labelledby="local-h" className="gutter mx-auto max-w-6xl py-20">
           <h2 id="local-h" className="max-w-3xl font-display text-[clamp(2.2rem,5vw,3.5rem)] leading-[0.95] font-bold uppercase">
-            Made in Kingston, Ontario
+            Made in Ontario
           </h2>
           <p className="mt-5 max-w-2xl text-lg leading-relaxed text-[#4B5563]">
             Clbx is built by people who run amateur football teams themselves, and it&apos;s used by our own clubs every week.
@@ -224,7 +224,7 @@ export default function Welcome() {
               Privacy
             </Link>
           </nav>
-          <p className="w-full text-sm text-[rgba(255,255,255,0.45)]">Clbx, Kingston, Ontario</p>
+          <p className="w-full text-sm text-[rgba(255,255,255,0.45)]">Clbx, Ontario, Canada</p>
         </div>
       </footer>
     </div>
