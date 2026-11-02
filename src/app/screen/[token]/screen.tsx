@@ -346,6 +346,7 @@ export function AuctionScreen({ token, initial, crestUrl }: { token: string; ini
         )}
 
         {soldShow && soldShow.status === "sold" && <SoldOverlay sold={soldShow} v={v} />}
+        {soldShow && soldShow.status === "unsold" && <UnsoldOverlay lot={soldShow} v={v} />}
       </div>
     </div>
   );
@@ -609,6 +610,30 @@ function FinalTable({ v }: { v: ScreenView }) {
 }
 
 // ---------------------------------------------------------------------------
+
+/** The same moment for a player nobody bought: a grey UNSOLD stamp. */
+function UnsoldOverlay({ lot, v }: { lot: Recent; v: ScreenView }) {
+  const grey = "#9AA3B2";
+  const p = [...v.unsold, ...v.pool].find((x) => x.name === lot.player);
+  return (
+    <div className="au-show pointer-events-none absolute inset-0 z-50 grid place-items-center" style={{ background: `radial-gradient(circle at 50% 45%, ${glow(grey, 0.18)}, transparent 60%), ${INK}` }}>
+      <div className="flex items-center gap-[80px]">
+        {p && (
+          <div style={{ filter: "grayscale(1)", opacity: 0.75 }}>
+            <MiniCard p={p} tier={tierOf(p, v.auction.basePrice)} size={3.4} />
+          </div>
+        )}
+        <div className="grid justify-items-start gap-[20px]">
+          <span className="au-stamp mb-[46px] rounded-[22px] border-[10px] px-[44px] py-[4px] au-hd text-[170px] leading-[0.95] tracking-[0.03em]" style={{ borderColor: grey, color: grey, textShadow: `0 0 40px ${glow(grey, 0.5)}` }}>
+            UNSOLD
+          </span>
+          <span className="au-hd text-[80px] leading-none uppercase">{lot.player}</span>
+          <span className="text-[40px] font-semibold au-dim">No team picked them this time</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function SoldOverlay({ sold, v }: { sold: Recent; v: ScreenView }) {
   const color = sold.color ?? TIERS.gold.edge;

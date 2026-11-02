@@ -186,6 +186,8 @@ with sync_playwright() as pw:
     tv.wait_for_timeout(3500); tv.screenshot(path=f"{SHOTS}/auction-tv-passed.png")
     host.get_by_role("button", name="Pass on Jordan").click()
     expect(host.get_by_text("Jordan Blake went unsold")).to_be_visible(timeout=5000)
+    expect(tv.get_by_text("UNSOLD", exact=True)).to_be_visible(timeout=5000)
+    tv.wait_for_timeout(1500); tv.screenshot(path=f"{SHOTS}/auction-tv-unsold.png")
     host.get_by_role("button", name=re.compile("Bring back 1 unsold")).click()
     expect(host.get_by_label("Choose who goes next").locator("option", has_text="Jordan Blake")).to_have_count(1)
 
