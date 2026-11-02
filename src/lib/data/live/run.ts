@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { userClient } from "../../supabase/server";
+import { authUser, userClient } from "../../supabase/server";
 import type { Store } from "../store";
 import { runLive } from "./context";
 import { loadSlice } from "./load";
@@ -15,7 +15,7 @@ import { SyncError, syncChanges } from "./sync";
 
 const loadForRequest = cache(async () => {
   const sb = await userClient();
-  const { data } = await sb.auth.getUser();
+  const data = { user: await authUser() };
   const uid = data.user?.id ?? null;
   const { store, aux } = await loadSlice(sb, uid);
   return { sb, uid, store, aux, saved: structuredClone(store) as Store, lock: Promise.resolve() };

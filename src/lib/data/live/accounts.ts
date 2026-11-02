@@ -63,7 +63,7 @@ async function liveDeletionPlan(uid: string) {
 async function signedInUser() {
   const { userClient } = await import("../../supabase/server");
   const sb = await userClient();
-  const { data } = await sb.auth.getUser();
+  const data = { user: await (await import("../../supabase/server")).authUser() };
   if (!data.user) throw new Error("Not signed in");
   return { sb, user: data.user };
 }

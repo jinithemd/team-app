@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { adminClient, userClient } from "../supabase/server";
+import { adminClient, userClient, authUser } from "../supabase/server";
 import type { CalendarEvent, Repo, TeamRef } from "./repo";
 import type { Award, Entry, Match, MatchEvent, OfficialRole, RosterPerson, Tournament } from "./types";
 
@@ -84,8 +84,7 @@ async function reader(): Promise<{ c: SupabaseClient; visitor: boolean }> {
 }
 
 async function uid() {
-  const c = await sb();
-  const { data } = await c.auth.getUser();
+  const data = { user: await authUser() };
   return data.user?.id ?? null;
 }
 

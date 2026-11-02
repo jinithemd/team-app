@@ -31,5 +31,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|svg|webp|ico|woff2?)$).*)"],
+  // Skips files, and the auction's every-second refreshes and images (they don't need the
+  // sign-in refreshed, and checking it on each one slowed everything down).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auction/|api/cron/|api/stripe/|.*\\.(?:png|jpg|svg|webp|ico|woff2?)$).*)"],
 };

@@ -2,6 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import type { Database } from "./database.types";
 
 export type DB = SupabaseClient<Database>;
@@ -28,6 +29,15 @@ export async function userClient(): Promise<DB> {
     },
   });
 }
+
+/**
+ * Who's signed in, asked of Supabase once per request (pages used to ask up to five times,
+ * a round trip each).
+ */
+export const authUser = cache(async () => {
+  const { data } = await (await userClient()).auth.getUser();
+  return data.user ?? null;
+});
 
 let adminSingleton: DB | null = null;
 /**

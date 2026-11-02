@@ -11,7 +11,7 @@ const COOKIE = "demo_uid";
 const liveUserId = cache(async (): Promise<string | null> => {
   const { userClient } = await import("../supabase/server");
   const sb = await userClient();
-  const { data } = await sb.auth.getUser();
+  const data = { user: await (await import("../supabase/server")).authUser() };
   return data.user?.id ?? null;
 });
 

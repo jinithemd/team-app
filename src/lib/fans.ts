@@ -111,7 +111,7 @@ const s = (v: unknown) => (v == null ? null : String(v));
 async function clients() {
   const { adminClient, userClient } = await import("./supabase/server");
   const user = (await userClient()) as unknown as SupabaseClient;
-  const { data } = await user.auth.getUser();
+  const data = { user: await (await import("./supabase/server")).authUser() };
   return { admin: adminClient() as unknown as SupabaseClient, user, uid: data.user?.id ?? null };
 }
 

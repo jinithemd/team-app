@@ -1,7 +1,7 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
 import type { ActionResult, AttendanceStatus, ID, Person, RsvpResponse, TeamEvent } from "../types";
-import { adminClient, userClient } from "../../supabase/server";
+import { adminClient, authUser, userClient } from "../../supabase/server";
 import { sign, verify } from "../../tokens";
 import { APP_URL } from "../store";
 import { buildIcs } from "../feeds";
@@ -22,8 +22,7 @@ const eventSpec = TABLES.find((t) => t.key === "events")!;
 const toEvent = (row: Record<string, unknown>) => eventSpec.toApp(row, { store: emptyStore(), pollOptions: new Map() } as Aux) as TeamEvent;
 
 async function me() {
-  const sb = await userClient();
-  const { data } = await sb.auth.getUser();
+  const data = { user: await authUser() };
   if (!data.user) throw new Error("Not signed in");
   return data.user.id;
 }

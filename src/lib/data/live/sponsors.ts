@@ -1,7 +1,7 @@
 import "server-only";
 import type { ActionResult, ID, PublicSponsor, SponsorTier } from "../types";
 import { SPONSOR_TIERS } from "../types";
-import { adminClient, userClient } from "../../supabase/server";
+import { adminClient, userClient, authUser } from "../../supabase/server";
 import { verify } from "../../tokens";
 import { canManageSponsors, db } from "../store";
 import { onLive } from "./run";
@@ -43,7 +43,7 @@ export async function acceptSponsorInvite(token: string): Promise<ActionResult<{
   const t = verify<{ k: string; s: string; e: string }>(token);
   if (!t || t.k !== "sponsor") return { ok: false, error: "This sponsor link has expired. Ask the team for a new one." };
   const sb = await userClient();
-  const { data: auth } = await sb.auth.getUser();
+  const auth = { user: await authUser() };
   if (!auth.user) return { ok: false, error: "Sign in first." };
   if ((auth.user.email ?? "").toLowerCase() !== t.e) return { ok: false, error: `This invite is for ${t.e}. Sign out, then open the link again.` };
   const admin = adminClient();
@@ -70,7 +70,7 @@ type FeedRow = {
 /** What a sponsor sees (whoever runs the team can preview it). Sponsor-safe fields only. */
 export const getSponsorView = onLive(async (sponsorId: ID) => {
   const sb = await userClient();
-  const { data: auth } = await sb.auth.getUser();
+  const auth = { user: await authUser() };
   const uid = auth.user?.id;
   const s = db.sponsors.find((x) => x.id === sponsorId && !(x as { _pub?: boolean })._pub);
   if (!uid || !s) return null;
