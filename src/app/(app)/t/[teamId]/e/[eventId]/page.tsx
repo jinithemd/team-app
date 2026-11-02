@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Ticket, ArrowLeft, Car, ChevronRight, ClipboardCheck, Clock, MapPin, Pencil, StickyNote, Trophy, UserCog, Users } from "lucide-react";
+import { Ticket, ArrowLeft, Car, ChevronRight, ClipboardCheck, Clock, LayoutGrid, MapPin, Pencil, StickyNote, Trophy, UserCog, Users } from "lucide-react";
 import { attendanceSummary, carpoolSummary, eventPerms, getAvailability, getCheckIn, getEvent, getSessionUser, getTeam, myPerms } from "@/lib/data";
 import { CheckInCard } from "@/components/check-in";
 import { EVENT_TYPE_LABEL, isFixture } from "@/lib/data/types";
@@ -14,6 +14,7 @@ import { StaffEventActions } from "./staff-actions";
 import { eventPayments } from "@/lib/payments/service";
 import { CashToggle, PayButton } from "@/components/payments";
 import { SessionSpot } from "@/components/session-spot";
+import { hasLineup } from "@/lib/lineups/service";
 
 export async function generateMetadata({ params }: { params: Promise<{ eventId: string }> }): Promise<Metadata> {
   const e = await getEvent((await params).eventId);
@@ -29,8 +30,8 @@ export default async function EventPage({
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
-  const [team, e, avail, user, perms, checkIn, att, ep, pool] = await Promise.all([
-    getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId), eventPerms(eventId), carpoolSummary(eventId),
+  const [team, e, avail, user, perms, checkIn, att, ep, pool, lineupSaved] = await Promise.all([
+    getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId), eventPerms(eventId), carpoolSummary(eventId), hasLineup(eventId),
   ]);
   if (!team || !e || e.teamId !== teamId) notFound();
   const fee = e.feeCents ? await eventPayments(eventId) : null;
@@ -174,6 +175,20 @@ export default async function EventPage({
             <span className="block text-sm text-muted">
               {e.score ? `${e.score.us}–${e.score.them}${e.score.status === "live" ? ", updating" : ""}` : "Start the clock at kick-off. Everyone sees the score as it changes."}
             </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 text-muted" />
+        </Link>
+      )}
+
+      {isFixture(e.type) && !cancelled && (perms.staff || perms.games || lineupSaved) && (
+        <Link
+          href={`/t/${teamId}/e/${eventId}/lineup`}
+          className="flex items-center gap-3 rounded-lg border border-border p-4 hover:bg-surface focus-visible:outline-2 focus-visible:outline-focus"
+        >
+          <LayoutGrid aria-hidden className="size-6 shrink-0 text-team-ink" />
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">{lineupSaved ? "Team sheet" : "Pick the team"}</span>
+            <span className="block text-sm text-muted">{lineupSaved ? "The starting line-up and subs." : "Choose a formation, put players in it and share it with the team."}</span>
           </span>
           <ChevronRight aria-hidden className="size-5 text-muted" />
         </Link>

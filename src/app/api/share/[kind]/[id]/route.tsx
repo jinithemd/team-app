@@ -7,12 +7,16 @@ import { APP_URL } from "@/lib/data/store";
 import { getFanPage, fanPageUrl } from "@/lib/fans";
 import { deriveTeamTheme } from "@/lib/team-theme";
 import { TIER_LABEL, type PublicSponsor } from "@/lib/data/types";
+import { lineupForImage } from "@/lib/lineups/service";
+import { slotsFor } from "@/lib/lineups/formations";
+import { formatLongDate, formatTime } from "@/lib/time";
 
 /*
  * Ready-to-post images for social media:
  *   /api/share/follow/<teamId>             QR poster: "Follow us" → the team's fan page (1080×1350)
  *   /api/share/sponsors/<teamId>           every sponsor in a grid: "Proudly supported by" (1080×1350)
  *   /api/share/sponsor/<teamId>?s=<id>     one sponsor: "Welcome to the team" (1080×1080)
+ *   /api/share/lineup/<eventId>            the team sheet: formation on a pitch, plus subs (1080×1350)
  * The QR poster is also the fan page's link preview, so it follows the fan page's access
  * (public teams, or members). Sponsor posts are for the team's own members.
  */
@@ -73,7 +77,68 @@ const H = "Barlow";
 export async function GET(req: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await params;
   const none = () => new Response("Not found", { status: 404 });
-  if (!/^[\w-]{1,64}$/.test(id) || !["follow", "sponsors", "sponsor"].includes(kind)) return none();
+  if (!/^[\w-]{1,64}$/.test(id) || !["follow", "sponsors", "sponsor", "lineup"].includes(kind)) return none();
+
+  if (kind === "lineup") {
+    const p = await lineupForImage(id);
+    if (!p) return none();
+    const t = await getTeam(p.team.id).catch(() => null);
+    const { team, onTeam } = deriveTeamTheme(p.team.color, "light");
+    const crest = img(t?.settings.crest);
+    const byId = new Map(p.players.map((x) => [x.id, x]));
+    const spots = slotsFor(p.lineup.formation);
+    const subs = p.lineup.subs.map((x) => byId.get(x)).filter(Boolean) as typeof p.players;
+    const PW = 940;
+    const PH = 1040;
+    return new ImageResponse(
+      (
+        <div style={{ width: 1080, height: 1350, background: team, color: onTeam, display: "flex", flexDirection: "column", alignItems: "center", padding: "50px 70px", fontFamily: "Inter" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 22, width: "100%" }}>
+            <Crest src={crest} name={p.team.name} size={96} fg={onTeam} bg={team} />
+            <div style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ display: "flex", fontFamily: H, fontSize: 60, fontWeight: 800, textTransform: "uppercase", lineHeight: 1 }}>{p.team.name}</div>
+              <div style={{ display: "flex", fontSize: 28, opacity: 0.9, marginTop: 6 }}>
+                {p.title} · {formatLongDate(p.event.startAt, p.event.tz)}, {formatTime(p.event.startAt, p.event.tz)}
+              </div>
+            </div>
+            <div style={{ display: "flex", marginLeft: "auto", fontFamily: H, fontSize: 44, fontWeight: 800 }}>{p.lineup.formation}</div>
+          </div>
+          <div style={{ display: "flex", position: "relative", width: PW, height: PH, marginTop: 30, borderRadius: 28, background: "#2E8B47", border: "6px solid rgba(255,255,255,.85)" }}>
+            <div style={{ display: "flex", position: "absolute", left: 0, right: 0, top: PH / 2 - 3, height: 3, background: "rgba(255,255,255,.7)" }} />
+            <div style={{ display: "flex", position: "absolute", left: PW / 2 - 90, top: PH / 2 - 90, width: 180, height: 180, borderRadius: 90, border: "3px solid rgba(255,255,255,.7)" }} />
+            <div style={{ display: "flex", position: "absolute", left: PW * 0.22, width: PW * 0.56, bottom: 0, height: PH * 0.16, border: "3px solid rgba(255,255,255,.7)", borderBottom: "none" }} />
+            <div style={{ display: "flex", position: "absolute", left: PW * 0.22, width: PW * 0.56, top: 0, height: PH * 0.16, border: "3px solid rgba(255,255,255,.7)", borderTop: "none" }} />
+            {spots.map((sp, i) => {
+              const pl = p.lineup.slots[i] ? byId.get(p.lineup.slots[i]!) : undefined;
+              return (
+                <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "absolute", left: (sp.x / 100) * PW - 80, top: (sp.y / 100) * PH - 50, width: 160 }}>
+                  <div style={{ display: "flex", width: 86, height: 86, borderRadius: 43, background: pl ? team : "rgba(0,0,0,.25)", color: onTeam, border: "5px solid #ffffff", alignItems: "center", justifyContent: "center", fontFamily: H, fontSize: pl ? 40 : 26, fontWeight: 800 }}>
+                    {pl ? pl.jersey ?? initials(pl.name) : sp.line}
+                  </div>
+                  <div style={{ display: "flex", marginTop: 8, padding: "3px 12px", borderRadius: 10, background: "rgba(0,0,0,.6)", color: "#ffffff", fontSize: 24, fontWeight: 700 }}>{pl ? pl.short : "–"}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, width: "100%", marginTop: 24, fontSize: 26, alignItems: "center" }}>
+            <div style={{ display: "flex", fontFamily: H, fontSize: 34, fontWeight: 800 }}>SUBS</div>
+            {subs.length ? (
+              subs.slice(0, 9).map((x) => (
+                <div key={x.id} style={{ display: "flex", padding: "6px 16px", borderRadius: 30, background: "rgba(255,255,255,.18)" }}>
+                  {x.jersey ? `${x.jersey} ` : ""}
+                  {x.short}
+                </div>
+              ))
+            ) : (
+              <div style={{ display: "flex", opacity: 0.8 }}>None</div>
+            )}
+            <div style={{ display: "flex", marginLeft: "auto", fontSize: 22, opacity: 0.75 }}>clbx.ca</div>
+          </div>
+        </div>
+      ),
+      { width: 1080, height: 1350, fonts: await fonts(), headers: { "Cache-Control": "private, max-age=60" } },
+    );
+  }
 
   if (kind === "follow") {
     const fan = await getFanPage(id);

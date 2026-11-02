@@ -913,6 +913,7 @@ function writeRsvp(uid: ID, eventId: ID, userId: ID, response: RsvpResponse, not
   if (e.status === "cancelled") return { ok: false, error: "This event was cancelled." };
   if (note && note.length > 500) return { ok: false, error: "Keep the note under 500 characters." };
   let r = db.rsvps.find((x) => x.eventId === eventId && x.userId === userId);
+  const before = r?.response ?? null;
   if (r) {
     r.response = response;
     if (note !== undefined) r.note = note?.trim() || null;
@@ -922,7 +923,34 @@ function writeRsvp(uid: ID, eventId: ID, userId: ID, response: RsvpResponse, not
     r = { id: newId(), eventId, userId, response, note: note?.trim() || null, respondedBy: uid, updatedAt: now() };
     db.rsvps.push(r);
   }
+  if (response === "not_going" && (before === "going" || before === "maybe")) alertDropOut(e, userId, before, r.note);
   return { ok: true, data: r };
+}
+
+/** Within 48 hours of the start, tell the captains and managers when someone who was in pulls out. */
+function alertDropOut(e: TeamEvent, userId: ID, before: RsvpResponse, note: string | null) {
+  const start = Date.parse(e.startAt);
+  if (!(start > Date.now() && start - Date.now() <= 48 * 3600_000)) return;
+  const team = teamById(e.teamId);
+  const who = profileById(userId);
+  if (!team || !who) return;
+  const staffIds = new Set(db.roster.filter((x) => x.teamId === e.teamId && x.status === "active" && x.userId && isTeamStaff(x.userId, e.teamId)).map((x) => x.userId!));
+  if (team.createdBy) staffIds.add(team.createdBy);
+  staffIds.delete(userId);
+  const going = db.rsvps.filter((x) => x.eventId === e.id && x.response === "going").length;
+  const title = eventTitle(e);
+  const when = `${formatLongDate(e.startAt, e.tz)}, ${formatTimeRange(e.startAt, e.endAt, e.tz)}`;
+  const name = `${who.firstName} ${who.lastName}`.trim();
+  for (const id of staffIds) {
+    const u = profileById(id);
+    if (!u?.email) continue;
+    queueEmail({
+      to: u.email,
+      subject: `${name} can't make it · ${title}, ${formatLongDate(e.startAt, e.tz)}`,
+      text: `${name} was ${before === "going" ? "going" : "a maybe"} and now can't make it.\n${title}\n${when}${note ? `\n\nTheir note: ${note}` : ""}\n\n${going}${e.squadSize ? ` of ${e.squadSize}` : ""} going now.`,
+      links: [{ label: "See who's coming", href: `${APP_URL}/t/${team.id}/e/${e.id}` }],
+    });
+  }
 }
 
 export async function getAvailability(eventId: ID): Promise<Availability | null> {
