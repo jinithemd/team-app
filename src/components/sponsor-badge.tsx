@@ -27,9 +27,9 @@ export function TierBadge({ tier, size = "sm" }: { tier: SponsorTier | null; siz
   );
 }
 
-export function SponsorMark({ s, big }: { s: Pick<PublicSponsor, "name" | "logo">; big?: boolean }) {
+export function SponsorMark({ s, big, small }: { s: Pick<PublicSponsor, "name" | "logo">; big?: boolean; small?: boolean }) {
   const initials = s.name.split(/\s+/).filter((w) => /^[A-Za-z0-9]/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  const box = big ? "size-14 text-lg" : "size-10 text-sm";
+  const box = big ? "size-14 text-lg" : small ? "size-7 text-[11px] rounded-full" : "size-10 text-sm";
   return s.logo ? (
     <img src={s.logo} alt="" className={`${box} shrink-0 rounded-md bg-white object-contain p-0.5 ring-1 ring-border`} />
   ) : (
@@ -88,5 +88,42 @@ export function SponsorStrip({ sponsors, title = "Our sponsors", manageHref }: {
         </ul>
       )}
     </section>
+  );
+}
+
+const MAJOR: SponsorTier[] = ["diamond", "platinum", "gold"];
+
+/** The team's major sponsors (Diamond, Platinum, Gold) as a row of logo chips under the team's details. */
+export function HeaderSponsors({ sponsors, moreHref }: { sponsors: PublicSponsor[]; moreHref: string }) {
+  const major = sponsors.filter((s) => s.tier && MAJOR.includes(s.tier)).slice(0, 4);
+  if (!major.length) return null;
+  const rest = sponsors.length - major.length;
+  return (
+    <div className="-mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" aria-label="Major sponsors">
+      {major.map((s) => {
+        const chip = (
+          <>
+            <SponsorMark s={s} small />
+            <span className="max-w-[9rem] truncate text-sm font-semibold">{s.name}</span>
+            <TierBadge tier={s.tier} />
+          </>
+        );
+        const cls = "flex shrink-0 items-center gap-2 rounded-pill bg-bg py-1 pr-1.5 pl-1 text-fg shadow-sm";
+        return s.website ? (
+          <a key={s.id} href={s.website} target="_blank" rel="noreferrer sponsored" className={`${cls} hover:bg-surface`}>
+            {chip}
+          </a>
+        ) : (
+          <div key={s.id} className={cls}>
+            {chip}
+          </div>
+        );
+      })}
+      {rest > 0 && (
+        <a href={moreHref} className="shrink-0 rounded-pill px-2 py-1.5 text-xs font-semibold whitespace-nowrap underline opacity-90">
+          +{rest} more {rest === 1 ? "sponsor" : "sponsors"}
+        </a>
+      )}
+    </div>
   );
 }

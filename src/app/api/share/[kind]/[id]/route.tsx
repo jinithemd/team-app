@@ -73,6 +73,7 @@ const fonts = () =>
     return [];
   }));
 const H = "Barlow";
+const TIER_INK = { diamond: "#0B4F6C", platinum: "#353B45", gold: "#6B4A00", silver: "#4A5361", bronze: "#7A3712" } as const;
 
 export async function GET(req: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
   const { kind, id } = await params;
@@ -88,8 +89,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
     const byId = new Map(p.players.map((x) => [x.id, x]));
     const spots = slotsFor(p.lineup.formation);
     const subs = p.lineup.subs.map((x) => byId.get(x)).filter(Boolean) as typeof p.players;
+    const backers = (await listTeamSponsors(p.team.id).catch(() => [] as PublicSponsor[])).filter((x) => x.tier === "diamond" || x.tier === "platinum" || x.tier === "gold").slice(0, 3);
     const PW = 940;
-    const PH = 1040;
+    const PH = backers.length ? 940 : 1040;
     return new ImageResponse(
       (
         <div style={{ width: 1080, height: 1350, background: team, color: onTeam, display: "flex", flexDirection: "column", alignItems: "center", padding: "50px 70px", fontFamily: "Inter" }}>
@@ -134,6 +136,28 @@ export async function GET(req: Request, { params }: { params: Promise<{ kind: st
             )}
             <div style={{ display: "flex", marginLeft: "auto", fontSize: 22, opacity: 0.75 }}>clbx.ca</div>
           </div>
+          {backers.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 16, width: "100%", marginTop: 22 }}>
+              <div style={{ display: "flex", fontSize: 22, fontWeight: 700, opacity: 0.85 }}>Supported by</div>
+              {backers.map((b) => {
+                const logo = img(b.logo);
+                return (
+                  <div key={b.id} style={{ display: "flex", alignItems: "center", gap: 12, background: "#ffffff", color: "#111827", borderRadius: 16, padding: "8px 16px 8px 8px" }}>
+                    {logo ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={logo} width={52} height={52} style={{ objectFit: "contain" }} alt="" />
+                    ) : (
+                      <div style={{ display: "flex", width: 52, height: 52, borderRadius: 10, background: "#EEF0F3", alignItems: "center", justifyContent: "center", fontFamily: H, fontSize: 24, fontWeight: 800 }}>{initials(b.name)}</div>
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <div style={{ display: "flex", fontSize: 22, fontWeight: 700 }}>{b.name}</div>
+                      <div style={{ display: "flex", fontSize: 15, fontWeight: 700, letterSpacing: 2, color: TIER_INK[b.tier!] }}>{TIER_LABEL[b.tier!].toUpperCase()}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ),
       { width: 1080, height: 1350, fonts: await fonts(), headers: { "Cache-Control": "private, max-age=60" } },
