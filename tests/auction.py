@@ -46,12 +46,12 @@ with sync_playwright() as pw:
         p.on("pageerror", lambda e, p=p: errors.append(p.url + " " + str(e)[:80]))
         p.on("dialog", lambda d: d.accept())
 
-    # 1) Priya sets up a 2-team auction: 300 points each, base 50, steps of 10, 6 seconds a player.
+    # 1) Priya sets up a 2-team auction: 300 points each, base 50, steps of 10, 10 seconds a player.
     login(host, "Priya")
     host.goto(f"{BASE}/t/t-strikers/auction")
     host.fill("#title", "Winter Cup auction")
     host.fill("#squads", "2"); host.fill("#budget", "300"); host.fill("#basePrice", "50")
-    host.fill("#minIncrement", "10"); host.fill("#bidSeconds", "6"); host.fill("#squadMin", "3")
+    host.fill("#minIncrement", "10"); host.fill("#bidSeconds", "10"); host.fill("#squadMin", "3")
     host.get_by_role("button", name="Set up auction").click()
     host.wait_for_url(re.compile(r"/auction/[0-9a-f-]{36}$"))
     aid = host.url.rsplit("/", 1)[1]
@@ -148,7 +148,7 @@ with sync_playwright() as pw:
     expect(ph0.get_by_text("Current player")).to_be_visible()
     no_sideways(ph0, "big screen live on a phone")
     ph0.screenshot(path=f"{SHOTS}/auction-phone-live.png", full_page=True)
-    host.get_by_role("button", name="Sold now").click()
+    host.get_by_role("button", name="Sold now", exact=True).click()
     expect(tv.get_by_text("SOLD", exact=True)).to_be_visible(timeout=5000)
     tv.wait_for_timeout(1500)
     tv.screenshot(path=f"{SHOTS}/auction-tv-sold.png")
@@ -165,13 +165,27 @@ with sync_playwright() as pw:
     expect(cap.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("100 left")
     tv.wait_for_timeout(6500); tv.screenshot(path=f"{SHOTS}/auction-tv-between.png")
 
-    # 5) Pass on someone, undo the last sale, bring the unsold back.
+    # 5) Passing: Priya bids, Rahul passes, so it's sold straight away (no waiting for the clock).
     host.get_by_label("Choose who goes next").select_option(label="Jordan Blake (50)")
     host.get_by_role("button", name="Put up").click()
-    host.get_by_role("button", name="Pass (unsold)").click()
-    expect(host.get_by_text("Jordan Blake went unsold")).to_be_visible()
+    host.get_by_role("region", name="Up now").get_by_role("button", name="50", exact=True).click()
+    expect(cap.get_by_role("status")).to_contain_text("50 Team Red")
+    expect(cap.get_by_label("Teams on this player")).to_contain_text("Team Red· Top bid")
+    cap.screenshot(path=f"{SHOTS}/auction-pass-button.png", full_page=True)
+    cap.get_by_role("button", name="Pass on Jordan").click()
+    expect(host.get_by_text(re.compile("Jordan Blake sold to Team Red for 50"))).to_be_visible(timeout=5000)
+    #    Undo it, then both teams pass with no bid: unsold straight away.
     host.get_by_role("button", name="Undo last sale").click()
-    expect(host.locator("li[aria-label=\'Blue Bombers\']")).to_contain_text("150 left")
+    expect(host.locator("li[aria-label='Team Red']")).to_contain_text("300 left")
+    host.get_by_label("Choose who goes next").select_option(label="Jordan Blake (50)")
+    host.get_by_role("button", name="Put up").click()
+    cap.get_by_role("button", name="Pass on Jordan").click()
+    expect(cap.get_by_text("You passed on this player.")).to_be_visible()
+    expect(host.get_by_label("Teams on this player")).to_contain_text("Blue Bombers· Passed")
+    expect(tv.locator("article[aria-label='Blue Bombers']")).to_contain_text("Passed", timeout=5000)
+    tv.wait_for_timeout(3500); tv.screenshot(path=f"{SHOTS}/auction-tv-passed.png")
+    host.get_by_role("button", name="Pass on Jordan").click()
+    expect(host.get_by_text("Jordan Blake went unsold")).to_be_visible(timeout=5000)
     host.get_by_role("button", name=re.compile("Bring back 1 unsold")).click()
     expect(host.get_by_label("Choose who goes next").locator("option", has_text="Jordan Blake")).to_have_count(1)
 
@@ -181,7 +195,7 @@ with sync_playwright() as pw:
     expect(host.get_by_text("You can bid up to 250.")).to_be_visible()
     host.fill("#custom-bid", "260"); host.get_by_role("button", name="Bid", exact=True).click()
     expect(host.get_by_role("alert").filter(has_text="can bid up to 250")).to_be_visible()
-    host.get_by_role("button", name="Pass (unsold)").click()
+    host.get_by_role("button", name="Unsold now").click()
 
     # The summary (host and monitor).
     summary = host.get_by_role("region", name="Summary")

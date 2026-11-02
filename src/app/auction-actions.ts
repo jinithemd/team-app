@@ -36,6 +36,9 @@ export async function startAuctionAction(auctionId: string): Promise<Out> {
 export async function nextPlayerAction(auctionId: string, playerId?: string): Promise<Out> {
   return out(await svc.nextPlayer(auctionId, playerId));
 }
+export async function passAction(auctionId: string): Promise<Out> {
+  return out(await svc.pass(auctionId));
+}
 export async function bidAction(auctionId: string, amount: number): Promise<Out> {
   return out(await svc.bid(auctionId, amount));
 }

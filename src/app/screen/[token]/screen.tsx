@@ -507,20 +507,28 @@ function Hands({ v, bottom }: { v: ScreenView; bottom: number }) {
   return (
     <section aria-label="Teams" className="absolute inset-x-[60px] grid gap-[18px]" style={{ bottom: bottom + 22, gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
       {v.squads.map((sq) => (
-        <Hand key={sq.id} sq={sq} standard={v.auction.basePrice} leading={v.lot?.topSquadId === sq.id} max={v.auction.squadMax ?? v.auction.squadMin} small={n > 4} />
+        <Hand
+          key={sq.id}
+          sq={sq}
+          standard={v.auction.basePrice}
+          leading={v.lot?.topSquadId === sq.id}
+          out={!v.lot ? null : v.lot.passed.includes(sq.id) ? "Passed" : v.lot.out.includes(sq.id) ? (sq.full ? "Full" : "Out") : null}
+          max={v.auction.squadMax ?? v.auction.squadMin}
+          small={n > 4}
+        />
       ))}
     </section>
   );
 }
 
-function Hand({ sq, standard, leading, max, small }: { sq: SquadView; standard: number; leading: boolean; max: number; small: boolean }) {
+function Hand({ sq, standard, leading, out, max, small }: { sq: SquadView; standard: number; leading: boolean; out: string | null; max: number; small: boolean }) {
   const shown = sq.players.slice(-7);
   const overlap = small ? 46 : 40;
   return (
     <article
       aria-label={sq.name}
-      className="relative min-w-0 rounded-[20px] px-[18px] pt-[14px] pb-[16px]"
-      style={{ background: `linear-gradient(180deg, ${glow(sq.color, leading ? 0.5 : 0.28)}, rgba(10,8,22,.92))`, boxShadow: leading ? `inset 0 0 0 3px ${sq.color}, 0 0 40px ${glow(sq.color, 0.5)}` : `inset 0 0 0 2px ${glow(sq.color, 0.6)}` }}
+      className="relative min-w-0 rounded-[20px] px-[18px] pt-[14px] pb-[16px] transition-opacity"
+      style={{ opacity: out ? 0.42 : 1, background: `linear-gradient(180deg, ${glow(sq.color, leading ? 0.5 : 0.28)}, rgba(10,8,22,.92))`, boxShadow: leading ? `inset 0 0 0 3px ${sq.color}, 0 0 40px ${glow(sq.color, 0.5)}` : `inset 0 0 0 2px ${glow(sq.color, 0.6)}` }}
     >
       <div className="flex items-center gap-[12px]">
         <Mark color={sq.color} logoUrl={sq.logoUrl} size={small ? 38 : 46} />
@@ -539,6 +547,9 @@ function Hand({ sq, standard, leading, max, small }: { sq: SquadView; standard: 
               <MiniCard p={p} tier={p.status === "captain" ? "gold" : tierOf(p, standard)} />
             </div>
           ))
+        )}
+        {out && (
+          <span className="absolute top-[-14px] right-[18px] rounded-[8px] bg-[#FFFFFF] px-[12px] py-[4px] au-hd text-[22px] leading-none tracking-[.08em] text-[#0A0816] uppercase">{out}</span>
         )}
         <span className="ml-auto shrink-0 self-end text-[20px] au-dim au-num">
           {max ? `${sq.count}/${max}` : `${sq.count} ${sq.count === 1 ? "player" : "players"}`}

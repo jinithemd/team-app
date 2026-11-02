@@ -68,6 +68,8 @@ export interface Lot {
   topBid: number | null;
   topSquadId: string | null;
   bids: number;
+  /** Teams that passed on this player: they're out for this one. */
+  passed: string[];
   endsAt: string;
   openedAt: string;
   closedAt: string | null;
@@ -120,7 +122,7 @@ const toPlayer = (r: Row): Player => ({
 });
 const toLot = (r: Row): Lot => ({
   id: s(r.id)!, auctionId: s(r.auction_id)!, playerId: s(r.player_id)!, status: r.status as Lot["status"], topBid: r.top_bid == null ? null : Number(r.top_bid),
-  topSquadId: s(r.top_squad_id), bids: Number(r.bids ?? 0), endsAt: iso(r.ends_at)!, openedAt: iso(r.opened_at)!, closedAt: iso(r.closed_at),
+  topSquadId: s(r.top_squad_id), bids: Number(r.bids ?? 0), passed: Array.isArray(r.passed) ? (r.passed as unknown[]).map(String) : [], endsAt: iso(r.ends_at)!, openedAt: iso(r.opened_at)!, closedAt: iso(r.closed_at),
 });
 const toBid = (r: Row): Bid => ({ id: s(r.id)!, lotId: s(r.lot_id)!, squadId: s(r.squad_id)!, amount: Number(r.amount), bidBy: s(r.bid_by), createdAt: iso(r.created_at)! });
 
@@ -253,7 +255,7 @@ export async function removePlayer(id: string) {
 }
 
 export async function openLot(auctionId: string, playerId: string, endsAt: string): Promise<Lot> {
-  const lot: Lot = { id: randomUUID(), auctionId, playerId, status: "open", topBid: null, topSquadId: null, bids: 0, endsAt, openedAt: new Date().toISOString(), closedAt: null };
+  const lot: Lot = { id: randomUUID(), auctionId, playerId, status: "open", topBid: null, topSquadId: null, bids: 0, passed: [], endsAt, openedAt: new Date().toISOString(), closedAt: null };
   if (!LIVE) {
     mem.lots.push(lot);
     return lot;
@@ -284,6 +286,19 @@ export async function placeBid(lot: Lot, squadId: string, amount: number, by: st
   if (!data?.length) return false;
   await sb.from("auction_bids").insert(snake(bid as unknown as Record<string, unknown>));
   return true;
+}
+
+/** A team passes on the open lot (once; never the top bidder). */
+export async function passLot(lot: Lot, squadId: string): Promise<boolean> {
+  if (!LIVE) {
+    const l = mem.lots.find((x) => x.id === lot.id);
+    if (!l || l.status !== "open" || l.passed.includes(squadId) || l.topSquadId === squadId) return false;
+    l.passed = [...l.passed, squadId];
+    return true;
+  }
+  const { data, error } = await ((await admin()) as unknown as { rpc: (f: string, a: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }> }).rpc("auction_pass", { p_lot: lot.id, p_squad: squadId });
+  check(error, "pass");
+  return data === true;
 }
 
 /** Closes an open lot once (returns false if someone else already did). */

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, BarChart3, Camera, Copy, Gavel, MonitorPlay, Play, Shuffle, Timer, Trophy, Undo2, UserPlus } from "lucide-react";
 import type { AuctionView, SquadView } from "@/lib/auction/service";
 import {
-  addGuestAction, bidAction, closeNowAction, deleteAuctionAction, finishAuctionAction, nextPlayerAction, setPlayerAction, setSquadAction, startAuctionAction,
+  addGuestAction, bidAction, passAction, closeNowAction, deleteAuctionAction, finishAuctionAction, nextPlayerAction, setPlayerAction, setSquadAction, startAuctionAction,
   undoSaleAction, unsoldBackAction, setMonitorAction, setSquadLogoAction, setPlayerPhotoAction, setBannerAction,
 } from "@/app/auction-actions";
 import { buttonClass, inputClass } from "@/components/ui";
@@ -361,7 +361,8 @@ function Live({ v, run, pending, skew }: { v: AuctionView; run: Run; pending: bo
   const [pick, setPick] = useState("");
   const steps = useMemo(() => (lot ? [lot.minNext, lot.minNext + a.minIncrement * 2, lot.minNext + a.minIncrement * 5] : []), [lot, a.minIncrement]);
   const leading = !!lot && !!mine && lot.topSquadId === mine.id;
-  const canBid = !!lot && !!mine && !leading && !mine.full && left > 0;
+  const iPassed = !!lot && !!mine && lot.passed.includes(mine.id);
+  const canBid = !!lot && !!mine && !leading && !iPassed && !mine.full && left > 0;
   return (
     <div className="grid gap-4">
       {lot ? (
@@ -394,6 +395,25 @@ function Live({ v, run, pending, skew }: { v: AuctionView; run: Run; pending: bo
               <p className="text-lg font-semibold">No bids yet · opens at {lot.minNext}</p>
             )}
           </div>
+          <ul className="flex flex-wrap gap-1.5" aria-label="Teams on this player">
+            {v.squads.map((sq) => {
+              const top = lot.topSquadId === sq.id;
+              const passed = lot.passed.includes(sq.id);
+              const out = lot.out.includes(sq.id);
+              const label = top ? "Top bid" : passed ? "Passed" : out ? (sq.full ? "Full" : "Can't afford") : "Still in";
+              return (
+                <li
+                  key={sq.id}
+                  className={`inline-flex items-center gap-1.5 rounded-pill border px-2.5 py-1 text-xs font-semibold ${out ? "border-border text-muted" : "border-transparent"}`}
+                  style={out ? undefined : { background: `color-mix(in srgb, ${sq.color} ${top ? 22 : 10}%, transparent)` }}
+                >
+                  <span aria-hidden className="size-2 rounded-pill" style={{ background: sq.color }} />
+                  <span className={out ? "line-through" : ""}>{sq.name}</span>
+                  <span className={out ? "" : "text-muted"}>· {label}</span>
+                </li>
+              );
+            })}
+          </ul>
           {mine && (
             <div className="grid gap-2">
               <div className="grid grid-cols-3 gap-2">
@@ -426,7 +446,20 @@ function Live({ v, run, pending, skew }: { v: AuctionView; run: Run; pending: bo
                   Bid
                 </button>
               </form>
-              <p className="text-xs text-muted">{leading ? "You're winning. Others can still bid." : mine.full ? "Your team is full." : `You can bid up to ${mine.maxBid}.`}</p>
+              {!leading && !iPassed && !mine.full && (
+                <button type="button" disabled={pending || left <= 0} onClick={() => run(() => passAction(a.id))} className={buttonClass("secondary", "lg", "w-full")}>
+                  Pass on {lot.player.name.split(/\s+/)[0]}
+                </button>
+              )}
+              <p className="text-xs text-muted">
+                {leading
+                  ? "You're winning. It's yours if every other team passes or the clock runs out."
+                  : iPassed
+                    ? "You passed on this player."
+                    : mine.full
+                      ? "Your team is full."
+                      : `You can bid up to ${mine.maxBid}. Each bid restarts the clock; when it runs out, teams that haven't bid count as passed.`}
+              </p>
             </div>
           )}
           {v.bids.length > 0 && (
@@ -446,7 +479,7 @@ function Live({ v, run, pending, skew }: { v: AuctionView; run: Run; pending: bo
                 Sold now
               </button>
               <button type="button" disabled={pending} onClick={() => run(() => closeNowAction(a.id, "unsold"))} className={buttonClass("secondary", "sm")}>
-                Pass (unsold)
+                Unsold now
               </button>
             </div>
           )}

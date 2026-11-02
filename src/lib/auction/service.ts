@@ -6,8 +6,10 @@ import type { Auction, Player, Snapshot, Squad } from "./store";
 /*
  * Player auction for an internal tournament: the team's players are split into squads. Each
  * squad's captain (or manager) bids points from the same budget; every player has a base
- * price. The host puts players up one at a time; each bid restarts the clock and the top bid
- * when it runs out wins. A squad can never bid so much that it couldn't fill its minimum
+ * price. The host puts players up one at a time. Each bid starts a fresh clock for the others
+ * to answer; a team can pass, and is then out for that player. The player is sold to the top
+ * bid as soon as every other team is out (passed, full or can't afford the next bid), or when
+ * the clock runs out; if every team is out with no bid, the player goes unsold. A squad can never bid so much that it couldn't fill its minimum
  * squad at base price. Unsold players can go round again.
  */
 
@@ -99,15 +101,33 @@ function minNext(snap: Snapshot) {
   return lot.topBid == null ? p?.basePrice ?? snap.auction.basePrice : lot.topBid + snap.auction.minIncrement;
 }
 
+/** Teams that can't take part in the current lot: passed, full, or can't reach the next bid. */
+function outIds(snap: Snapshot): string[] {
+  const lot = snap.lot;
+  if (!lot) return [];
+  const min = minNext(snap);
+  return squadViews(snap, new Map())
+    .filter((x) => x.id !== lot.topSquadId && (lot.passed.includes(x.id) || x.full || x.maxBid < min))
+    .map((x) => x.id);
+}
+
+/** Everyone but the top bidder is out: nothing left to wait for. */
+function decided(snap: Snapshot): boolean {
+  const lot = snap.lot;
+  if (!lot || lot.status !== "open") return false;
+  const others = snap.squads.filter((x) => x.id !== lot.topSquadId).length;
+  return outIds(snap).length >= others;
+}
+
 // ---------------------------------------------------------------------------
 // settling the clock
 // ---------------------------------------------------------------------------
 
-/** If the current lot's clock has run out, sell it (or mark unsold). Safe to call from every poll. */
+/** If the current lot's clock has run out, or every other team is out, sell it (or mark unsold). Safe to call from every poll. */
 async function settle(snap: Snapshot, force?: "sold" | "unsold"): Promise<boolean> {
   const lot = snap.lot;
   if (!lot || lot.status !== "open") return false;
-  if (!force && Date.parse(lot.endsAt) > Date.now()) return false;
+  if (!force && Date.parse(lot.endsAt) > Date.now() && !decided(snap)) return false;
   const status = force ?? (lot.topSquadId ? "sold" : "unsold");
   if (status === "sold" && !lot.topSquadId) return false;
   if (!(await st.closeLot(lot, status))) return false;
@@ -135,7 +155,7 @@ export interface AuctionView {
   squads: SquadView[];
   pool: PlayerView[];
   unsold: PlayerView[];
-  lot: (st.Lot & { player: PlayerView; squadName: string | null; squadColor: string | null; minNext: number; secondsLeft: number }) | null;
+  lot: (st.Lot & { player: PlayerView; squadName: string | null; squadColor: string | null; minNext: number; secondsLeft: number; out: string[] }) | null;
   bids: { squad: string; color: string; amount: number; at: string }[];
   recent: { id: string; player: string; squad: string | null; color: string | null; price: number | null; status: string; at: string | null }[];
   summary: AuctionSummary;
@@ -190,6 +210,7 @@ function build(snap: Snapshot, team: { id: string; name: string }[], teamName: s
             ...snap.lot, player: pview(player), squadName: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.name ?? null : null,
             squadColor: snap.lot.topSquadId ? sqById.get(snap.lot.topSquadId)?.color ?? null : null, minNext: minNext(snap),
             secondsLeft: Math.max(0, Math.ceil((Date.parse(snap.lot.endsAt) - Date.now()) / 1000)),
+            out: outIds(snap),
           }
         : null,
     bids: snap.bids.map((b) => ({ squad: sqById.get(b.squadId)?.name ?? "", color: sqById.get(b.squadId)?.color ?? "#888", amount: b.amount, at: b.createdAt })),
@@ -451,10 +472,36 @@ export async function bid(auctionId: string, amount: number): Promise<Result> {
     if (mine.full) return fail(`${mine.name} is full.`);
     const min = minNext(snap);
     if (!Number.isInteger(amount) || amount < min) return fail(`The next bid is at least ${min}.`);
+    if (lot.passed.includes(mine.id)) return fail(`${mine.name} passed on this player.`);
     if (amount > mine.maxBid) return fail(mine.maxBid < min ? `${mine.name} can't afford this one.` : `${mine.name} can bid up to ${mine.maxBid} (keeping enough to fill the team).`);
-    // Every bid gives the others a fair chance to answer.
-    const endsAt = new Date(Math.max(Date.parse(lot.endsAt), Date.now() + Math.min(snap.auction.bidSeconds, 15) * 1000)).toISOString();
+    // Every bid stops the clock and starts a fresh one for the others to answer.
+    const endsAt = new Date(Date.now() + snap.auction.bidSeconds * 1000).toISOString();
     if (!(await st.placeBid(lot, mine.id, amount, u.id, endsAt))) return fail("Someone just bid. Try again.");
+    // If nobody else can still bid, it's sold now.
+    const after = await st.snapshot(auctionId);
+    if (after) await settle(after);
+    return { ok: true, data: undefined };
+  });
+}
+
+/** A captain or manager passes on the player for their team: they're out for this one. */
+export async function pass(auctionId: string): Promise<Result> {
+  return caught(async () => {
+    const u = await me();
+    if (!u) return fail("Sign in first.");
+    let snap = await st.snapshot(auctionId);
+    if (!snap || snap.auction.status !== "live") return fail("The auction isn't running.");
+    if (await settle(snap)) return fail("Too late, that one's gone.");
+    snap = (await st.snapshot(auctionId))!;
+    const lot = snap.lot;
+    if (!lot || lot.status !== "open") return fail("Nobody's up right now.");
+    const mine = snap.squads.find((x) => x.captainId === u.id || x.managerId === u.id);
+    if (!mine) return fail("Only captains and managers can pass.");
+    if (lot.topSquadId === mine.id) return fail("You're the top bid, so you can't pass.");
+    if (lot.passed.includes(mine.id)) return { ok: true, data: undefined };
+    await st.passLot(lot, mine.id);
+    const after = await st.snapshot(auctionId);
+    if (after) await settle(after);
     return { ok: true, data: undefined };
   });
 }
