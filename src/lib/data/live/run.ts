@@ -14,10 +14,15 @@ import { SyncError, syncChanges } from "./sync";
  */
 
 const loadForRequest = cache(async () => {
+  const t0 = Date.now();
   const sb = await userClient();
   const data = { user: await authUser() };
   const uid = data.user?.id ?? null;
+  const t1 = Date.now();
   const { store, aux } = await loadSlice(sb, uid);
+  const t2 = Date.now();
+  // Speed check: shows in the Vercel logs when loading someone's data is slow.
+  if (t2 - t0 > 250) console.log(`[timing] sign-in ${t1 - t0}ms, data ${t2 - t1}ms (${store.events.length} events, ${store.messages.length} messages)`);
   return { sb, uid, store, aux, saved: structuredClone(store) as Store, lock: Promise.resolve() };
 });
 

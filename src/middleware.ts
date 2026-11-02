@@ -26,8 +26,10 @@ export async function middleware(request: NextRequest) {
       },
     },
   });
-  const { data } = await supabase.auth.getUser();
-  return welcome(request, !!data.user, response) ?? response;
+  // Refreshes the sign-in only when it has run out (no call to Supabase otherwise); each page
+  // still checks who's signed in properly.
+  const { data } = await supabase.auth.getSession();
+  return welcome(request, !!data.session, response) ?? response;
 }
 
 export const config = {

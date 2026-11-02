@@ -54,8 +54,16 @@ export function ChatRoom({ chat }: { chat: ChatView }) {
   const lastId = chat.messages[chat.messages.length - 1]?.id;
 
   useEffect(() => {
-    const t = setInterval(() => router.refresh(), 5000);
-    return () => clearInterval(t);
+    // New messages every 5 seconds, only while the chat is on screen (not in a background tab or app).
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, 5000);
+    const back = () => document.visibilityState === "visible" && router.refresh();
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      clearInterval(t);
+      document.removeEventListener("visibilitychange", back);
+    };
   }, [router]);
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });

@@ -44,7 +44,7 @@ export function MatchDay(props: {
   // Followers: refresh every 15 seconds while the match is live (real build: Realtime).
   useEffect(() => {
     if (score.status !== "live") return;
-    const t = setInterval(() => router.refresh(), 15000);
+    const t = setInterval(() => document.visibilityState === "visible" && router.refresh(), 15000);
     return () => clearInterval(t);
   }, [score.status, router]);
 

@@ -31,12 +31,15 @@ export async function userClient(): Promise<DB> {
 }
 
 /**
- * Who's signed in, asked of Supabase once per request (pages used to ask up to five times,
- * a round trip each).
+ * Who's signed in, once per request. Reads the verified sign-in token (getClaims checks its
+ * signature and expiry, locally when the project's keys allow it) instead of asking the
+ * Supabase auth server on every page.
  */
-export const authUser = cache(async () => {
-  const { data } = await (await userClient()).auth.getUser();
-  return data.user ?? null;
+export const authUser = cache(async (): Promise<{ id: string; email: string | null } | null> => {
+  const { data, error } = await (await userClient()).auth.getClaims();
+  const c = data?.claims as { sub?: string; email?: string } | undefined;
+  if (error || !c?.sub) return null;
+  return { id: c.sub, email: c.email ?? null };
 });
 
 let adminSingleton: DB | null = null;
