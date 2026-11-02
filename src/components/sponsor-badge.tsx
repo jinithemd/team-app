@@ -99,7 +99,7 @@ export function HeaderSponsors({ sponsors, moreHref }: { sponsors: PublicSponsor
   if (!major.length) return null;
   const rest = sponsors.length - major.length;
   return (
-    <div className="-mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" aria-label="Major sponsors">
+    <div className="relative -mx-1 mt-3 flex items-center gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]" aria-label="Major sponsors">
       {major.map((s) => {
         const chip = (
           <>
