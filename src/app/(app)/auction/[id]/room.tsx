@@ -1,5 +1,6 @@
 "use client";
 
+import { PhotoCropper } from "@/components/photo-cropper";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, BarChart3, Camera, Copy, Gavel, MonitorPlay, Play, Shuffle, Timer, Trophy, Undo2, UserPlus } from "lucide-react";
@@ -757,8 +758,24 @@ async function toSquare(file: File, size = 320): Promise<string> {
 function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label: string; src: string | null; fallback: React.ReactNode; onPick: (dataUrl: string) => void; disabled?: boolean; square?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [crop, setCrop] = useState<string | null>(null);
+  const closeCrop = () => {
+    if (crop) URL.revokeObjectURL(crop);
+    setCrop(null);
+  };
   return (
     <span className="grid shrink-0 justify-items-center gap-0.5">
+      {crop && (
+        <PhotoCropper
+          src={crop}
+          size={320}
+          onCancel={closeCrop}
+          onDone={(url) => {
+            closeCrop();
+            onPick(url);
+          }}
+        />
+      )}
       <span className="relative">
         <button
           type="button"
@@ -786,6 +803,8 @@ function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label
           if (!f) return;
           if (!/^image\/(png|jpeg|webp)$/.test(f.type)) return setErr("PNG or JPG");
           setErr(null);
+          // Photos of people: fit them in the round frame first. Logos keep their whole shape.
+          if (!square) return setCrop(URL.createObjectURL(f));
           onPick(await toSquare(f));
         }}
       />

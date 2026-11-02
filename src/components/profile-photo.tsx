@@ -4,38 +4,42 @@ import { useRef, useState, useTransition } from "react";
 import { Camera, Trash2 } from "lucide-react";
 import { setMyPhotoAction } from "@/app/actions";
 import { Avatar } from "@/components/ui";
+import { PhotoCropper } from "@/components/photo-cropper";
 
 /**
- * Add, change or remove your profile photo. The browser crops it to a square and shrinks it
- * to 320 px JPEG (about 20–40 KB) before it's sent, so big phone photos upload fast.
+ * Add, change or remove your profile photo. You fit it in the round frame (drag and zoom),
+ * then the browser makes a 320 px JPEG (about 20–40 KB), so big phone photos upload fast.
  */
 export function ProfilePhoto({ name, photo }: { name: string; photo: string | null }) {
   const [preview, setPreview] = useState<string | null>(photo);
   const [msg, setMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
   const input = useRef<HTMLInputElement>(null);
+  const [crop, setCrop] = useState<string | null>(null);
 
   async function pick(file: File) {
     setMsg(null);
     if (!/^image\//.test(file.type)) return setMsg({ tone: "error", text: "Pick a photo (JPG, PNG, HEIC or WebP)." });
     if (file.size > 20_000_000) return setMsg({ tone: "error", text: "That photo is over 20 MB." });
-    let img: HTMLImageElement;
+    const url = URL.createObjectURL(file);
     try {
-      const url = URL.createObjectURL(file);
-      img = new Image();
+      const img = new Image();
       img.src = url;
       await img.decode();
-      URL.revokeObjectURL(url);
     } catch {
+      URL.revokeObjectURL(url);
       return setMsg({ tone: "error", text: "Couldn't open that photo. Try a JPG or PNG." });
     }
-    const size = 320;
-    const c = document.createElement("canvas");
-    c.width = c.height = size;
-    const ctx = c.getContext("2d")!;
-    const s = Math.min(img.naturalWidth, img.naturalHeight);
-    ctx.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size);
-    const dataUrl = c.toDataURL("image/jpeg", 0.85);
+    setCrop(url);
+  }
+
+  function closeCrop() {
+    if (crop) URL.revokeObjectURL(crop);
+    setCrop(null);
+  }
+
+  function save(dataUrl: string) {
+    closeCrop();
     setPreview(dataUrl);
     start(async () => {
       const r = await setMyPhotoAction(dataUrl);
@@ -95,6 +99,7 @@ export function ProfilePhoto({ name, photo }: { name: string; photo: string | nu
           if (f) void pick(f);
         }}
       />
+      {crop && <PhotoCropper src={crop} onCancel={closeCrop} onDone={save} />}
     </div>
   );
 }

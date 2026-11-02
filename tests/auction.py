@@ -68,7 +68,7 @@ with sync_playwright() as pw:
     # Team Red's logo, Ade's photo; his position comes from the roster.
     host.locator("input[type=file][aria-label='Logo for Team Red']").set_input_files(LOGO)
     expect(host.get_by_role("button", name="Logo for Team Red").locator("img")).to_be_visible()
-    host.locator("input[type=file][aria-label='Photo for Ade Bello']").set_input_files(PHOTO)
+    host.locator("input[type=file][aria-label='Photo for Ade Bello']").set_input_files(PHOTO); host.get_by_role("dialog", name="Fit your photo").get_by_role("button", name="Save photo").click()
     expect(host.get_by_role("button", name="Photo for Ade Bello").locator("img")).to_be_visible()
     expect(host.get_by_label("Position for Ade Bello")).to_have_value("Defence")
     host.get_by_label("Position for Sam Okafor").fill("Goalkeeper"); host.get_by_label("Position for Sam Okafor").blur()
@@ -76,7 +76,7 @@ with sync_playwright() as pw:
     host.get_by_label("Base price for Ade Bello").fill("80"); host.get_by_label("Base price for Ade Bello").blur()
     host.get_by_role("button", name="Remove Tom", exact=False).first.click()
     # A guest with a photo, position and shirt number, all added at once.
-    host.locator("input[type=file][aria-label='Photo for the guest']").set_input_files(PHOTO)
+    host.locator("input[type=file][aria-label='Photo for the guest']").set_input_files(PHOTO); host.get_by_role("dialog", name="Fit your photo").get_by_role("button", name="Save photo").click()
     host.fill("#guest", "Guest Gary"); host.fill("#guest-position", "Winger"); host.fill("#guest-jersey", "77")
     host.get_by_role("button", name="Add", exact=True).click()
     expect(host.get_by_text("Guest Gary").first).to_be_visible()
