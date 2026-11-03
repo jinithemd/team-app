@@ -184,6 +184,12 @@ export async function createEventAction(teamId: string, _: FormState, f: FormDat
   if ("error" in nv) return nv.error;
   const res = await data.createEvent(teamId, nv.input);
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  // Guest players: the whole guest list, chosen ones, or none (the team only).
+  const mode = str(f, "guestMode");
+  if (mode === "all" || mode === "chosen") {
+    const { invite } = await import("@/lib/guests/service");
+    await invite(res.data.id, mode === "all" ? "all" : f.getAll("guestIds").map(String), { notify: nv.input.notify, series: true });
+  }
   revalidatePath("/", "layout");
   redirect(`/t/${teamId}/e/${res.data.id}?created=1`);
 }
@@ -193,6 +199,7 @@ export async function updateEventAction(eventId: string, teamId: string, _: Form
   if ("error" in nv) return nv.error;
   const res = await data.updateEvent(eventId, { ...nv.input, scope: str(f, "scope") === "following" ? "following" : "one" });
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
+  if (nv.input.notify) await (await import("@/lib/guests/service")).notifyChange(eventId, "changed");
   revalidatePath("/", "layout");
   redirect(`/t/${teamId}/e/${eventId}?saved=1`);
 }
@@ -208,6 +215,7 @@ export async function setEventStatusAction(eventId: string, teamId: string, _: F
   const status = str(f, "status") as "active" | "postponed" | "cancelled";
   const res = await data.setEventStatus(eventId, status, str(f, "reason"), str(f, "notify") !== "off");
   if (!res.ok) return { error: res.error };
+  if (str(f, "notify") !== "off") await (await import("@/lib/guests/service")).notifyChange(eventId, status === "active" ? "reinstated" : status);
   revalidatePath("/", "layout");
   return { ok: true, message: status === "active" ? "Back on the schedule. The team was told." : `Marked ${status}. The team was told.` };
 }

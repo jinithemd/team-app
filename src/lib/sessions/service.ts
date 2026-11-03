@@ -94,6 +94,14 @@ async function announce(s: Session) {
       links: [{ label: "Book a spot", href: `${APP_URL}/s/${s.id}` }],
     })),
   );
+  // The team's guest players hear about drop-in games too.
+  const { announceSession } = await import("../guests/service");
+  await announceSession(
+    s.teamId,
+    s.id,
+    { subject: `${team.name} · ${s.title}, ${formatLongDate(s.startsAt, s.tz)}`, text: `${when}${s.venueName ? ` at ${s.venueName}` : ""}. ${money(s.priceCents)} to play. ${s.capacity} spots. Book yours before it fills up.` },
+    [...ids, ...(s.createdBy ? [s.createdBy] : [])],
+  );
 }
 
 /** Posts weekly sessions that are due and announces newly posted ones. Safe to run often. */

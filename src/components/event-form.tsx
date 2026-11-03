@@ -52,6 +52,7 @@ export function EventForm({
   startWeekly,
   teamName,
   today,
+  guests,
 }: {
   teamId: string;
   tz: string;
@@ -66,6 +67,8 @@ export function EventForm({
   startWeekly?: boolean;
   teamName?: string;
   today?: string;
+  /** New events: the team's guest list, to choose who else gets this. */
+  guests?: { id: string; name: string }[];
 }) {
   const editing = !!eventId;
   const bound = editing ? updateEventAction.bind(null, eventId!, teamId) : createEventAction.bind(null, teamId);
@@ -86,6 +89,13 @@ export function EventForm({
   const [viewerTz, setViewerTz] = useState<string | null>(null);
   const dropInOk = !editing && canEvents;
   const [dropIn, setDropIn] = useState(dropInOk && !!startDropIn);
+  // Who gets it: guests come to matches, tournaments and events by default, not training.
+  const [guestMode, setGuestMode] = useState<"team" | "all" | "chosen">(kind === "training" ? "team" : "all");
+  const [guestTouched, setGuestTouched] = useState(false);
+  const [chosen, setChosen] = useState<string[]>([]);
+  useEffect(() => {
+    if (!guestTouched) setGuestMode(kind === "training" ? "team" : "all");
+  }, [kind, guestTouched]);
 
   useEffect(() => setViewerTz(Intl.DateTimeFormat().resolvedOptions().timeZone), []);
   useEffect(() => {
@@ -304,12 +314,57 @@ export function EventForm({
         </select>
       </Field>
 
+      {!editing && guests && (
+        <fieldset className="grid gap-2">
+          <legend className="mb-1 text-sm font-semibold">Who gets this?</legend>
+          <input type="hidden" name="guestMode" value={guests.length ? guestMode : "team"} />
+          {guests.length === 0 ? (
+            <p className="text-xs text-muted">The team. Add guest players on the Roster tab to send games to people who aren&apos;t on the roster.</p>
+          ) : (
+            <>
+              {(
+                [
+                  ["team", "The team only"],
+                  ["all", `The team and all ${guests.length} guest ${guests.length === 1 ? "player" : "players"}`],
+                  ["chosen", "The team and some guest players"],
+                ] as const
+              ).map(([v, l]) => (
+                <label key={v} className="flex min-h-10 items-center gap-2 text-sm">
+                  <input
+                    type="radio"
+                    name="guestModePick"
+                    checked={guestMode === v}
+                    onChange={() => {
+                      setGuestTouched(true);
+                      setGuestMode(v);
+                    }}
+                    className="size-4 accent-[var(--team)]"
+                  />
+                  {l}
+                </label>
+              ))}
+              {guestMode === "chosen" && (
+                <div className="grid gap-1.5 rounded-md bg-surface p-3" role="group" aria-label="Guest players to ask">
+                  {guests.map((x) => (
+                    <label key={x.id} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" name="guestIds" value={x.id} checked={chosen.includes(x.id)} onChange={(e) => setChosen((c) => (e.target.checked ? [...c, x.id] : c.filter((y) => y !== x.id)))} className="size-4" />
+                      {x.name}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted">Guest players only see the games you send them, never team chat, payments or the roster. You can add more on the event page.</p>
+            </>
+          )}
+        </fieldset>
+      )}
+
       <label className="flex min-h-11 items-start gap-3 rounded-md bg-surface p-3">
         <input type="checkbox" name="notify" defaultChecked={!editing} className="mt-0.5 size-5 shrink-0 accent-[var(--team)]" />
         <span>
           <span className="block text-sm font-semibold">Tell the team</span>
           <span className="block text-xs text-muted">
-            {editing ? "Players get an email saying what changed." : "Every player gets an email with Going / Maybe / Can't make it buttons."}
+            {editing ? "Players (and any guests asked) get an email saying what changed." : "Every player, and any guests you ask, gets an email with Going / Maybe / Can't make it buttons."}
           </span>
         </span>
       </label>

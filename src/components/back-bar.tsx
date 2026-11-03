@@ -13,7 +13,7 @@ import { ChevronLeft } from "lucide-react";
 
 const ROOTS = new Set(["/", "/teams", "/tournaments", "/calendar", "/chat", "/account"]);
 // Path segments that aren't screens of their own, so "up a level" skips them.
-const NOT_PAGES = new Set(["t", "e", "p", "matches", "auction", "pay", "sponsor", "sponsor-chat", "clubs"]);
+const NOT_PAGES = new Set(["t", "e", "p", "matches", "auction", "pay", "sponsor", "sponsor-chat", "clubs", "guest"]);
 
 // The screens visited in this tab, to tell "back" from "up" (shared by every Back bar).
 const trail: string[] = [];

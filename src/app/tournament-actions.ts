@@ -219,7 +219,8 @@ export async function addRosterPersonAction(id: string, entryId: string, _: Form
 export async function addFromTeamAction(id: string, entryId: string, _: FormState, f: FormData): Promise<FormState> {
   const picks = f.getAll("pick").map(String);
   if (!picks.length) return { error: "Tick the players to add." };
-  const people = picks.map((uid) => ({ role: "player", userId: uid, name: str(f, `name_${uid}`), jersey: str(f, `jersey_${uid}`) }));
+  // Guest players without a Clbx account come as "guest:<id>": added by name.
+  const people = picks.map((uid) => ({ role: "player", userId: uid.startsWith("guest:") ? undefined : uid, name: str(f, `name_${uid}`), jersey: str(f, `jersey_${uid}`) }));
   const res = await svc.addRosterPeople(id, entryId, people);
   revalidatePath(rosterPath(id, entryId));
   refresh(id);

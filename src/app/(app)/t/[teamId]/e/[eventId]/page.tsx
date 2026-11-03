@@ -15,6 +15,8 @@ import { eventPayments } from "@/lib/payments/service";
 import { CashToggle, PayButton } from "@/components/payments";
 import { SessionSpot } from "@/components/session-spot";
 import { hasLineup } from "@/lib/lineups/service";
+import { eventGuests } from "@/lib/guests/service";
+import { EventGuests } from "@/components/guests";
 
 export async function generateMetadata({ params }: { params: Promise<{ eventId: string }> }): Promise<Metadata> {
   const e = await getEvent((await params).eventId);
@@ -30,8 +32,9 @@ export default async function EventPage({
 }) {
   const { teamId, eventId } = await params;
   const sp = await searchParams;
-  const [team, e, avail, user, perms, checkIn, att, ep, pool, lineupSaved] = await Promise.all([
+  const [team, e, avail, user, perms, checkIn, att, ep, pool, lineupSaved, guests] = await Promise.all([
     getTeam(teamId), getEvent(eventId), getAvailability(eventId), getSessionUser(), myPerms(teamId), getCheckIn(eventId), attendanceSummary(eventId), eventPerms(eventId), carpoolSummary(eventId), hasLineup(eventId),
+    eventGuests(eventId).catch(() => null),
   ]);
   if (!team || !e || e.teamId !== teamId) notFound();
   const fee = e.feeCents ? await eventPayments(eventId) : null;
@@ -299,6 +302,10 @@ export default async function EventPage({
           </div>
           <Counts counts={avail.counts} />
         </section>
+      )}
+
+      {guests && !e.sessionId && !(past && !guests.invited.length) && (
+        <EventGuests teamId={teamId} eventId={eventId} invited={guests.invited} others={guests.others} manage={guests.manage && !past} cancelled={cancelled} />
       )}
 
       {team.isStaff && !past && !cancelled && !e.sessionId && (

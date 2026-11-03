@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ChevronRight, Pencil, UserPlus, Users } from "lucide-react";
 import { getTeam, listJoinRequests, listRoster, listTeamUnavailable } from "@/lib/data";
 import { JoinRequests } from "./join-requests";
+import { guestList } from "@/lib/guests/service";
+import { GuestList } from "@/components/guests";
 import { Avatar, Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { ROLE_LABEL, TEAM_ROLES, hatLabels, type RosterRow } from "@/lib/data/types";
@@ -20,6 +22,7 @@ export default async function RosterPage({
   const { teamId } = await params;
   const sp = await searchParams;
   const [team, roster, out, requests] = await Promise.all([getTeam(teamId), listRoster(teamId), listTeamUnavailable(teamId), listJoinRequests(teamId)]);
+  const guests = await guestList(teamId);
   if (!team) return null;
   const players = roster.filter((r) => r.isPlayer);
   const others = roster.filter((r) => !r.isPlayer);
@@ -129,6 +132,7 @@ export default async function RosterPage({
           )}
         </>
       )}
+      {guests && <GuestList teamId={teamId} guests={guests.guests} manage={guests.manage} />}
       {team.isStaff && (
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
           <span className="text-muted">Export:</span>

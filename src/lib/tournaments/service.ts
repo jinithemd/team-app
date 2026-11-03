@@ -725,7 +725,7 @@ export interface RosterView {
   players: number;
   hostChanges: number;
   /** Players on the Clbx team who aren't on the roster yet, to add with one tap. */
-  pickable: { userId: string | null; name: string; jersey: number | null }[];
+  pickable: { key: string; userId: string | null; name: string; jersey: number | null; guest?: boolean }[];
 }
 
 function rosterWindow(t: Tournament, e: Entry, matches: Match[]) {
@@ -769,7 +769,15 @@ export async function getRoster(tid: string, entryId: string): Promise<RosterVie
   let pickable: RosterView["pickable"] = [];
   if (a.canEdit && a.e.teamId && a.isTeamStaff) {
     const on = new Set(active.map((p) => p.userId).filter(Boolean));
-    pickable = (await repo.teamPlayers(a.e.teamId)).filter((p) => !p.userId || !on.has(p.userId)).sort((x, y) => x.name.localeCompare(y.name));
+    const team = (await repo.teamPlayers(a.e.teamId)).filter((p) => !p.userId || !on.has(p.userId)).sort((x, y) => x.name.localeCompare(y.name));
+    // The team's guest players can play the tournament too.
+    const { tournamentGuests } = await import("../guests/service");
+    const names = new Set(active.map((p) => p.name.toLowerCase()));
+    const guests = (await tournamentGuests(a.e.teamId)).filter((g) => (g.userId ? !on.has(g.userId) : !names.has(g.name.toLowerCase())));
+    pickable = [
+      ...team.filter((p) => p.userId).map((p) => ({ ...p, key: p.userId! })),
+      ...guests.map((g) => ({ key: g.userId ?? `guest:${g.id}`, userId: g.userId, name: g.name, jersey: null, guest: true })),
+    ];
   }
   const order: Record<RosterRole, number> = { manager: 0, coach: 1, player: 2 };
   return {

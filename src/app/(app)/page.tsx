@@ -15,6 +15,8 @@ import { photoUrl } from "@/lib/data/store";
 import { Avatar } from "@/components/ui";
 import { formatTime, isToday } from "@/lib/time";
 import { tournamentBadges } from "@/lib/tournaments/service";
+import { myGuestGames } from "@/lib/guests/service";
+import { GuestGameRow } from "@/components/guest-games";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -23,7 +25,7 @@ export default async function HomePage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
   const [teams, upcoming, pending, avail, sponsorships] = await Promise.all([listMyTeams(), listUpcomingForMe(6), listPendingRsvps(), listMyAvailability(), mySponsorships()]);
-  const sessions = await sessionsForMe(teams.map((t) => t.id));
+  const [sessions, guestGames] = await Promise.all([sessionsForMe(teams.map((t) => t.id)), myGuestGames().catch(() => [])]);
   const myTeamIds = new Set(teams.map((t) => t.id));
   const tBadges = await tournamentBadges([...upcoming, ...pending].map((e) => e.tournamentId));
   const out = avail.periods[0];
@@ -151,6 +153,19 @@ export default async function HomePage() {
               <EventCard key={e.id} e={e} showTeam tournament={e.tournamentId ? tBadges[e.tournamentId] : undefined} />
             ))}
           </div>
+        </section>
+      )}
+
+      {guestGames.length > 0 && (
+        <section aria-labelledby="gg-h" className="grid gap-3">
+          <SectionTitle>
+            <span id="gg-h">You&apos;re invited as a guest</span>
+          </SectionTitle>
+          <ul className="grid gap-2">
+            {guestGames.slice(0, 6).map((g) => (
+              <GuestGameRow key={g.event.id} g={g} />
+            ))}
+          </ul>
         </section>
       )}
 

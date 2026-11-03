@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { getTeam, listVenues, myPerms } from "@/lib/data";
 import { DEFAULT_TZ, utcToZoned } from "@/lib/time";
 import { EventForm } from "@/components/event-form";
+import { guestList } from "@/lib/guests/service";
 
 export const metadata: Metadata = { title: "New event" };
 
@@ -20,6 +21,7 @@ export default async function NewEventPage({ params, searchParams }: { params: P
         <p className="text-muted">Ask your captain if something is missing from the schedule.</p>
       </div>
     );
+  const gl = await guestList(teamId);
   const today = utcToZoned(new Date().toISOString(), DEFAULT_TZ).date;
   const type = sp.type === "training" || sp.type === "social" || sp.type === "tournament" ? sp.type : "match";
   return (
@@ -39,6 +41,7 @@ export default async function NewEventPage({ params, searchParams }: { params: P
         startWeekly={sp.weekly === "1"}
         teamName={team.name}
         today={today}
+        guests={gl?.manage ? gl.guests.map((x) => ({ id: x.id, name: x.name })) : undefined}
         initial={{
           type,
           competition: "league",

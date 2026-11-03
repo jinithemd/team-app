@@ -53,25 +53,25 @@ export function AddPersonForm({ id, entryId, role }: { id: string; entryId: stri
 }
 
 /** Tick players from the Clbx team; numbers come from their team profile and can be changed. */
-export function PickFromTeam({ id, entryId, players, room }: { id: string; entryId: string; players: { userId: string | null; name: string; jersey: number | null }[]; room: number | null }) {
+export function PickFromTeam({ id, entryId, players, room }: { id: string; entryId: string; players: { key: string; userId: string | null; name: string; jersey: number | null; guest?: boolean }[]; room: number | null }) {
   const [state, action, pending] = useActionState<FormState, FormData>(addFromTeamAction.bind(null, id, entryId), null);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (state?.ok) setPicked(new Set());
   }, [state]);
-  const list = players.filter((p) => p.userId);
+  const list = players;
   const full = room != null && picked.size >= room;
   return (
     <details className="rounded-lg border border-border">
       <summary className="flex min-h-12 cursor-pointer items-center gap-2 px-3 font-semibold">
         <Users aria-hidden className="size-4" />
-        Add from your team ({list.length})
+        Add from your team and guest players ({list.length})
       </summary>
       <form action={action} className="grid gap-2 border-t border-border p-3">
         <p className="text-xs text-muted">Tick who&apos;s playing. Numbers come from your team; change any that differ.</p>
         <ul className="grid gap-1.5">
           {list.map((p) => {
-            const uid = p.userId!;
+            const uid = p.key;
             const on = picked.has(uid);
             return (
               <li key={uid} className="flex items-center gap-2.5">
@@ -92,6 +92,7 @@ export function PickFromTeam({ id, entryId, players, room }: { id: string; entry
                 />
                 <label htmlFor={`pick-${uid}`} className="min-w-0 flex-1 text-sm break-words">
                   {p.name}
+                  {p.guest && <span className="ml-1.5 rounded-pill bg-sunken px-1.5 py-0.5 text-[10px] font-bold tracking-[.05em] text-muted uppercase">Guest</span>}
                 </label>
                 <input type="hidden" name={`name_${uid}`} value={p.name} />
                 <label className="sr-only" htmlFor={`pick-j-${uid}`}>
