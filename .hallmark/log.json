@@ -1,0 +1,29 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "page",
+  "shape": "Workbench",
+  "theme": "brand",
+  "axes": "light/display-condensed/chromatic-lime",
+  "hero": "Stage",
+  "nav": "edge-aligned",
+  "footer": "statement",
+  "imagery": "screenshots 5",
+  "photos": [],
+  "entry": "/welcome",
+  "sections": [
+   "hero",
+   "split",
+   "pair",
+   "showcase",
+   "rows",
+   "deal+table",
+   "footer statement"
+  ],
+  "signature": "the real match screen tall beside SUNDAY 9AM. WHO S IN?",
+  "waived": [],
+  "prompt": "clbx.ca front page, make it more premium",
+  "date": "2026-11-04"
+ }
+]
