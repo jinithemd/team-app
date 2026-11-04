@@ -143,7 +143,7 @@ export default function Welcome() {
             </div>
             <div className="show">
               <div className="shot" data-kind="product">
-                <img src="/landing/auction.webp" alt="The Clbx auction big screen: a player up for bidding, the current bid, the clock and each team's points" width={1920} height={878} loading="lazy" />
+                <img src="/landing/auction.webp" alt="The Clbx auction big screen: Ade Bello's player card up for bidding, Blue Bombers on top at 150, the clock, and each team's crest, points and signed players" width={1920} height={1080} loading="lazy" />
               </div>
             </div>
           </div>

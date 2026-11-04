@@ -759,6 +759,7 @@ function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label
   const input = useRef<HTMLInputElement>(null);
   const [err, setErr] = useState<string | null>(null);
   const [crop, setCrop] = useState<string | null>(null);
+  const [png, setPng] = useState(false);
   const closeCrop = () => {
     if (crop) URL.revokeObjectURL(crop);
     setCrop(null);
@@ -769,6 +770,7 @@ function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label
         <PhotoCropper
           src={crop}
           size={320}
+          transparent={png}
           onCancel={closeCrop}
           onDone={(url) => {
             closeCrop();
@@ -804,7 +806,11 @@ function PhotoButton({ label, src, fallback, onPick, disabled, square }: { label
           if (!/^image\/(png|jpeg|webp)$/.test(f.type)) return setErr("PNG or JPG");
           setErr(null);
           // Photos of people: fit them in the round frame first. Logos keep their whole shape.
-          if (!square) return setCrop(URL.createObjectURL(f));
+          if (!square) {
+            // A PNG cut-out keeps its see-through background on the player card.
+            setPng(f.type === "image/png");
+            return setCrop(URL.createObjectURL(f));
+          }
           onPick(await toSquare(f));
         }}
       />

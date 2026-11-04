@@ -135,7 +135,7 @@ html, body { overflow-x: clip; }
 .hm .show-head h2 { grid-column: 1 / span 6; }
 .hm .show-head p { grid-column: 8 / span 5; }
 .hm .show { margin-top: var(--space-2xl); }
-.hm .show .shot { border-radius: var(--radius-well); aspect-ratio: 1920 / 878; }
+.hm .show .shot { border-radius: var(--radius-well); aspect-ratio: 1920 / 1080; }
 
 /* The rest of the season: rows, the head held on 1 to 4, the rows on 5 to 12. */
 .hm .rows-head { grid-column: 1 / span 4; align-self: start; position: sticky; top: var(--space-2xl); }

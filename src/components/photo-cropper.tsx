@@ -13,7 +13,7 @@ const MAX = 4;
 
 type Pt = { x: number; y: number };
 
-export function PhotoCropper({ src, size = 320, onCancel, onDone }: { src: string; size?: number; onCancel: () => void; onDone: (dataUrl: string) => void }) {
+export function PhotoCropper({ src, size = 320, transparent = false, onCancel, onDone }: { src: string; size?: number; /** Keep a cut-out's see-through background (a PNG), e.g. a player card. */ transparent?: boolean; onCancel: () => void; onDone: (dataUrl: string) => void }) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [off, setOff] = useState<Pt>({ x: 0, y: 0 });
@@ -103,10 +103,10 @@ export function PhotoCropper({ src, size = 320, onCancel, onDone }: { src: strin
     c.width = c.height = size;
     const ctx = c.getContext("2d")!;
     ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, size, size);
+    if (!transparent) ctx.fillRect(0, 0, size, size);
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(img, ((V - dw) / 2 + off.x) * k, ((V - dh) / 2 + off.y) * k, dw * k, dh * k);
-    onDone(c.toDataURL("image/jpeg", 0.88));
+    onDone(transparent ? c.toDataURL("image/png") : c.toDataURL("image/jpeg", 0.88));
   }
 
   return (
