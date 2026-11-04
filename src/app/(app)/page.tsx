@@ -1,3 +1,4 @@
+import { APP_NAME } from "@/lib/brand";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -32,6 +33,13 @@ export default async function HomePage() {
   const fmtDay = (d: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "UTC", month: "short", day: "numeric" }).format(new Date(d + "T12:00:00Z"));
   const staffTeams = teams.filter((t) => t.isStaff);
   return (
+    <>
+    {/* Phones: the Clbx bar on Home (the sidebar carries the logo on wider screens). */}
+    <header className="gutter border-b-2 border-[#BAFA10] bg-[#06080D] pt-[calc(var(--sat)+14px)] pb-3.5 lg:hidden">
+      <Link href="/" aria-label={`${APP_NAME} home`} className="inline-flex">
+        <img src="/clbx-logo.png" alt={APP_NAME} width={1077} height={177} className="h-6 w-auto" />
+      </Link>
+    </header>
     <main id="main" className="gutter mx-auto grid max-w-3xl gap-7 py-6">
       {/* Who's signed in and the one thing worth knowing right now: what needs an answer, or what's next. */}
       <header className="flex items-center gap-3.5">
@@ -236,5 +244,6 @@ export default async function HomePage() {
         )}
       </section>
     </main>
+    </>
   );
 }
