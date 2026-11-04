@@ -34,13 +34,14 @@ export default async function HomePage() {
   const staffTeams = teams.filter((t) => t.isStaff);
   return (
     <>
-    {/* Phones: the Clbx bar on Home (the sidebar carries the logo on wider screens). */}
-    <header className="gutter border-b-2 border-[#BAFA10] bg-[#06080D] pt-[calc(var(--sat)+14px)] pb-3.5 lg:hidden">
+    {/* Phones: a small Clbx logo on Home (the sidebar carries it on wider screens). */}
+    <header className="gutter pt-[calc(var(--sat)+14px)] lg:hidden">
       <Link href="/" aria-label={`${APP_NAME} home`} className="inline-flex">
-        <img src="/clbx-logo.png" alt={APP_NAME} width={1077} height={177} className="h-6 w-auto" />
+        <img src="/clbx-logo-ink.png" alt="" width={480} height={79} className="logo-on-light h-4 w-auto" />
+        <img src="/clbx-logo-white.png" alt="" width={480} height={79} className="logo-on-dark h-4 w-auto" />
       </Link>
     </header>
-    <main id="main" className="gutter mx-auto grid max-w-3xl gap-7 py-6">
+    <main id="main" className="gutter mx-auto grid max-w-3xl gap-7 pt-4 pb-6 lg:pt-6">
       {/* Who's signed in and the one thing worth knowing right now: what needs an answer, or what's next. */}
       <header className="flex items-center gap-3.5">
         <h1 className="sr-only">Home</h1>

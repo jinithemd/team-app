@@ -63,8 +63,9 @@ export function PrimaryNav({ pendingCount, chatCount = 0 }: { pendingCount: numb
       </nav>
 
       <nav aria-label="Primary" className="sticky top-0 hidden h-dvh w-62 shrink-0 flex-col gap-1 border-r border-border bg-surface px-3 py-5 lg:flex">
-        <Link href="/" className="mb-4 inline-flex self-start rounded-md bg-[#06080D] px-3.5 py-2.5">
-          <img src="/clbx-logo.png" alt={APP_NAME} width={1077} height={177} className="h-5 w-auto" />
+        <Link href="/" aria-label={`${APP_NAME} home`} className="mb-4 inline-flex self-start px-3 py-2">
+          <img src="/clbx-logo-ink.png" alt="" width={480} height={79} className="logo-on-light h-[18px] w-auto" />
+          <img src="/clbx-logo-white.png" alt="" width={480} height={79} className="logo-on-dark h-[18px] w-auto" />
         </Link>
         {ITEMS.map(({ href, label, icon: Icon, match }) => {
           const active = href === "/teams" ? match(path) && !path.startsWith("/tournaments") : match(path);

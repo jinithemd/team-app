@@ -70,3 +70,12 @@
 @media (prefers-reduced-motion: reduce) {
   .nav-progress { animation: none; width: 100%; opacity: 0.6; }
 }
+
+/* The Clbx logo without a box: dark letters on light screens, white letters on dark. */
+.logo-on-dark { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .logo-on-light { display: none; }
+  :root:not([data-theme="light"]) .logo-on-dark { display: inline; }
+}
+:root[data-theme="dark"] .logo-on-light { display: none; }
+:root[data-theme="dark"] .logo-on-dark { display: inline; }
