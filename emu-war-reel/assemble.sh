@@ -6,8 +6,7 @@ set -euo pipefail
 AUDIO="${1:?narration mp3}"; cd "$(dirname "$0")"; mkdir -p work
 DURS=(4.9 2.6 3.5 1.5 2.4 5.2 4.4 2.5 8.2 5.0 4.2)
 LOOK="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=24,\
-colorbalance=rs=.06:gs=.02:bs=-.08:rm=.05:bm=-.06,eq=saturation=0.62:contrast=1.08:gamma=1.04,\
-curves=all='0/0.06 1/0.94',noise=alls=14:allf=t,vignette=PI/5"
+eq=saturation=0.9:contrast=1.04,noise=alls=8:allf=t,vignette=PI/6"
 : > work/list.txt
 for i in $(seq 1 11); do
   n=$(printf %02d "$i"); src="clips/shot$n.mp4"
