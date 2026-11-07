@@ -2,7 +2,15 @@
 // The real backend uses the same format with RSVP_LINK_SECRET set in the environment.
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-const SECRET = process.env.RSVP_LINK_SECRET || "dev-only-secret-change-me";
+// The live site must have its own secret: this code is public, so a built-in fallback would let
+// anyone make valid links. The sample-data build (DATA_SOURCE unset) can use the dev one.
+const SECRET =
+  process.env.RSVP_LINK_SECRET ||
+  (process.env.DATA_SOURCE === "supabase"
+    ? (() => {
+        throw new Error("RSVP_LINK_SECRET is not set");
+      })()
+    : "dev-only-secret-change-me");
 
 function b64url(buf: Buffer | string) {
   return Buffer.from(buf).toString("base64url");

@@ -8,7 +8,7 @@ import { APP_NAME, TERMS_VERSION } from "./brand";
  * Supabase dashboard). One account per person; names come from the sign-up form.
  */
 
-export const safeNext = (next: string | null | undefined) => (next && next.startsWith("/") && !next.startsWith("//") ? next : "/");
+export const safeNext = (next: string | null | undefined) => (next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : "/");
 const callback = (next: string) => `${APP_URL}/auth/callback?next=${encodeURIComponent(safeNext(next))}`;
 
 export type LinkResult = { ok: true; email: string } | { ok: false; error: string; fieldErrors?: Record<string, string> };

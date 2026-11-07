@@ -15,7 +15,7 @@ const str = (f: FormData, k: string) => String(f.get(k) ?? "");
 
 export async function signInAsAction(f: FormData) {
   await data.signInAs(str(f, "userId"));
-  redirect(str(f, "next") || "/");
+  redirect(safeNext(str(f, "next")));
 }
 
 export async function signUpAction(_: FormState, f: FormData): Promise<FormState> {
@@ -114,7 +114,7 @@ export async function setMyPartAction(teamId: string, next: string, _: FormState
   });
   if (!res.ok) return { error: res.error, fieldErrors: res.fieldErrors };
   revalidatePath("/", "layout");
-  if (next) redirect(next);
+  if (next) redirect(safeNext(next));
   return { ok: true, message: "Saved." };
 }
 
