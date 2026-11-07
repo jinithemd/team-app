@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Oswald:wght@400;600&family=Playfair+Display:ital,wght@0,600;1,500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#f1e2c0;
+    --cream-dim:#d9c49a;
+    --ink:#1a110a;
+    --rust:#b5562a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1080px;height:1920px;background:var(--ink);overflow:hidden}
+  .poster{position:relative;width:1080px;height:1920px;overflow:hidden;background:var(--ink)}
+
+  /* hero photograph */
+  .hero{position:absolute;left:0;right:0;top:600px;bottom:0;background:url(hero.png) center 88%/cover no-repeat;
+        filter:sepia(.35) contrast(1.08) brightness(.95) saturate(.9)}
+  /* darken top for title + bottom for billing */
+  .shade{position:absolute;inset:0;
+    background:
+      linear-gradient(180deg, #140c06 0%, #140c06 31%, rgba(20,12,6,.6) 38%, rgba(20,12,6,0) 48%),
+      linear-gradient(0deg, rgba(14,9,5,.97) 0%, rgba(14,9,5,.85) 18%, rgba(14,9,5,0) 33%);}
+  /* vignette */
+  .vig{position:absolute;inset:0;background:radial-gradient(ellipse 75% 65% at 50% 52%, transparent 55%, rgba(8,5,2,.75) 100%)}
+  /* film grain */
+  .grain{position:absolute;inset:-50%;opacity:.22;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='300' height='300'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .5  0 0 0 0 .5  0 0 0 1.2 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");}
+  /* aged border */
+  .frame{position:absolute;inset:28px;border:2px solid rgba(241,226,192,.55);pointer-events:none}
+  .frame::after{content:"";position:absolute;inset:10px;border:1px solid rgba(241,226,192,.25)}
+
+  .top{position:absolute;top:84px;left:0;right:0;text-align:center;color:var(--cream)}
+  .kicker{font-family:'Oswald',sans-serif;font-weight:400;font-size:30px;letter-spacing:.42em;padding-left:.42em;color:var(--cream-dim)}
+  .kicker .dot{color:var(--rust);margin:0 .25em}
+  .rule{width:540px;height:2px;margin:26px auto 30px;background:linear-gradient(90deg,transparent,var(--cream-dim),transparent)}
+  .the{font-family:'Playfair Display',serif;font-style:italic;font-weight:500;font-size:62px;line-height:1;color:var(--cream);margin-bottom:6px}
+  h1{font-family:'Abril Fatface',serif;font-weight:400;color:var(--cream);line-height:.86;
+     text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 40px rgba(0,0,0,.45)}
+  h1 .l1{display:block;white-space:nowrap;font-size:200px;letter-spacing:.02em}
+  h1 .l2{display:block;white-space:nowrap;font-size:150px;letter-spacing:.04em}
+  .tag{margin:26px auto 0;width:860px;font-family:'Playfair Display',serif;font-style:italic;font-weight:500;
+       font-size:36px;line-height:1.35;color:var(--cream-dim)}
+
+  .bottom{position:absolute;left:0;right:0;bottom:84px;text-align:center;color:var(--cream)}
+  .stills{display:flex;justify-content:center;gap:22px;margin-bottom:46px}
+  .still{width:250px;height:250px;border:3px solid var(--cream-dim);background-size:cover;background-position:center 35%;
+         filter:sepia(.3) contrast(1.05);box-shadow:0 10px 30px rgba(0,0,0,.6)}
+  .s1{background-image:url(still_farmer.png);transform:rotate(-2.2deg)}
+  .s2{background-image:url(still_major.png);background-position:center 18%}
+  .s3{background-image:url(still_sunset.png);background-position:center 60%;transform:rotate(2deg)}
+  .billing{font-family:'Oswald',sans-serif;font-weight:600;font-size:44px;letter-spacing:.14em;padding-left:.14em}
+  .billing .vs{font-family:'Playfair Display',serif;font-style:italic;font-weight:500;letter-spacing:0;color:var(--rust);margin:0 .35em;font-size:46px}
+  .rule2{width:720px;height:1px;margin:30px auto;background:linear-gradient(90deg,transparent,var(--cream-dim),transparent)}
+  .credits{font-family:'Oswald',sans-serif;font-weight:400;font-size:24px;letter-spacing:.3em;padding-left:.3em;color:var(--cream-dim);line-height:1.8}
+  .true{margin-top:26px;display:inline-block;font-family:'Oswald',sans-serif;font-weight:600;font-size:30px;letter-spacing:.5em;padding:12px 18px 12px 34px;
+        border:2px solid var(--rust);color:var(--cream)}
+</style>
+</head>
+<body>
+<div class="poster">
+  <div class="hero"></div>
+  <div class="shade"></div>
+  <div class="vig"></div>
+
+  <div class="top">
+    <div class="kicker">WESTERN AUSTRALIA<span class="dot">◆</span>1932</div>
+    <div class="rule"></div>
+    <div class="the">The</div>
+    <h1><span class="l1">GREAT</span><span class="l2">EMU WAR</span></h1>
+    <div class="tag">Twenty thousand emus. Three soldiers.<br>One machine gun.</div>
+  </div>
+
+  <div class="bottom">
+    <div class="stills">
+      <div class="still s1"></div>
+      <div class="still s2"></div>
+      <div class="still s3"></div>
+    </div>
+    <div class="billing">THE ARMY<span class="vs">versus</span>THE EMUS</div>
+    <div class="rule2"></div>
+    <div class="credits">CAMPION DISTRICT · NOVEMBER – DECEMBER 1932</div>
+    <div class="true">A TRUE STORY</div>
+  </div>
+
+  <div class="grain"></div>
+  <div class="frame"></div>
+</div>
+</body>
+</html>
