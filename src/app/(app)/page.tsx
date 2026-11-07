@@ -18,6 +18,8 @@ import { formatTime, isToday } from "@/lib/time";
 import { tournamentBadges } from "@/lib/tournaments/service";
 import { myGuestGames } from "@/lib/guests/service";
 import { GuestGameRow } from "@/components/guest-games";
+import { Suspense } from "react";
+import { FollowingFeed } from "@/components/following-feed";
 
 export const metadata: Metadata = { title: "Home" };
 
@@ -244,6 +246,10 @@ export default async function HomePage() {
           />
         )}
       </section>
+
+      <Suspense fallback={null}>
+        <FollowingFeed />
+      </Suspense>
     </main>
     </>
   );

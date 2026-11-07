@@ -228,3 +228,71 @@ export async function followedTeams(): Promise<{ id: string; name: string; crest
 }
 
 export const fanPageUrl = (appUrl: string, teamId: string) => `${appUrl.replace(/\/$/, "")}/f/${teamId}`;
+
+// ---------------------------------------------------------------------------
+// following like a social app: who I follow, teams to follow, my feed
+// ---------------------------------------------------------------------------
+
+export type TeamCard = { id: string; name: string; crestUrl: string | null; color: string; level: string | null; location: string | null; followers: number };
+
+/** For a list of teams: which ones I follow, and how many followers each has. */
+export async function followState(teamIds: string[]): Promise<{ mine: Set<string>; counts: Map<string, number> }> {
+  const counts = new Map<string, number>();
+  if (!teamIds.length) return { mine: new Set(), counts };
+  if (!LIVE) {
+    const { currentUserId } = await import("./data/store");
+    const uid = await currentUserId();
+    for (const set of memFollows.values()) for (const id of set) if (teamIds.includes(id)) counts.set(id, (counts.get(id) ?? 0) + 1);
+    return { mine: new Set(uid ? [...(memFollows.get(uid) ?? [])] : []), counts };
+  }
+  const { admin, uid } = await clients();
+  const { data } = await admin.from("follows").select("team_id, user_id").in("team_id", teamIds);
+  const mine = new Set<string>();
+  for (const r of (data ?? []) as Row[]) {
+    counts.set(String(r.team_id), (counts.get(String(r.team_id)) ?? 0) + 1);
+    if (uid && r.user_id === uid) mine.add(String(r.team_id));
+  }
+  return { mine, counts };
+}
+
+/** Public teams worth following, most-followed first (for Find a team before you search). */
+export async function teamsToFollow(limit = 12): Promise<TeamCard[]> {
+  let teams: Omit<TeamCard, "followers">[];
+  if (!LIVE) {
+    const { db } = await import("./data/store");
+    teams = db.teams.filter((t) => t.isPublic).map((t) => ({ id: t.id, name: t.name, crestUrl: crestUrl(t.id, t.settings.crest), color: t.color, level: t.level, location: t.location }));
+  } else {
+    const { admin } = await clients();
+    const { data } = await admin.from("teams").select("id, name, logo_path, color, level, location").eq("is_public", true).is("archived_at", null).order("created_at", { ascending: false }).limit(60);
+    teams = ((data ?? []) as Row[]).map((t) => ({ id: String(t.id), name: String(t.name), crestUrl: crestUrl(String(t.id), s(t.logo_path)), color: s(t.color) ?? "#1D4ED8", level: s(t.level), location: s(t.location) }));
+  }
+  const { counts } = await followState(teams.map((t) => t.id));
+  return teams
+    .map((t) => ({ ...t, followers: counts.get(t.id) ?? 0 }))
+    .sort((a, b) => b.followers - a.followers || a.name.localeCompare(b.name))
+    .slice(0, limit);
+}
+
+export type FeedItem = { team: FanTeam; game: FanGame; kind: "result" | "live" | "next" };
+
+/** Home: the latest results, live scores and next games of the teams I follow. */
+export async function followingFeed(): Promise<FeedItem[]> {
+  const teams = (await followedTeams()).slice(0, 12);
+  const pages = (await Promise.all(teams.map((t) => getFanPage(t.id).catch(() => null)))).filter((p): p is FanPage => !!p);
+  const now = Date.now();
+  const items: FeedItem[] = [];
+  for (const p of pages) {
+    for (const g of p.results) if (g.score && now - Date.parse(g.startAt) < 21 * 86_400_000) items.push({ team: p.team, game: g, kind: g.score.final ? "result" : "live" });
+    for (const g of p.upcoming) {
+      if (g.score && !g.score.final) items.push({ team: p.team, game: g, kind: "live" });
+      else if (!g.score && g.status === "active" && Date.parse(g.startAt) - now < 14 * 86_400_000) {
+        items.push({ team: p.team, game: g, kind: "next" });
+        break; // just their next one
+      }
+    }
+  }
+  const order = { live: 0, result: 1, next: 2 };
+  return items
+    .sort((a, b) => order[a.kind] - order[b.kind] || (a.kind === "next" ? a.game.startAt.localeCompare(b.game.startAt) : b.game.startAt.localeCompare(a.game.startAt)))
+    .slice(0, 10);
+}

@@ -663,6 +663,6 @@ export async function followTeamAction(teamId: string, on: boolean): Promise<For
   const res = await setFollow(teamId, on);
   if (!res.ok) return { error: res.error };
   revalidatePath(`/f/${teamId}`);
-  revalidatePath("/teams");
+  revalidatePath("/", "layout");
   return { ok: true };
 }
