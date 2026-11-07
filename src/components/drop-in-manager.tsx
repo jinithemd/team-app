@@ -52,7 +52,7 @@ export async function DropInManager({ teamId }: { teamId: string }) {
                   Posts {x.postDaysBefore === 0 ? "the same day" : `${x.postDaysBefore} ${x.postDaysBefore === 1 ? "day" : "days"} before`} at {ampm(x.postTime)}
                 </p>
               </div>
-              <SeriesControls seriesId={x.id} active={x.active} />
+              <SeriesControls seriesId={x.id} active={x.active} title={x.title} />
             </div>
             {x.active && x.next[0] && (
               // Only the coming week: players see it once it's posted, the rest comes week by week.

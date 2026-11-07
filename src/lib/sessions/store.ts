@@ -167,6 +167,17 @@ export async function updateSeries(id: string, patch: Partial<Series>) {
   check(error, "update series");
 }
 
+/** Removes a weekly drop-in. Games it already posted stay (they just stop pointing at it). */
+export async function deleteSeries(id: string) {
+  if (!LIVE) {
+    mem.series = mem.series.filter((x) => x.id !== id);
+    for (const s of mem.sessions) if (s.seriesId === id) s.seriesId = null;
+    return;
+  }
+  const { error } = await (await admin()).from("session_series").delete().eq("id", id);
+  check(error, "delete series");
+}
+
 // ---- sessions -------------------------------------------------------------
 
 export async function sessionsFor(teamId: string, fromIso: string): Promise<Session[]> {

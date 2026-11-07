@@ -64,6 +64,25 @@ with sync_playwright() as pw:
     p.get_by_role("button", name="Delete session").click()
     p.wait_for_url(re.compile(r"/t/t-strikers/schedule\?deleted=1"))
     expect(p.get_by_role("link", name=re.compile(r"^Delete me pickup"))).to_have_count(0)
+
+    # 4) A weekly drop-in: Delete takes it off the list and its posted game off the schedule.
+    p.goto(f"{BASE}/t/t-strikers/e/new")
+    p.get_by_role("radio", name="Drop-in").click()
+    p.get_by_label("Every week").check()
+    p.fill("#title", "Weekly delete me")
+    p.select_option("#weekday", "0")
+    p.fill("#venueName", "Caraco Park")
+    p.fill("#capacity", "20"); p.fill("#memberSpots", "6")
+    p.fill("#postDaysBefore", "27"); p.fill("#postTime", "09:00")
+    p.get_by_role("button", name="Set up weekly drop-in").click()
+    p.wait_for_url(re.compile(r"/schedule\?weekly=1"))
+    weekly = p.get_by_role("region", name="Drop-ins you've set up")
+    expect(weekly).to_contain_text("Weekly delete me")
+    expect(p.get_by_role("link", name=re.compile(r"^Weekly delete me, Drop-in")).first).to_be_visible()
+    weekly.get_by_role("button", name="Delete Weekly delete me").click()
+    expect(p.get_by_text("Weekly delete me", exact=True)).to_have_count(0)
+    p.reload()
+    expect(p.get_by_role("link", name=re.compile(r"^Weekly delete me"))).to_have_count(0)
     b.close()
 
 assert not [e for e in errors if "#418" not in e], errors

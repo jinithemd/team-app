@@ -73,6 +73,12 @@ export async function deleteSessionAction(sessionId: string): Promise<{ error?: 
   redirect(`/t/${r.data.teamId}/schedule?deleted=1`);
 }
 
+export async function deleteSeriesAction(seriesId: string): Promise<{ error?: string }> {
+  const r = await svc.deleteSeries(seriesId);
+  refresh();
+  return r.ok ? {} : { error: r.error };
+}
+
 export async function cancelSessionAction(sessionId: string): Promise<{ error?: string }> {
   const r = await svc.cancelSession(sessionId);
   refresh();

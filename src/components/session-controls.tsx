@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, CreditCard } from "lucide-react";
-import { bookSessionAction, declineSessionAction, cancelBookingAction, cancelSessionAction, deleteSessionAction, payForBookingAction, seriesAction, staffBookingAction } from "@/app/session-actions";
+import { bookSessionAction, declineSessionAction, cancelBookingAction, cancelSessionAction, deleteSeriesAction, deleteSessionAction, payForBookingAction, seriesAction, staffBookingAction } from "@/app/session-actions";
 import { buttonClass } from "./ui";
 
 function useOp() {
@@ -149,13 +149,26 @@ export function DeleteSession({ sessionId }: { sessionId: string }) {
   );
 }
 
-export function SeriesControls({ seriesId, active }: { seriesId: string; active: boolean }) {
+export function SeriesControls({ seriesId, active, title }: { seriesId: string; active: boolean; title?: string }) {
   const { pending, run, err } = useOp();
   return (
     <div className="grid gap-1">
-      <button type="button" disabled={pending} onClick={() => run(() => seriesAction(seriesId, { active: !active }))} className={buttonClass("secondary", "sm", "justify-self-start")}>
-        {active ? "Pause" : "Resume"}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={pending} onClick={() => run(() => seriesAction(seriesId, { active: !active }))} className={buttonClass("secondary", "sm")}>
+          {active ? "Pause" : "Resume"}
+        </button>
+        <button
+          type="button"
+          disabled={pending}
+          aria-label={title ? `Delete ${title}` : "Delete"}
+          onClick={() => {
+            if (confirm(`Delete ${title ? `"${title}"` : "this weekly drop-in"}? It stops posting and its upcoming games come off the schedule. Games already played stay in your history.`)) run(() => deleteSeriesAction(seriesId));
+          }}
+          className={buttonClass("ghost", "sm", "text-danger")}
+        >
+          Delete
+        </button>
+      </div>
       {err}
     </div>
   );

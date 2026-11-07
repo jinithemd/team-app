@@ -478,6 +478,30 @@ export async function deleteSession(sessionId: string): Promise<Result<{ teamId:
   return { ok: true, data: { teamId: s.teamId } };
 }
 
+/**
+ * Deletes a weekly drop-in: it stops posting, and its upcoming games come off the schedule.
+ * An upcoming game someone already paid for by card is cancelled instead (everyone's told, and
+ * there's a record for the refund). Games already played stay in the team's history.
+ */
+export async function deleteSeries(seriesId: string): Promise<Result<{ removed: number; cancelled: number }>> {
+  const x = await st.seriesById(seriesId);
+  if (!x || !(await canManage(x.teamId))) return fail("Only team staff can delete weekly sessions.");
+  const upcoming = (await st.sessionsFor(x.teamId, new Date().toISOString())).filter((s) => s.seriesId === x.id);
+  const bookings = await st.bookingsFor(upcoming.map((s) => s.id));
+  let removed = 0, cancelled = 0;
+  for (const s of upcoming) {
+    if (bookings.some((b) => b.sessionId === s.id && b.paid === "card" && b.status !== "cancelled")) {
+      await cancelSession(s.id);
+      cancelled++;
+    } else {
+      await st.deleteSession(s.id);
+      removed++;
+    }
+  }
+  await st.deleteSeries(x.id);
+  return { ok: true, data: { removed, cancelled } };
+}
+
 export async function cancelSession(sessionId: string): Promise<Result> {
   const s = await st.sessionById(sessionId);
   if (!s || !(await canManage(s.teamId))) return fail("Only team staff can cancel sessions.");
