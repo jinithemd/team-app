@@ -9,7 +9,7 @@ import { teamThemeCss } from "@/lib/team-theme";
 import { APP_NAME } from "@/lib/brand";
 import { formatLongDate, formatTimeRange, zoneLabel } from "@/lib/time";
 import { Banner, buttonClass } from "@/components/ui";
-import { BookButton, CancelBooking, CancelSession, PayLaterButton, StaffRow } from "@/components/session-controls";
+import { BookButton, CancelBooking, CancelSession, DeleteSession, PayLaterButton, StaffRow } from "@/components/session-controls";
 
 // One game session: what, when, where, cost, spots. Book (or join the waitlist), pay, cancel.
 // Team staff also see everyone booked and can tick off cash or cancel the session.
@@ -194,7 +194,10 @@ export default async function SessionView({ params, searchParams }: { params: Pr
                   </ol>
                 </>
               )}
-              {!cancelled && <CancelSession sessionId={s.id} />}
+              <div className="flex flex-wrap gap-2">
+                {!cancelled && <CancelSession sessionId={s.id} />}
+                <DeleteSession sessionId={s.id} />
+              </div>
             </section>
           )}
           <p className="text-center text-xs text-muted">Powered by {APP_NAME}</p>

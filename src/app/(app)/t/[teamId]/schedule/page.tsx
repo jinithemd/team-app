@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarPlus, Plus } from "lucide-react";
+import { CalendarPlus, ChevronDown, Plus } from "lucide-react";
 import { getTeam, listEvents, listPastEvents, listTeamSponsors, myPerms } from "@/lib/data";
 import { SponsorStrip } from "@/components/sponsor-badge";
 import { EventCard, KindLegend, ScheduleList } from "@/components/event-bits";
@@ -21,7 +21,7 @@ export default async function SchedulePage({
   const { teamId } = await params;
   const sp = await searchParams;
   const view = sp.view === "month" ? "month" : "list";
-  const [team, events, past, sponsors, perms] = await Promise.all([getTeam(teamId), listEvents(teamId), listPastEvents(teamId, sp.past ? 20 : 3), listTeamSponsors(teamId), myPerms(teamId)]);
+  const [team, events, past, sponsors, perms] = await Promise.all([getTeam(teamId), listEvents(teamId), listPastEvents(teamId, sp.past ? 40 : 10), listTeamSponsors(teamId), myPerms(teamId)]);
   const tBadges = await tournamentBadges([...events, ...past].map((e) => e.tournamentId));
   if (!team) return null;
 
@@ -74,20 +74,24 @@ export default async function SchedulePage({
         </>
       )}
 
+      {/* Past events stay folded under one heading until you open it. */}
       {view === "list" && past.length > 0 && (
-        <section aria-labelledby="past-h" className="grid gap-2.5">
-          <h2 id="past-h" className="eyebrow">
-            Earlier
-          </h2>
-          {past.map((e) => (
-            <EventCard key={e.id} e={e} tournament={e.tournamentId ? tBadges[e.tournamentId] : undefined} />
-          ))}
-          {!sp.past && (
-            <Link href={`/t/${teamId}/schedule?past=1`} className="justify-self-start text-sm font-semibold text-team-ink">
-              Show more past events
-            </Link>
-          )}
-        </section>
+        <details className="group grid gap-2.5" open={!!sp.past}>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-md border border-border px-3 font-semibold hover:bg-surface [&::-webkit-details-marker]:hidden">
+            <span>Past events</span>
+            <ChevronDown aria-hidden className="size-5 text-muted transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="mt-2.5 grid gap-2.5">
+            {past.map((e) => (
+              <EventCard key={e.id} e={e} tournament={e.tournamentId ? tBadges[e.tournamentId] : undefined} />
+            ))}
+            {!sp.past && past.length >= 10 && (
+              <Link href={`/t/${teamId}/schedule?past=1`} className="justify-self-start text-sm font-semibold text-team-ink">
+                Show more past events
+              </Link>
+            )}
+          </div>
+        </details>
       )}
       {team.isStaff && <DropInManager teamId={teamId} />}
       {perms.settings && <SponsorStrip sponsors={sponsors} manageHref={`/t/${teamId}/sponsors`} />}

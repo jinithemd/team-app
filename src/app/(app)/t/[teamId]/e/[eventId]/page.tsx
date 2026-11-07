@@ -70,17 +70,17 @@ export default async function EventPage({
           {e.sessionId ? (
             <Link href={`/s/${e.sessionId}`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
               <Ticket aria-hidden className="size-4" />
-              Open session
+              {canEdit ? "Manage drop-in" : "Open session"}
             </Link>
           ) : e.tournamentId ? (
             <Link href={`/tournaments/${e.tournamentId}`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
               <Trophy aria-hidden className="size-4" />
               Open tournament
             </Link>
-          ) : canEdit && !past && (
+          ) : canEdit && (
             <Link href={`/t/${teamId}/e/${eventId}/edit`} className="ml-auto inline-flex min-h-9 items-center gap-1 text-sm font-semibold text-team-ink">
               <Pencil aria-hidden className="size-4" />
-              Edit
+              {past ? "Edit or delete" : "Edit"}
             </Link>
           )}
         </div>

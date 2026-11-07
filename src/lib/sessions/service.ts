@@ -458,6 +458,26 @@ export async function skipWeek(seriesId: string, date: string, skip: boolean): P
   return { ok: true, data: undefined };
 }
 
+/**
+ * Deletes a session for good: it leaves the schedule, and the bookings go with it. A weekly
+ * session's week is skipped too, so it isn't posted again. Not once someone has paid by card:
+ * cancel it instead, so there's a record for the refund.
+ */
+export async function deleteSession(sessionId: string): Promise<Result<{ teamId: string }>> {
+  const s = await st.sessionById(sessionId);
+  if (!s || !(await canManage(s.teamId))) return fail("Only team staff can delete sessions.");
+  const bookings = await st.bookingsFor([s.id]);
+  if (bookings.some((b) => b.paid === "card" && b.status !== "cancelled"))
+    return fail("Someone has paid by card for this one. Cancel it instead, so there's a record for their refund.");
+  if (s.seriesId) {
+    const x = await st.seriesById(s.seriesId);
+    const date = utcToZoned(s.startsAt, s.tz).date;
+    if (x && !x.skipDates.includes(date)) await st.updateSeries(x.id, { skipDates: [...x.skipDates, date] });
+  }
+  await st.deleteSession(s.id);
+  return { ok: true, data: { teamId: s.teamId } };
+}
+
 export async function cancelSession(sessionId: string): Promise<Result> {
   const s = await st.sessionById(sessionId);
   if (!s || !(await canManage(s.teamId))) return fail("Only team staff can cancel sessions.");

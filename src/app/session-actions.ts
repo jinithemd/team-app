@@ -66,6 +66,13 @@ export async function staffBookingAction(sessionId: string, bookingId: string, o
   return r.ok ? {} : { error: r.error };
 }
 
+export async function deleteSessionAction(sessionId: string): Promise<{ error?: string }> {
+  const r = await svc.deleteSession(sessionId);
+  if (!r.ok) return { error: r.error };
+  refresh();
+  redirect(`/t/${r.data.teamId}/schedule?deleted=1`);
+}
+
 export async function cancelSessionAction(sessionId: string): Promise<{ error?: string }> {
   const r = await svc.cancelSession(sessionId);
   refresh();

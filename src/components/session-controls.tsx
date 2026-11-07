@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CalendarPlus, CreditCard } from "lucide-react";
-import { bookSessionAction, declineSessionAction, cancelBookingAction, cancelSessionAction, payForBookingAction, seriesAction, staffBookingAction } from "@/app/session-actions";
+import { bookSessionAction, declineSessionAction, cancelBookingAction, cancelSessionAction, deleteSessionAction, payForBookingAction, seriesAction, staffBookingAction } from "@/app/session-actions";
 import { buttonClass } from "./ui";
 
 function useOp() {
@@ -124,6 +124,25 @@ export function CancelSession({ sessionId }: { sessionId: string }) {
         className={buttonClass("secondary", "sm", "justify-self-start text-danger")}
       >
         Cancel session
+      </button>
+      {err}
+    </div>
+  );
+}
+
+export function DeleteSession({ sessionId }: { sessionId: string }) {
+  const { pending, run, err } = useOp();
+  return (
+    <div className="grid gap-1">
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          if (confirm("Delete this session for good? It comes off the schedule and the bookings go with it. To keep a record, cancel it instead.")) run(() => deleteSessionAction(sessionId));
+        }}
+        className={buttonClass("ghost", "sm", "justify-self-start text-danger")}
+      >
+        Delete session
       </button>
       {err}
     </div>

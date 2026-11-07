@@ -354,6 +354,26 @@ export async function sendEmails(list: { key: string; to: string; subject: strin
 
 // ---- the team calendar ----------------------------------------------------
 
+/** Removes a session, its bookings and its place on the team's calendar. */
+export async function deleteSession(id: string) {
+  if (!LIVE) {
+    mem.sessions = mem.sessions.filter((x) => x.id !== id);
+    mem.bookings = mem.bookings.filter((b) => b.sessionId !== id);
+    const { db } = await import("../data/store");
+    const gone = new Set(db.events.filter((e) => e.sessionId === id).map((e) => e.id));
+    db.events = db.events.filter((e) => !gone.has(e.id));
+    db.rsvps = db.rsvps.filter((r) => !gone.has(r.eventId));
+    return;
+  }
+  const sb = await admin();
+  const steps = [
+    await sb.from("events").delete().eq("session_id", id),
+    await sb.from("session_bookings").delete().eq("session_id", id),
+    await sb.from("game_sessions").delete().eq("id", id),
+  ];
+  for (const r of steps) if (r.error) throw new Error(`sessions: delete: ${r.error.message}`);
+}
+
 /** Puts a posted session on the team's calendar (schedule, calendar, phone feeds), or updates it. */
 export async function syncCalendarEvent(x: Session) {
   const fields = {
