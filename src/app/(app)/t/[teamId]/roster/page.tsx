@@ -6,6 +6,7 @@ import { getTeam, listJoinRequests, listRoster, listTeamUnavailable } from "@/li
 import { JoinRequests } from "./join-requests";
 import { guestList } from "@/lib/guests/service";
 import { GuestList } from "@/components/guests";
+import { ExportLink } from "@/components/export-link";
 import { Avatar, Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { ROLE_LABEL, TEAM_ROLES, hatLabels, type RosterRow } from "@/lib/data/types";
@@ -136,9 +137,9 @@ export default async function RosterPage({
       {team.isStaff && (
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
           <span className="text-muted">Export:</span>
-          <a href={`/t/${teamId}/export/players.csv`} className="text-team-ink">Players</a>
-          <a href={`/t/${teamId}/export/attendance.csv`} className="text-team-ink">Attendance</a>
-          <a href={`/t/${teamId}/export/events.csv`} className="text-team-ink">Schedule</a>
+          <ExportLink href={`/t/${teamId}/export/players.csv`} className="text-team-ink">Players</ExportLink>
+          <ExportLink href={`/t/${teamId}/export/attendance.csv`} className="text-team-ink">Attendance</ExportLink>
+          <ExportLink href={`/t/${teamId}/export/events.csv`} className="text-team-ink">Schedule</ExportLink>
         </p>
       )}
       {team.canManagePermissions && (

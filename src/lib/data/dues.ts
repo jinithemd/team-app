@@ -19,6 +19,7 @@ function today() {
 }
 
 export type DueStatus = "paid" | "reported" | "overdue" | "owes";
+type DueItem = { dueId: ID; fee: string; amount: number; left: number; payments: { id: ID; amount: number; method: PaymentMethod; paidOn: string; confirmed: boolean }[] };
 
 function dueRow(dueId: ID) {
   const d = db.dues.find((x) => x.id === dueId)!;
@@ -38,14 +39,18 @@ export async function getTeamDues(teamId: ID) {
   const fees = db.fees.filter((f) => f.teamId === teamId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const dues = db.dues.filter((d) => fees.some((f) => f.id === d.feeId) && (treasurer || d.userId === user.id)).map((d) => dueRow(d.id));
 
-  const byPlayer = new Map<ID, { person: Person; owed: number; paid: number; left: number; reported: number; status: DueStatus; dueIds: ID[] }>();
+  const byPlayer = new Map<ID, { person: Person; owed: number; paid: number; left: number; reported: number; status: DueStatus; dueIds: ID[]; items: DueItem[] }>();
   for (const r of dues) {
-    const cur = byPlayer.get(r.due.userId) ?? { person: personOf(r.due.userId), owed: 0, paid: 0, left: 0, reported: 0, status: "paid" as DueStatus, dueIds: [] };
+    const cur = byPlayer.get(r.due.userId) ?? { person: personOf(r.due.userId), owed: 0, paid: 0, left: 0, reported: 0, status: "paid" as DueStatus, dueIds: [], items: [] };
     cur.owed += r.due.amountCents;
     cur.paid += r.paid;
     cur.left += r.left;
     cur.reported += r.reported;
     cur.dueIds.push(r.due.id);
+    cur.items.push({
+      dueId: r.due.id, fee: r.fee.name, amount: r.due.amountCents, left: r.left,
+      payments: db.payments.filter((p) => p.dueId === r.due.id).map((p) => ({ id: p.id, amount: p.amountCents, method: p.method, paidOn: p.paidOn, confirmed: !!p.verifiedAt })),
+    });
     const rank = { overdue: 3, owes: 2, reported: 1, paid: 0 };
     if (rank[r.status] > rank[cur.status]) cur.status = r.status;
     byPlayer.set(r.due.userId, cur);
@@ -116,6 +121,61 @@ export async function addFee(teamId: ID, input: { name: string; amount: string; 
   const players = activePlayers(teamId);
   players.forEach((r) => db.dues.push({ id: newId(), feeId: fee.id, userId: r.userId!, amountCents: cents }));
   return { ok: true, data: { players: players.length } };
+}
+
+/** Takes a fee away: every player's balance for it and what was recorded against it. */
+export async function deleteFee(feeId: ID): Promise<ActionResult> {
+  const user = await requireUser();
+  const fee = db.fees.find((f) => f.id === feeId);
+  if (!fee) return { ok: true, data: undefined };
+  if (!hasTeamPerm(user.id, fee.teamId, "payments")) return { ok: false, error: "Only the treasurer can delete fees." };
+  const dueIds = new Set(db.dues.filter((d) => d.feeId === feeId).map((d) => d.id));
+  if (db.payments.some((p) => dueIds.has(p.dueId) && p.method === "card"))
+    return { ok: false, error: "Someone paid this fee by card, so it stays for the record. Remove the players who haven't paid instead." };
+  db.payments = db.payments.filter((p) => !dueIds.has(p.dueId));
+  db.dues = db.dues.filter((d) => !dueIds.has(d.id));
+  db.fees = db.fees.filter((f) => f.id !== feeId);
+  return { ok: true, data: undefined };
+}
+
+function treasurerDue(userId: ID, dueId: ID) {
+  const d = db.dues.find((x) => x.id === dueId);
+  const fee = d && db.fees.find((f) => f.id === d.feeId);
+  if (!d || !fee) return null;
+  return hasTeamPerm(userId, fee.teamId, "payments") ? { d, fee } : null;
+}
+
+/** The treasurer ticks a player off as paid in cash for what's left. */
+export async function markDuePaid(dueId: ID): Promise<ActionResult> {
+  const user = await requireUser();
+  const x = treasurerDue(user.id, dueId);
+  if (!x) return { ok: false, error: "Only the treasurer can do that." };
+  const left = x.d.amountCents - paidOn(dueId, false);
+  if (left <= 0) return { ok: true, data: undefined };
+  db.payments.push({ id: newId(), dueId, amountCents: left, method: "cash", ref: null, paidOn: today(), reportedBy: user.id, verifiedBy: user.id, verifiedAt: now(), createdAt: now() });
+  return { ok: true, data: undefined };
+}
+
+/** Takes one player off a fee (they don't owe it after all). */
+export async function removeDue(dueId: ID): Promise<ActionResult> {
+  const user = await requireUser();
+  const x = treasurerDue(user.id, dueId);
+  if (!x) return { ok: false, error: "Only the treasurer can do that." };
+  if (db.payments.some((p) => p.dueId === dueId && p.method === "card")) return { ok: false, error: "They paid part of this by card, so it stays for the record." };
+  db.payments = db.payments.filter((p) => p.dueId !== dueId);
+  db.dues = db.dues.filter((d) => d.id !== dueId);
+  return { ok: true, data: undefined };
+}
+
+/** Undoes a payment recorded by mistake (not card payments: those are refunded through the card). */
+export async function undoPayment(paymentId: ID): Promise<ActionResult> {
+  const user = await requireUser();
+  const p = db.payments.find((x) => x.id === paymentId);
+  if (!p) return { ok: true, data: undefined };
+  if (!treasurerDue(user.id, p.dueId)) return { ok: false, error: "Only the treasurer can do that." };
+  if (p.method === "card") return { ok: false, error: "Card payments can't be undone here. Refund it from your payout account." };
+  db.payments = db.payments.filter((x) => x.id !== paymentId);
+  return { ok: true, data: undefined };
 }
 
 /** A player reports what they paid; the treasurer recording it confirms it at the same time. */

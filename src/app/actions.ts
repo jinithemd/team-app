@@ -483,6 +483,14 @@ export async function confirmPaymentAction(teamId: string, paymentId: string, ac
   return res.ok ? { ok: true as const } : { ok: false as const, error: res.error };
 }
 
+/** The treasurer's fixes on the Payments tab: delete a fee, tick someone off, take them off a fee, undo a payment. */
+export async function duesFixAction(teamId: string, op: { kind: "deleteFee" | "markPaid" | "removeDue" | "undo"; id: string }): Promise<{ error?: string }> {
+  const res =
+    op.kind === "deleteFee" ? await data.deleteFee(op.id) : op.kind === "markPaid" ? await data.markDuePaid(op.id) : op.kind === "removeDue" ? await data.removeDue(op.id) : await data.undoPayment(op.id);
+  revalidatePath(`/t/${teamId}`, "layout");
+  return res.ok ? {} : { error: res.error };
+}
+
 export async function remindUnpaidAction(teamId: string, _: FormState): Promise<FormState> {
   const res = await data.remindUnpaid(teamId);
   if (!res.ok) return { error: res.error };
