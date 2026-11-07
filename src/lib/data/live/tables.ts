@@ -91,6 +91,7 @@ export const TABLES: TableSpec[] = [
         sponsorChat: r.sponsor_chat !== false,
         linkNeedsApproval: !!r._needs_approval,
         payTo: s(r.pay_to),
+        fanUpdates: Array.isArray(r.fan_updates) ? (r.fan_updates as T.FanUpdate[]) : null,
       },
     }),
     toDb: (t: T.Team) => ({
@@ -114,6 +115,7 @@ export const TABLES: TableSpec[] = [
       members_can_post: t.settings.membersCanPost,
       sponsor_chat: t.settings.sponsorChat !== false,
       pay_to: t.settings.payTo ?? null,
+      fan_updates: t.settings.fanUpdates ?? null,
     }),
   },
   {

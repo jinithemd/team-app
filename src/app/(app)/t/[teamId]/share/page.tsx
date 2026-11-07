@@ -5,6 +5,7 @@ import { getTeam, listTeamSponsors, myPerms } from "@/lib/data";
 import { getFanPage } from "@/lib/fans";
 import { ShareLink } from "@/components/tournament/share-link";
 import { ShareImage } from "./share-image";
+import { FollowerNews } from "./follower-news";
 
 // Ready-made posts for the team's socials: a QR poster that brings fans to the fan page,
 // a grid of every sponsor, and a welcome post for each sponsor.
@@ -17,6 +18,7 @@ export default async function SharePage({ params }: { params: Promise<{ teamId: 
   const slug = team.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "team";
   return (
     <div className="grid gap-6">
+      {perms.messages && team.isPublic && <FollowerNews teamId={teamId} followers={fan.followers} />}
       <section aria-labelledby="fans-h" className="grid gap-3">
         <div className="grid gap-1">
           <h2 id="fans-h" className="flex items-center gap-2 text-xl font-bold">

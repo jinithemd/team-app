@@ -29,7 +29,7 @@ import type {
   TeamSettings,
   Venue,
 } from "./types";
-import { DEFAULT_POINTS_RULES, EVENT_TYPES, TEAM_PERMISSIONS, TEAM_ROLES, hatLabels, isFixture, permissionsForRoles } from "./types";
+import { DEFAULT_POINTS_RULES, EVENT_TYPES, FAN_UPDATES, TEAM_PERMISSIONS, TEAM_ROLES, hatLabels, isFixture, permissionsForRoles } from "./types";
 import {
   APP_URL,
   EMAIL_RE,
@@ -338,6 +338,8 @@ export async function updateTeam(
     rosterVisible: boolean;
     membersCanPost: boolean;
     sponsorChat?: boolean;
+    isPublic?: boolean;
+    fanUpdates?: string[];
     pointsEnabled: boolean;
     pointsPublic: boolean;
     geoCheckinEnabled: boolean;
@@ -373,6 +375,11 @@ export async function updateTeam(
   const st: TeamSettings = team.settings;
   st.membersCanPost = input.membersCanPost;
   if (input.sponsorChat !== undefined) st.sponsorChat = input.sponsorChat;
+  if (input.isPublic !== undefined) team.isPublic = input.isPublic;
+  if (input.fanUpdates !== undefined) {
+    const picked = FAN_UPDATES.filter((k) => input.fanUpdates!.includes(k));
+    st.fanUpdates = picked.length === FAN_UPDATES.length ? null : picked;
+  }
   st.pointsEnabled = input.pointsEnabled;
   st.pointsPublic = input.pointsPublic;
   st.geoCheckinEnabled = input.geoCheckinEnabled;

@@ -8,7 +8,7 @@ import type { Booking, Series, Session } from "./store";
 
 /*
  * Game sessions: drop-in games a team posts (one-off or every week) for its own players and
- * its supporters (followers). Some spots can be held for the team's players until a set time
+ * its followers. Some spots can be held for the team's players until a set time
  * before kick-off; the rest are open. Full sessions take a waitlist; a cancelled spot goes to
  * the next person on it. Weekly sessions post themselves on schedule and notify everyone.
  * Paying: by card when the team collects online (the spot is held 20 minutes while they pay),
@@ -81,7 +81,8 @@ async function announce(s: Session) {
   await st.syncCalendarEvent(s);
   const team = await st.teamBasics(s.teamId);
   if (!team) return;
-  const ids = [...new Set([...(await st.teamMemberIds(s.teamId)), ...(team.isPublic ? await st.followerIds(s.teamId) : [])])].filter((id) => id !== s.createdBy);
+  const { followersFor } = await import("../followers");
+  const ids = [...new Set([...(await st.teamMemberIds(s.teamId)), ...(await followersFor(s.teamId, "games"))])].filter((id) => id !== s.createdBy);
   const who = await st.people(ids);
   const sp = spots(s, []);
   const when = `${formatLongDate(s.startsAt, s.tz)}, ${formatTimeRange(s.startsAt, s.endsAt, s.tz)}`;
@@ -251,7 +252,7 @@ export async function book(sessionId: string): Promise<Result<{ status: Booking[
   if (p.mine) return fail(p.mine.status === "waitlist" ? "You're already on the waitlist." : "You've already got a spot.");
   if (!p.canBook) return fail(p.started ? "This session has started." : "This session isn't taking bookings.");
   const status: Booking["status"] = p.canBook === "waitlist" ? "waitlist" : "booked";
-  if (!p.member && p.team.isPublic) await setFollow(p.team.id, true).catch(() => {}); // supporters who book follow the team
+  if (!p.member && p.team.isPublic) await setFollow(p.team.id, true).catch(() => {}); // people who book follow the team
   const { teamCollector } = await import("../payments/service");
   const online = status === "booked" && p.s.priceCents > 0 && (await teamCollector(p.s.teamId)).active;
   const b = await st.upsertBooking({

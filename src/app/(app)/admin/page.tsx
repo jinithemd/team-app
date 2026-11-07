@@ -42,7 +42,7 @@ export default async function AdminPage() {
           <Tile label="Tournaments" value={t.tournaments} />
           <Tile label="Auctions" value={t.auctions} />
           <Tile label="Drop-in games" value={t.dropIns} />
-          <Tile label="Supporters" value={t.followers} note={`${t.sponsors} active ${t.sponsors === 1 ? "sponsor" : "sponsors"}`} />
+          <Tile label="Followers" value={t.followers} note={`${t.sponsors} active ${t.sponsors === 1 ? "sponsor" : "sponsors"}`} />
         </dl>
       </section>
 

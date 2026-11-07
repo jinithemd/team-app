@@ -1,5 +1,5 @@
 # Sample-data build: game sessions. Staff post a drop-in game with spots held for players,
-# supporters (followers) get told and book, it fills, the waitlist moves up, and a weekly
+# followers get told and book, it fills, the waitlist moves up, and a weekly
 # session posts itself.
 import re, datetime
 import _waits  # noqa: F401
@@ -59,7 +59,7 @@ with sync_playwright() as pw:
     p.get_by_role("button", name="Post drop-in").click()
     p.wait_for_url(re.compile(r"/s/[0-9a-f-]{36}\?posted=1"))
     sid = re.search(r"/s/([0-9a-f-]{36})", p.url).group(1)
-    expect(p.get_by_text("Posted. Your players and supporters have been told.")).to_be_visible()
+    expect(p.get_by_text("Posted. Your players and followers have been told.")).to_be_visible()
     expect(p.get_by_text("4 of 4 spots left")).to_be_visible()
     expect(p.get_by_text("2 kept for Kingston Strikers players")).to_be_visible()
     # It's on the team's schedule as a Drop-in, opening the session.
@@ -118,7 +118,7 @@ with sync_playwright() as pw:
     p.goto(f"{BASE}/s/{sid}")
     who = p.get_by_role("region", name="Who's coming")
     expect(who).to_contain_text("3 of 4")
-    expect(who.locator("li", has_text="Marcus Lee")).to_contain_text("Supporter")
+    expect(who.locator("li", has_text="Marcus Lee")).to_contain_text("Follower")
     expect(who.locator("li", has_text="Rahul Menon")).to_contain_text("Player")
     who.get_by_role("button", name="Mark Marcus Lee as paid cash").click()
     expect(who.get_by_role("button", name="Marcus Lee paid cash. Untick")).to_be_visible()

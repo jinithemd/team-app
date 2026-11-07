@@ -5,7 +5,8 @@ import { updateTeamAction, type FormState } from "@/app/actions";
 import { Field, Input, buttonClass } from "@/components/ui";
 import { ImagePicker } from "@/components/image-picker";
 import { ColorField } from "../../../teams/new/create-team-form";
-import type { PointsRules } from "@/lib/data/types";
+import type { FanUpdate, PointsRules } from "@/lib/data/types";
+import { FAN_UPDATES, FAN_UPDATE_LABEL } from "@/lib/data/types";
 
 type Initial = {
   name: string;
@@ -17,6 +18,8 @@ type Initial = {
   crest: string | null;
   membersCanPost: boolean;
   sponsorChat: boolean;
+  isPublic: boolean;
+  fanUpdates?: FanUpdate[] | null;
   pointsEnabled: boolean;
   pointsPublic: boolean;
   geoCheckinEnabled: boolean;
@@ -88,6 +91,31 @@ export function TeamSettingsForm({ teamId, initial, clubName }: { teamId: string
         <Toggle name="rosterVisible" label="Players can see the roster" hint="Off: players only see themselves. Captains always see everyone." defaultChecked={initial.rosterVisible} />
         <Toggle name="membersCanPost" label="Everyone can post in team chat" hint="Off: only captains and managers post; players can still react and reply." defaultChecked={initial.membersCanPost} />
         <Toggle name="sponsorChat" label="Sponsor chat" hint="A room where your sponsors and the whole team talk. Sponsors see first names and last initials only." defaultChecked={initial.sponsorChat} />
+      </section>
+
+      <section aria-labelledby="fol-h" className="grid gap-2 border-t border-border pt-5">
+        <input type="hidden" name="followersSection" value="1" />
+        <h3 id="fol-h" className="text-lg font-semibold">
+          Followers
+        </h3>
+        <Toggle
+          name="isPublic"
+          label="Anyone can find and follow this team"
+          hint="Your fan page shows games, results, sponsors and trophies. Never your roster, chat or anyone's details. Off: only your team can see it."
+          defaultChecked={initial.isPublic}
+        />
+        <fieldset className="grid gap-1">
+          <legend className="pb-1 text-sm font-semibold">What followers can choose to get</legend>
+          {FAN_UPDATES.map((k) => (
+            <label key={k} className="flex min-h-11 cursor-pointer items-start gap-3 py-1">
+              <input type="checkbox" name="fanUpdate" value={k} defaultChecked={!initial.fanUpdates || initial.fanUpdates.includes(k)} className="mt-0.5 size-5 shrink-0 accent-[var(--fg)]" />
+              <span>
+                <span className="block font-medium">{FAN_UPDATE_LABEL[k].title}</span>
+                <span className="block text-sm text-muted">{FAN_UPDATE_LABEL[k].hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
       </section>
 
       <section aria-labelledby="c-h" className="grid gap-2 border-t border-border pt-5">

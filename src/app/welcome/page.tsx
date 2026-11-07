@@ -28,7 +28,7 @@ function Capture({ src, alt, className = "", caption }: { src: string; alt: stri
 }
 
 const MORE = [
-  ["Drop-in games", "Post a pickup session, hold spots for your own players and open the rest to supporters. Weekly sessions post themselves."],
+  ["Drop-in games", "Post a pickup session, hold spots for your own players and open the rest to your followers. Weekly sessions post themselves."],
   ["Tournaments", "Groups, fixtures, live tables and knockout rounds, with a public page for fans."],
   ["Player auctions", "Split your club into teams with captains, budgets and a live auction on a big screen."],
   ["Carpools", "Offer seats or ask for a lift to away games."],

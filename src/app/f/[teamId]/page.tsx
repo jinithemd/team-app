@@ -10,6 +10,8 @@ import { formatDateBlock, formatTime } from "@/lib/time";
 import { HeaderSponsors, SponsorStrip } from "@/components/sponsor-badge";
 import { ShareLink } from "@/components/tournament/share-link";
 import { FollowButton } from "./follow-button";
+import { UpdatesPicker } from "./updates-picker";
+import { myFollow } from "@/lib/followers";
 import { publicSessions } from "@/lib/sessions/service";
 import { SessionRow } from "@/components/session-bits";
 
@@ -71,7 +73,7 @@ export default async function FanPageView({ params }: { params: Promise<{ teamId
   const v = await getFanPage(teamId);
   if (!v) notFound();
   const { team } = v;
-  const sessions = await publicSessions(team.id);
+  const [sessions, mine] = await Promise.all([publicSessions(team.id), v.signedIn && !v.isMember ? myFollow(team.id) : Promise.resolve(null)]);
   const initials = team.name.split(/\s+/).filter((w) => /^[A-Za-z]/.test(w)).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const wins = v.honours.filter((h) => h.place === "champions").length;
   return (
@@ -122,6 +124,8 @@ export default async function FanPageView({ params }: { params: Promise<{ teamId
               Only your team can see this page right now. Turn on &ldquo;Public team&rdquo; in the team&apos;s settings so fans can find and follow you.
             </p>
           )}
+
+          {mine?.following && mine.offers.length > 0 && <UpdatesPicker teamId={team.id} offers={mine.offers} chosen={mine.updates} />}
 
           {sessions.length > 0 && (
             <section aria-labelledby="ses-h" className="grid gap-2">

@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import * as data from "@/lib/data";
 import type { ActionResult, RsvpResponse } from "@/lib/data/types";
 import { LIVE } from "@/lib/mode";
+import { APP_URL } from "@/lib/data/store";
+import { formatLongDate, formatTime } from "@/lib/time";
 import { googleSignInUrl, safeNext, sendSignInLink, verifySignInCode } from "@/lib/auth";
 
 // Thin server-action wrappers. Permission checks live in the data layer (and in RLS later).
@@ -191,6 +193,7 @@ export async function createEventAction(teamId: string, _: FormState, f: FormDat
     await invite(res.data.id, mode === "all" ? "all" : f.getAll("guestIds").map(String), { notify: nv.input.notify, series: true });
   }
   revalidatePath("/", "layout");
+  if (nv.input.notify) await tellFixture(res.data.id).catch((e) => console.error("[followers] fixture", e));
   redirect(`/t/${teamId}/e/${res.data.id}?created=1`);
 }
 
@@ -292,6 +295,8 @@ export async function updateTeamAction(teamId: string, _: FormState, f: FormData
     rosterVisible: str(f, "rosterVisible") === "on",
     membersCanPost: str(f, "membersCanPost") === "on",
     sponsorChat: str(f, "sponsorChat") === "on",
+    isPublic: f.has("followersSection") ? str(f, "isPublic") === "on" : undefined,
+    fanUpdates: f.has("followersSection") ? f.getAll("fanUpdate").map(String) : undefined,
     pointsEnabled: str(f, "pointsEnabled") === "on",
     pointsPublic: str(f, "pointsPublic") === "on",
     geoCheckinEnabled: str(f, "geoCheckinEnabled") === "on",
@@ -403,8 +408,41 @@ export async function closeSeasonAction(teamId: string, _: FormState, f: FormDat
 
 export async function updateScoreAction(eventId: string, input: { us: number; them: number; period: string | null; status: "not_started" | "live" | "final"; version: number; statusOnly?: boolean }) {
   const res = await data.updateScore(eventId, input);
+  if (res.ok && res.data.status === "final") await tellResult(eventId, res.data.us, res.data.them).catch((e) => console.error("[followers] result", e));
   revalidatePath("/", "layout");
   return res;
+}
+
+/** Followers who asked for results hear the final score (once per match). */
+async function tellResult(eventId: string, us: number, them: number) {
+  const e = await data.getEvent(eventId);
+  const team = e && (await data.getTeam(e.teamId));
+  if (!e || !team || !["match", "tournament"].includes(e.type)) return;
+  const { tellFollowers } = await import("@/lib/followers");
+  const vs = e.opponent ? ` v ${e.opponent}` : e.title ? ` · ${e.title}` : "";
+  const word = us > them ? "won" : us < them ? "lost" : "drew";
+  await tellFollowers(e.teamId, "results", {
+    key: `result:${eventId}:${us}-${them}`,
+    subject: `Full time: ${team.name} ${us}–${them}${e.opponent ? ` ${e.opponent}` : ""}`,
+    text: `${team.name}${vs}: ${us}–${them}. ${team.name} ${word}.`,
+    link: { label: `See ${team.name}'s results`, href: `${APP_URL}/f/${e.teamId}` },
+  });
+}
+
+/** Followers who asked for fixtures hear about a new match. */
+async function tellFixture(eventId: string) {
+  const e = await data.getEvent(eventId);
+  const team = e && (await data.getTeam(e.teamId));
+  if (!e || !team || !["match", "tournament"].includes(e.type)) return;
+  const { tellFollowers } = await import("@/lib/followers");
+  const when = `${formatLongDate(e.startAt, e.tz)}, ${formatTime(e.startAt, e.tz)}`;
+  const what = e.opponent ? `${team.name} v ${e.opponent}` : `${team.name} · ${e.title ?? "Match"}`;
+  await tellFollowers(e.teamId, "fixtures", {
+    key: `fixture:${eventId}`,
+    subject: `New fixture: ${what}, ${formatLongDate(e.startAt, e.tz)}`,
+    text: `${what}. ${when}${e.locationText ? ` at ${e.locationText}` : ""}.`,
+    link: { label: `See ${team.name}'s fixtures`, href: `${APP_URL}/f/${e.teamId}` },
+  });
 }
 
 export async function addMatchEventAction(eventId: string, input: { kind: string; side: string; userId?: string; assistId?: string; minute?: string; version: number }) {
@@ -657,6 +695,32 @@ export async function setMyPhotoAction(dataUrl: string): Promise<FormState> {
 }
 
 // ---------- fans ----------
+
+export async function setFollowUpdatesAction(teamId: string, updates: string[]): Promise<{ error?: string }> {
+  const { setMyUpdates } = await import("@/lib/followers");
+  const { FAN_UPDATES } = await import("@/lib/data/types");
+  const r = await setMyUpdates(teamId, updates.filter((u): u is (typeof FAN_UPDATES)[number] => (FAN_UPDATES as readonly string[]).includes(u)));
+  revalidatePath(`/f/${teamId}`);
+  return r.ok ? {} : { error: r.error };
+}
+
+/** Team news for followers who asked for it (staff who can message the team). */
+export async function postFollowerNewsAction(teamId: string, _: FormState, f: FormData): Promise<FormState> {
+  const text = str(f, "news").trim();
+  if (text.length < 3) return { error: "Write your news first." };
+  if (text.length > 1000) return { error: "Keep it under 1,000 characters." };
+  const [team, perms] = await Promise.all([data.getTeam(teamId), data.myPerms(teamId)]);
+  if (!team || !perms.messages) return { error: "Only captains and managers can post team news." };
+  const { tellFollowers, teamOffers } = await import("@/lib/followers");
+  if (!(await teamOffers(teamId)).includes("news")) return { error: "Turn on Team news for followers in Settings first." };
+  const n = await tellFollowers(teamId, "news", {
+    key: `news:${teamId}:${Date.now()}`,
+    subject: `${team.name}: ${text.split("\n")[0].slice(0, 70)}`,
+    text,
+    link: { label: `See ${team.name}`, href: `${APP_URL}/f/${teamId}` },
+  });
+  return { ok: true, message: n ? `Sent to ${n} ${n === 1 ? "follower" : "followers"}.` : "Posted. None of your followers have asked for team news yet." };
+}
 
 export async function followTeamAction(teamId: string, on: boolean): Promise<FormState> {
   const { setFollow } = await import("@/lib/fans");

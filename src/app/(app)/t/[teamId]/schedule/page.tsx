@@ -27,7 +27,7 @@ export default async function SchedulePage({
 
   return (
     <div className="grid gap-5">
-      {sp.weekly && <Banner>Weekly drop-in set up. Each week posts itself, goes on the schedule and tells your players and supporters.</Banner>}
+      {sp.weekly && <Banner>Weekly drop-in set up. Each week posts itself, goes on the schedule and tells your players and followers.</Banner>}
       {sp.joined && <Banner>You&apos;re on the team. Answer below so your captains know if you&apos;re in.</Banner>}
 
       <div className="flex flex-wrap items-center justify-between gap-3">

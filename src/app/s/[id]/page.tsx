@@ -54,7 +54,7 @@ export default async function SessionView({ params, searchParams }: { params: Pr
         </header>
 
         <div className="gutter mx-auto grid max-w-2xl gap-5 py-5">
-          {sp.posted && <Banner>Posted. Your players and supporters have been told.</Banner>}
+          {sp.posted && <Banner>Posted. Your players and followers have been told.</Banner>}
           {sp.payment === "cancelled" && <Banner tone="warning">Payment cancelled, so the spot wasn&apos;t booked.</Banner>}
           {cancelled && <Banner tone="danger">This session is cancelled.</Banner>}
           {p.manage && Date.parse(s.postAt) > Date.now() && (
@@ -175,7 +175,7 @@ export default async function SessionView({ params, searchParams }: { params: Pr
                     <li key={b.bookingId} className="flex items-center justify-between gap-3 border-b border-border py-2 last:border-0">
                       <span className="min-w-0">
                         <span className="block font-semibold">{b.name}</span>
-                        <span className="block text-xs text-muted">{[b.member ? "Player" : "Supporter", b.status === "held" ? "paying now" : null].filter(Boolean).join(" · ")}</span>
+                        <span className="block text-xs text-muted">{[b.member ? "Player" : "Follower", b.status === "held" ? "paying now" : null].filter(Boolean).join(" · ")}</span>
                       </span>
                       <StaffRow sessionId={s.id} bookingId={b.bookingId} name={b.name} paid={b.paid} priced={s.priceCents > 0} />
                     </li>
@@ -188,7 +188,7 @@ export default async function SessionView({ params, searchParams }: { params: Pr
                   <ol className="grid gap-1 pl-5 text-sm [list-style:decimal]">
                     {waiting.map((b) => (
                       <li key={b.bookingId}>
-                        {b.name} <span className="text-muted">· {b.member ? "Player" : "Supporter"}</span>
+                        {b.name} <span className="text-muted">· {b.member ? "Player" : "Follower"}</span>
                       </li>
                     ))}
                   </ol>

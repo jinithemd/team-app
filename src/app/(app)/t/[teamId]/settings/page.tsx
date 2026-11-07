@@ -46,6 +46,7 @@ export default async function TeamSettingsPage({ params }: { params: Promise<{ t
           color: team.color,
           colorSecondary: team.colorSecondary,
           rosterVisible: team.rosterVisible,
+          isPublic: team.isPublic,
           ...team.settings,
           sponsorChat: team.settings.sponsorChat !== false,
         }}

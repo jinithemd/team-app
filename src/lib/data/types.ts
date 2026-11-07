@@ -229,7 +229,19 @@ export interface TeamSettings {
   linkNeedsApproval?: boolean;
   /** Where players send e-Transfers, shown on the dues screen. */
   payTo?: string | null;
+  /** What the team shares with followers (null or missing = all of it). */
+  fanUpdates?: FanUpdate[] | null;
 }
+
+/** The updates a follower can get from a team. */
+export const FAN_UPDATES = ["games", "fixtures", "results", "news"] as const;
+export type FanUpdate = (typeof FAN_UPDATES)[number];
+export const FAN_UPDATE_LABEL: Record<FanUpdate, { title: string; hint: string }> = {
+  games: { title: "Open games", hint: "Drop-in and pickup games anyone can book a spot in" },
+  fixtures: { title: "New fixtures", hint: "When a match or tournament game is added" },
+  results: { title: "Results", hint: "The final score after every match" },
+  news: { title: "Team news", hint: "Announcements the team posts for its followers" },
+};
 
 export interface Season {
   id: ID;

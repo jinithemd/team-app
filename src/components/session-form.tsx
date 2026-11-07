@@ -101,7 +101,7 @@ export function SessionForm({
       {weekly ? (
         <fieldset className="grid gap-3 rounded-lg border border-border p-4">
           <legend className="px-1 text-sm font-semibold">Post it automatically each week</legend>
-          <p className="text-sm text-muted">Each week&apos;s session goes up on its own and your players and supporters get told.</p>
+          <p className="text-sm text-muted">Each week&apos;s session goes up on its own and your players and followers who want open games get told.</p>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field id="postDaysBefore" label="Days before" error={fe.postDaysBefore}>
               <Input id="postDaysBefore" name="postDaysBefore" type="number" min={0} max={27} defaultValue="6" error={fe.postDaysBefore} />
