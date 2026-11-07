@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+Malayalam:wght@800&family=Baloo+2:wght@800&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="edl.js"></script>
+<script>
+const W = 1080, H = 1920, FPS = 30, BY = 656, BH = 608;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const ML = "'Noto Sans Malayalam', sans-serif", BAL = "'Baloo 2', sans-serif", OSW = "'Oswald', sans-serif";
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const back = x => { const c1 = 1.9, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const isML = s => /[ഀ-ൿ]/.test(s);
+function rr(x, y, w, h, r, fill) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); }
+function txt(s, x, y, size, font, color, stroke = 0, align = 'center') {
+  ctx.save(); ctx.font = `${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (stroke) { ctx.lineWidth = stroke; ctx.strokeStyle = '#000'; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
+  ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+}
+function popTxt(s, x, y, size, color, t, t0, dur, rot = -.05) {
+  if (t < t0 || t > t0 + dur) return;
+  const p = seg(t, t0, t0 + .2), out = seg(t, t0 + dur - .15, t0 + dur);
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); const k = back(p) * (1 - .3 * out); ctx.scale(k, k); ctx.globalAlpha = 1 - out;
+  txt(s, 0, 0, size, isML(s) ? ML : BAL, color, size * .18); ctx.restore();
+}
+
+/* pop-up words, on global time: [time, text, colour, duration] */
+const POPS = [
+  [0.15, 'BRAKE FAIL 😱', '#ff4d4d', 1.6],
+  [7.0, 'PEE PEE PEE! 😤', '#ffd23f', 1.6],
+  [10.3, 'ഹും 🤨', '#fff', 1.4],
+  [14.2, 'BRAKE CHECK! 😡', '#ff4d4d', 1.8],
+  [18.5, 'Bye bye അങ്കിൾ 😏', '#ffd23f', 2.0],
+  [22.9, 'BRAKE FAIL!! 😱', '#ff4d4d', 2.2],
+  [28.4, 'ആആആ!! 😭', '#fff', 1.8],
+  [31.0, 'HAIRPIN ⚠️', '#ffd23f', 1.6],
+  [33.9, 'ഞാൻ നോക്കിക്കോളാം 😤', '#ffd23f', 2.4],
+  [37.8, 'BUMP! 💥', '#ff8a3d', 1.4],
+  [43.4, '😰😰', '#fff', 1.6],
+  [45.8, '🎉 YESSS 🎉', '#4dff88', 2.4],
+  [49.3, 'Sorry ചേട്ടാ 🙏', '#9ee7ff', 1.9],
+  [51.4, '👍😎', '#fff', 1.4],
+];
+const HITS = [[0.1, 1], [14.2, 1], [22.9, .6], [37.8, 1], [42.9, .5]];   // flash + shake moments
+
+const cache = new Map();
+function loadImg(src) {
+  if (cache.has(src)) return cache.get(src);
+  const p = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  cache.set(src, p); if (cache.size > 40) cache.delete(cache.keys().next().value); return p;
+}
+async function drawClip(e, lt) {
+  const n = Math.min(e.n, Math.floor(lt * FPS) + 1);
+  const im = await loadImg(`frames/s${String(e.i).padStart(2, '0')}/${String(n).padStart(4, '0')}.jpg`);
+  ctx.drawImage(im, 0, 0, W, BH);
+}
+function speedo(lt) {
+  ctx.fillStyle = '#0d0e12'; ctx.fillRect(0, 0, W, BH);
+  const cx = 540, cy = 330, R = 250, v = lerp(78, 128, easeOut(seg(lt, 0, 2.2))) + Math.sin(lt * 50) * 1.5;
+  const g = ctx.createRadialGradient(cx, cy, 20, cx, cy, R); g.addColorStop(0, '#22252e'); g.addColorStop(1, '#111318');
+  ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.fillStyle = g; ctx.fill(); ctx.lineWidth = 10; ctx.strokeStyle = '#aaa'; ctx.stroke();
+  const A0 = Math.PI * .75, A1 = Math.PI * 2.25, ang = s => A0 + (A1 - A0) * s / 140;
+  ctx.lineWidth = 20; ctx.strokeStyle = '#e23b3b'; ctx.beginPath(); ctx.arc(cx, cy, R - 28, ang(100), ang(140)); ctx.stroke();
+  for (let s = 0; s <= 140; s += 10) { const a = ang(s); ctx.lineWidth = s % 20 ? 4 : 8; ctx.strokeStyle = '#eee';
+    ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * (R - 45), cy + Math.sin(a) * (R - 45)); ctx.lineTo(cx + Math.cos(a) * (R - 18), cy + Math.sin(a) * (R - 18)); ctx.stroke();
+    if (s % 20 === 0) txt(String(s), cx + Math.cos(a) * (R - 80), cy + Math.sin(a) * (R - 80), 30, OSW, '#eee'); }
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(ang(v)); rr(-6, -8, R - 36, 16, 8, '#ff3b3b'); ctx.restore();
+  ctx.beginPath(); ctx.arc(cx, cy, 28, 0, 7); ctx.fillStyle = '#333'; ctx.fill();
+  txt(Math.round(v) + ' km/h', cx, cy + 140, 64, OSW, v > 100 ? '#ff4d4d' : '#fff');
+  const blink = Math.floor(lt * 6) % 2;
+  if (blink) { rr(70, 60, 230, 90, 16, '#ff2b2b'); txt('⚠ BRAKE', 185, 105, 40, OSW, '#fff'); }
+  ctx.fillStyle = `rgba(255,0,0,${.12 + .12 * Math.sin(lt * 25)})`; ctx.fillRect(0, 0, W, BH);
+}
+function card(e, lt) {
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, BH);
+  const s = e.src, n = Math.floor(seg(lt, 0, .5) * s.length);
+  txt(s.slice(0, Math.max(1, n)), W / 2, BH / 2, 70, ML, '#fff');
+  txt('⏪', W / 2, BH / 2 - 110, 70, 'serif', '#fff');
+}
+async function endCard(lt) {
+  const im = await loadImg('frames/s13/0110.jpg');
+  ctx.save(); ctx.filter = 'blur(10px) brightness(.4)'; ctx.drawImage(im, -40, -30, W + 80, BH + 60); ctx.restore();
+  const p = back(seg(lt, .1, .4));
+  ctx.save(); ctx.translate(W / 2, 150); ctx.scale(p, p); txt('REAL HERO 🫡', 0, 0, 100, BAL, '#ffd23f', 16); ctx.restore();
+  if (lt > .5) { ctx.save(); ctx.translate(W / 2, 250); const k = back(seg(lt, .5, .8)); ctx.scale(k, k); txt('നമ്മുടെ KSRTC ഡ്രൈവർ ❤️', 0, 0, 56, ML, '#fff', 8); ctx.restore(); }
+  if (lt > 1.6) { ctx.save(); ctx.translate(W / 2, 370); const k = back(seg(lt, 1.6, 1.9)); ctx.scale(k, k);
+    txt('ഇങ്ങനെ വണ്ടി ഓടിക്കുന്ന', 0, -35, 50, ML, '#fff', 8); txt('സുഹൃത്തിനെ ടാഗ് ചെയ്യൂ 😂', 0, 35, 50, ML, '#ffd23f', 8); ctx.restore(); }
+  if (lt > 2.4) { ctx.save(); ctx.translate(W / 2, 500); const k = back(seg(lt, 2.4, 2.7)) * (1 + .04 * Math.sin(lt * 8)); ctx.scale(k, k);
+    rr(-290, -48, 580, 96, 48, '#fff'); const tag = '@over_speed_friend'.slice(0, Math.floor(seg(lt, 2.6, 3.6) * 18));
+    txt(tag + (Math.floor(lt * 4) % 2 ? '|' : ''), 0, 2, 42, OSW, '#111'); ctx.restore(); }
+}
+
+async function frame(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  let i = EDL.findIndex(e => t >= e.start && t < e.start + e.d); if (i < 0) i = EDL.length - 1;
+  const e = EDL[i], lt = t - e.start;
+  // shake: segment base + hit impulses
+  let sh = e.shake * 6; for (const [ht, k] of HITS) sh += 26 * k * Math.max(0, 1 - Math.abs(t - ht) / .35) * (t >= ht ? 1 : 0);
+  ctx.save(); ctx.translate(0, BY); ctx.beginPath(); ctx.rect(0, 0, W, BH); ctx.clip();
+  const z = 1 + .08 * (1 - easeOut(seg(lt, 0, .3))) + (sh > 0 ? .03 : 0);
+  ctx.translate(W / 2 + Math.sin(t * 91) * sh, BH / 2 + Math.cos(t * 77) * sh); ctx.scale(z, z); ctx.translate(-W / 2, -BH / 2);
+  if (e.kind === 'clip') await drawClip(e, lt);
+  else if (e.kind === 'speedo') speedo(lt);
+  else if (e.kind === 'card') card(e, lt);
+  else await endCard(lt);
+  ctx.restore();
+  // flash on hits and on a few hard cuts
+  for (const [ht, k] of HITS) { const f = seg(t, ht, ht + .18); if (t >= ht && f < 1) { ctx.fillStyle = `rgba(255,255,255,${.7 * k * (1 - f)})`; ctx.fillRect(0, BY, W, BH); } }
+  // red vignette pulse during the brake failure chase
+  if (t > 22.8 && t < 42.8) { const v = ctx.createRadialGradient(W / 2, BY + BH / 2, 200, W / 2, BY + BH / 2, 700);
+    v.addColorStop(0, 'rgba(255,0,0,0)'); v.addColorStop(1, `rgba(255,0,0,${.18 + .12 * Math.sin(t * 9)})`); ctx.fillStyle = v; ctx.fillRect(0, BY, W, BH); }
+  // pop-up words in the band
+  ctx.save(); ctx.translate(0, BY); ctx.beginPath(); ctx.rect(0, 0, W, BH); ctx.clip();
+  for (const [pt, s, col, d] of POPS) popTxt(s, W / 2, 95, isML(s) ? 66 : 78, col, t, pt, d);
+  ctx.restore();
+  // title bar + retention line + progress
+  txt('Car vs KSRTC Bus 😏', W / 2, BY - 80, 78, BAL, '#fff');
+  txt('അവസാനം വരെ കാണൂ 😳', W / 2, BY + BH + 80, 46, ML, '#ffd23f');
+  rr(90, BY + BH + 140, W - 180, 8, 4, '#333'); rr(90, BY + BH + 140, (W - 180) * clamp(t / TOTAL), 8, 4, '#ffd23f');
+}
+window.FPS = FPS;
+window.grab = async (t) => { await frame(t); return cv.toDataURL('image/jpeg', 0.9); };
+window.ready = (async () => {
+  await document.fonts.load("800 48px 'Noto Sans Malayalam'"); await document.fonts.load("800 48px 'Baloo 2'");
+  await document.fonts.load("500 48px 'Oswald'"); await document.fonts.ready; return TOTAL;
+})();
+</script>
+</body>
+</html>
