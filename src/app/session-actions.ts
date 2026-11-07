@@ -74,9 +74,15 @@ export async function deleteSessionAction(sessionId: string): Promise<{ error?: 
 }
 
 export async function deleteSeriesAction(seriesId: string): Promise<{ error?: string }> {
-  const r = await svc.deleteSeries(seriesId);
-  refresh();
-  return r.ok ? {} : { error: r.error };
+  try {
+    const r = await svc.deleteSeries(seriesId);
+    console.log(`[sessions] delete series ${seriesId}: ${r.ok ? `removed ${r.data.removed}, cancelled ${r.data.cancelled}` : r.error}`);
+    refresh();
+    return r.ok ? {} : { error: r.error };
+  } catch (e) {
+    console.error(`[sessions] delete series ${seriesId} failed`, e);
+    return { error: "Couldn't delete it just now. Try again in a moment." };
+  }
 }
 
 export async function cancelSessionAction(sessionId: string): Promise<{ error?: string }> {

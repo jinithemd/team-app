@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarPlus, CreditCard } from "lucide-react";
 import { bookSessionAction, declineSessionAction, cancelBookingAction, cancelSessionAction, deleteSeriesAction, deleteSessionAction, payForBookingAction, seriesAction, staffBookingAction } from "@/app/session-actions";
 import { buttonClass } from "./ui";
+import { ConfirmButton } from "./confirm-button";
 
 function useOp() {
   const router = useRouter();
@@ -59,16 +60,16 @@ export function CancelBooking({ sessionId, waitlist }: { sessionId: string; wait
   const { pending, run, err } = useOp();
   return (
     <div className="grid gap-1">
-      <button
-        type="button"
+      <ConfirmButton
         disabled={pending}
-        onClick={() => {
-          if (confirm(waitlist ? "Leave the waitlist?" : "Give up your spot? The next person on the waitlist gets it.")) run(() => cancelBookingAction(sessionId));
-        }}
+        question={waitlist ? "Leave the waitlist?" : "Give up your spot? The next person on the waitlist gets it."}
+        yes={waitlist ? "Leave the waitlist" : "Give up my spot"}
+        no="Stay in"
+        onConfirm={() => run(() => cancelBookingAction(sessionId))}
         className="justify-self-start text-sm font-semibold text-danger underline"
       >
         {waitlist ? "Leave the waitlist" : "Can't make it? Cancel my spot"}
-      </button>
+      </ConfirmButton>
       {err}
     </div>
   );
@@ -94,17 +95,17 @@ export function StaffRow({ sessionId, bookingId, name, paid, priced }: { session
               {paid === "cash" ? "Paid · cash" : "Mark paid"}
             </button>
           ))}
-        <button
-          type="button"
+        <ConfirmButton
           disabled={pending}
-          aria-label={`Remove ${name}`}
-          onClick={() => {
-            if (confirm(`Remove ${name} from this session?`)) run(() => staffBookingAction(sessionId, bookingId, "remove"));
-          }}
+          ariaLabel={`Remove ${name}`}
+          question={`Remove ${name} from this session?`}
+          yes="Remove"
+          no="Keep"
+          onConfirm={() => run(() => staffBookingAction(sessionId, bookingId, "remove"))}
           className="min-h-9 px-2 text-xs font-semibold text-danger"
         >
           Remove
-        </button>
+        </ConfirmButton>
       </span>
       {err}
     </span>
@@ -115,16 +116,16 @@ export function CancelSession({ sessionId }: { sessionId: string }) {
   const { pending, run, err } = useOp();
   return (
     <div className="grid gap-1">
-      <button
-        type="button"
+      <ConfirmButton
         disabled={pending}
-        onClick={() => {
-          if (confirm("Cancel this session? Everyone booked gets an email.")) run(() => cancelSessionAction(sessionId));
-        }}
+        question="Cancel this session? Everyone booked gets an email."
+        yes="Yes, cancel it"
+        no="Keep it on"
+        onConfirm={() => run(() => cancelSessionAction(sessionId))}
         className={buttonClass("secondary", "sm", "justify-self-start text-danger")}
       >
         Cancel session
-      </button>
+      </ConfirmButton>
       {err}
     </div>
   );
@@ -134,16 +135,15 @@ export function DeleteSession({ sessionId }: { sessionId: string }) {
   const { pending, run, err } = useOp();
   return (
     <div className="grid gap-1">
-      <button
-        type="button"
+      <ConfirmButton
         disabled={pending}
-        onClick={() => {
-          if (confirm("Delete this session for good? It comes off the schedule and the bookings go with it. To keep a record, cancel it instead.")) run(() => deleteSessionAction(sessionId));
-        }}
+        question="Delete this session for good? It comes off the schedule and the bookings go with it. To keep a record, cancel it instead."
+        yes="Yes, delete it"
+        onConfirm={() => run(() => deleteSessionAction(sessionId))}
         className={buttonClass("ghost", "sm", "justify-self-start text-danger")}
       >
-        Delete session
-      </button>
+        {pending ? "Deleting…" : "Delete session"}
+      </ConfirmButton>
       {err}
     </div>
   );
@@ -157,17 +157,16 @@ export function SeriesControls({ seriesId, active, title }: { seriesId: string; 
         <button type="button" disabled={pending} onClick={() => run(() => seriesAction(seriesId, { active: !active }))} className={buttonClass("secondary", "sm")}>
           {active ? "Pause" : "Resume"}
         </button>
-        <button
-          type="button"
+        <ConfirmButton
           disabled={pending}
-          aria-label={title ? `Delete ${title}` : "Delete"}
-          onClick={() => {
-            if (confirm(`Delete ${title ? `"${title}"` : "this weekly drop-in"}? It stops posting and its upcoming games come off the schedule. Games already played stay in your history.`)) run(() => deleteSeriesAction(seriesId));
-          }}
+          ariaLabel={title ? `Delete ${title}` : "Delete"}
+          question={`Delete ${title ? `"${title}"` : "this weekly drop-in"}? It stops posting and its upcoming games come off the schedule. Games already played stay in your history.`}
+          yes="Yes, delete it"
+          onConfirm={() => run(() => deleteSeriesAction(seriesId))}
           className={buttonClass("ghost", "sm", "text-danger")}
         >
-          Delete
-        </button>
+          {pending ? "Deleting…" : "Delete"}
+        </ConfirmButton>
       </div>
       {err}
     </div>
@@ -197,16 +196,22 @@ export function DeclineButton({ sessionId, eventId, booked }: { sessionId: strin
   const { pending, run, err } = useOp();
   return (
     <div className="grid gap-1">
-      <button
-        type="button"
-        disabled={pending}
-        onClick={() => {
-          if (!booked || confirm("Give up your spot? The next person on the waitlist gets it.")) run(() => declineSessionAction(sessionId, eventId));
-        }}
-        className={buttonClass("secondary", "md", "w-full")}
-      >
-        Can&apos;t make it
-      </button>
+      {booked ? (
+        <ConfirmButton
+          disabled={pending}
+          question="Give up your spot? The next person on the waitlist gets it."
+          yes="Give up my spot"
+          no="Stay in"
+          onConfirm={() => run(() => declineSessionAction(sessionId, eventId))}
+          className={buttonClass("secondary", "md", "w-full")}
+        >
+          Can&apos;t make it
+        </ConfirmButton>
+      ) : (
+        <button type="button" disabled={pending} onClick={() => run(() => declineSessionAction(sessionId, eventId))} className={buttonClass("secondary", "md", "w-full")}>
+          Can&apos;t make it
+        </button>
+      )}
       {err}
     </div>
   );

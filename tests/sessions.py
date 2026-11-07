@@ -123,6 +123,7 @@ with sync_playwright() as pw:
     who.get_by_role("button", name="Mark Marcus Lee as paid cash").click()
     expect(who.get_by_role("button", name="Marcus Lee paid cash. Untick")).to_be_visible()
     who.get_by_role("button", name="Remove Dan Kowalski").click()
+    who.get_by_role("group", name="Remove Dan Kowalski from this session?").get_by_role("button", name="Remove").click()
     expect(p.get_by_role("region", name="Who's coming").locator("li", has_text="Aisha")).to_be_visible()
     expect(p.get_by_role("region", name="Who's coming")).to_contain_text("1 paid")
     p.screenshot(path=f"{SHOTS}/session-staff.png", full_page=True)
@@ -162,6 +163,7 @@ with sync_playwright() as pw:
     # 7) Cancelling a session tells everyone booked.
     p.goto(f"{BASE}/s/{sid}")
     p.get_by_role("button", name="Cancel session").click()
+    p.get_by_role("button", name="Yes, cancel it").click()
     expect(p.get_by_text("This session is cancelled.")).to_be_visible()
     p.goto(f"{BASE}/dev/outbox")
     expect(p.locator("li", has_text="Cancelled: Indoor night game").first).to_be_visible()

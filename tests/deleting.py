@@ -62,6 +62,7 @@ with sync_playwright() as pw:
     p.get_by_role("link", name="Manage drop-in").click()
     p.wait_for_url(re.compile(r"/s/[0-9a-f-]{36}"))
     p.get_by_role("button", name="Delete session").click()
+    p.get_by_role("button", name="Yes, delete it").click()
     p.wait_for_url(re.compile(r"/t/t-strikers/schedule\?deleted=1"))
     expect(p.get_by_role("link", name=re.compile(r"^Delete me pickup"))).to_have_count(0)
 
@@ -79,7 +80,14 @@ with sync_playwright() as pw:
     weekly = p.get_by_role("region", name="Drop-ins you've set up")
     expect(weekly).to_contain_text("Weekly delete me")
     expect(p.get_by_role("link", name=re.compile(r"^Weekly delete me, Drop-in")).first).to_be_visible()
+    # No browser pop-up (they don't show in the phone app): the card asks inline, and Keep backs out.
+    p.on("dialog", lambda d: errors.append("browser pop-up: " + d.message))
     weekly.get_by_role("button", name="Delete Weekly delete me").click()
+    weekly.get_by_role("button", name="Keep it").click()
+    expect(weekly).to_contain_text("Weekly delete me")
+    weekly.get_by_role("button", name="Delete Weekly delete me").click()
+    p.screenshot(path="/tmp/claude-0/weekly-confirm.png", full_page=True)
+    weekly.get_by_role("button", name="Yes, delete it").click()
     expect(p.get_by_text("Weekly delete me", exact=True)).to_have_count(0)
     p.reload()
     expect(p.get_by_role("link", name=re.compile(r"^Weekly delete me"))).to_have_count(0)
