@@ -14,13 +14,19 @@ export function SessionForm({
   today,
   teamName,
   venues = [],
+  groups = [],
+  group: startGroup = "",
 }: {
   teamId: string;
   weekly?: boolean;
   today: string;
   teamName: string;
   venues?: { name: string; address: string | null }[];
+  /** The team's groups: a game can go to one group only. */
+  groups?: { id: string; name: string }[];
+  group?: string;
 }) {
+  const [group, setGroup] = useState(groups.some((g) => g.id === startGroup) ? startGroup : "");
   const [weekly, setWeekly] = useState(startWeekly);
   const [state, action, pending] = useActionState<FormState, FormData>(async (prev: FormState, f: FormData) => createSessionAction(teamId, f.get("weekly") === "on", prev, f), null);
   const fe = state?.fieldErrors ?? {};
@@ -32,6 +38,28 @@ export function SessionForm({
       <Field id="title" label="Name" error={fe.title} hint="Leave blank for “Drop-in game”.">
         <Input id="title" name="title" maxLength={80} placeholder="e.g. Sunday fun game, Indoor night 5-a-side" error={fe.title} />
       </Field>
+
+      {groups.length > 0 && (
+        <fieldset className="grid gap-1.5">
+          <legend className="pb-1 text-sm font-semibold">Who&apos;s it for?</legend>
+          <label className="flex min-h-11 items-start gap-3 rounded-md border border-border p-3 has-[:checked]:border-fg">
+            <input type="radio" name="groupId" value="" checked={group === ""} onChange={() => setGroup("")} className="mt-0.5 size-5 shrink-0 accent-[var(--team)]" />
+            <span>
+              <span className="block text-sm font-semibold">Everyone</span>
+              <span className="block text-xs text-muted">Your players, guest players and followers who want open games</span>
+            </span>
+          </label>
+          {groups.map((g) => (
+            <label key={g.id} className="flex min-h-11 items-start gap-3 rounded-md border border-border p-3 has-[:checked]:border-fg">
+              <input type="radio" name="groupId" value={g.id} checked={group === g.id} onChange={() => setGroup(g.id)} className="mt-0.5 size-5 shrink-0 accent-[var(--team)]" />
+              <span>
+                <span className="block text-sm font-semibold">Just {g.name}</span>
+                <span className="block text-xs text-muted">Only people in the group see it and get told</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+      )}
 
       <label className="flex min-h-11 items-center gap-3 justify-self-start rounded-md border border-border px-3">
         <input type="checkbox" name="weekly" checked={weekly} onChange={(e) => setWeekly(e.target.checked)} className="size-5 accent-[var(--team)]" />
@@ -84,11 +112,13 @@ export function SessionForm({
         <Field id="capacity" label="Spots" error={fe.capacity}>
           <Input id="capacity" name="capacity" type="number" min={1} max={500} defaultValue="20" error={fe.capacity} />
         </Field>
-        <Field id="memberSpots" label={`Kept for ${teamName} players`} error={fe.memberSpots} hint="The rest are open to anyone.">
-          <Input id="memberSpots" name="memberSpots" type="number" min={0} max={500} placeholder="0" value={held} onChange={(e) => setHeld(e.target.value)} error={fe.memberSpots} />
-        </Field>
+        {!group && (
+          <Field id="memberSpots" label={`Kept for ${teamName} players`} error={fe.memberSpots} hint="The rest are open to anyone.">
+            <Input id="memberSpots" name="memberSpots" type="number" min={0} max={500} placeholder="0" value={held} onChange={(e) => setHeld(e.target.value)} error={fe.memberSpots} />
+          </Field>
+        )}
       </div>
-      {Number(held) > 0 && (
+      {!group && Number(held) > 0 && (
         <Field id="releaseHours" label="Open kept spots to everyone" error={fe.releaseHours} hint="Hours before the start. Leave blank to keep them for players right up to kick-off.">
           <Input id="releaseHours" name="releaseHours" type="number" min={0} max={336} placeholder="e.g. 24" error={fe.releaseHours} />
         </Field>

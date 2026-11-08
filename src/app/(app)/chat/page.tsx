@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronRight, Handshake, MessageCircle, Shield } from "lucide-react";
+import { ChevronRight, Handshake, MessageCircle, Shield, UsersRound } from "lucide-react";
+import { myGroups } from "@/lib/groups/service";
 import { listConversations } from "@/lib/data";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { TeamCrest } from "@/components/ui";
@@ -8,10 +9,10 @@ import { TeamCrest } from "@/components/ui";
 export const metadata: Metadata = { title: "Chat" };
 
 export default async function ChatListPage() {
-  const convos = await listConversations();
+  const [convos, groups] = await Promise.all([listConversations(), myGroups().catch(() => [])]);
   return (
     <main id="main" className="gutter mx-auto grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-5 py-6">
-      <PageHeader title="Chat" subtitle="Every team you're on, a captains-only room for captains, and a room with your sponsors." />
+      <PageHeader title="Chat" subtitle="Every team you're on, the groups you're in, a captains-only room for captains, and a room with your sponsors." />
       {convos.length ? (
         <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
           {convos.map((c) => (
@@ -48,7 +49,39 @@ export default async function ChatListPage() {
           ))}
         </ul>
       ) : (
-        <EmptyState icon={<MessageCircle />} title="No chats yet" hint="Join or start a team to chat with your teammates." />
+        !groups.length && <EmptyState icon={<MessageCircle />} title="No chats yet" hint="Join or start a team to chat with your teammates." />
+      )}
+      {groups.length > 0 && (
+        <section aria-labelledby="grp-h" className="grid gap-2">
+          <h2 id="grp-h" className="eyebrow">
+            Groups
+          </h2>
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-2">
+            {groups.map((g) => (
+              <li key={g.id}>
+                <Link href={`/g/${g.id}`} className="flex min-h-16 items-center gap-3 rounded-lg border border-border p-3 hover:border-border-input focus-visible:outline-2 focus-visible:outline-focus">
+                  <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-pill bg-sunken">
+                    <UsersRound className="size-5" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold break-words">
+                      {g.name}
+                      <span className="font-normal text-muted"> · {g.teamName}</span>
+                    </span>
+                    <span className={`block truncate text-sm ${g.unread ? "font-semibold text-fg" : "text-muted"}`}>{g.last ? g.last.body : `${g.members} ${g.members === 1 ? "person" : "people"}`}</span>
+                  </span>
+                  {g.unread > 0 && (
+                    <span className="grid h-6 min-w-6 place-items-center rounded-pill bg-danger px-1.5 text-xs font-bold text-on-danger tabular">
+                      {g.unread}
+                      <span className="sr-only"> unread</span>
+                    </span>
+                  )}
+                  <ChevronRight aria-hidden className="size-5 shrink-0 text-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </main>
   );

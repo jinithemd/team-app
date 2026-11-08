@@ -53,6 +53,8 @@ export function EventForm({
   teamName,
   today,
   guests,
+  groups,
+  startGroup,
 }: {
   teamId: string;
   tz: string;
@@ -67,6 +69,9 @@ export function EventForm({
   startWeekly?: boolean;
   teamName?: string;
   today?: string;
+  /** Drop-ins can go to one of the team's groups. */
+  groups?: { id: string; name: string }[];
+  startGroup?: string;
   /** New events: the team's guest list, to choose who else gets this. */
   guests?: { id: string; name: string }[];
 }) {
@@ -137,13 +142,13 @@ export function EventForm({
         )}
       </div>
       {dropIn ? (
-        <p className="text-xs text-muted">A game anyone can book: your players and the people who follow your team. Set the cost and the number of spots.</p>
+        <p className="text-xs text-muted">A game people book a spot in: for everyone (your players and followers), or just one of your groups. Set the cost and the number of spots.</p>
       ) : (
         !canFixtures && <p className="text-xs text-muted">Matches and tournaments are added by your manager.</p>
       )}
     </fieldset>
   );
-  if (dropIn) return <div className="grid gap-5">{picker}<SessionForm teamId={teamId} today={today ?? initial.date} teamName={teamName ?? "your team"} venues={venues.map((v) => ({ name: v.name, address: v.address }))} weekly={startWeekly} /></div>;
+  if (dropIn) return <div className="grid gap-5">{picker}<SessionForm teamId={teamId} today={today ?? initial.date} teamName={teamName ?? "your team"} venues={venues.map((v) => ({ name: v.name, address: v.address }))} weekly={startWeekly} groups={groups} group={startGroup} /></div>;
   return (
     <form action={action} className="grid gap-5" noValidate>
       <input type="hidden" name="type" value={kind} />

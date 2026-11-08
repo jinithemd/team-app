@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { DEFAULT_TZ } from "@/lib/time";
 import Link from "next/link";
-import { ChevronRight, Pencil, UserPlus, Users } from "lucide-react";
+import { ChevronRight, Pencil, UserPlus, Users, UsersRound } from "lucide-react";
 import { getTeam, listJoinRequests, listRoster, listTeamUnavailable } from "@/lib/data";
 import { JoinRequests } from "./join-requests";
 import { guestList } from "@/lib/guests/service";
 import { GuestList } from "@/components/guests";
 import { ExportLink } from "@/components/export-link";
+import { teamGroups } from "@/lib/groups/service";
 import { Avatar, Banner, ButtonLink, EmptyState } from "@/components/ui";
 import { HatBadges } from "@/components/hats";
 import { ROLE_LABEL, TEAM_ROLES, hatLabels, type RosterRow } from "@/lib/data/types";
@@ -23,7 +24,8 @@ export default async function RosterPage({
   const { teamId } = await params;
   const sp = await searchParams;
   const [team, roster, out, requests] = await Promise.all([getTeam(teamId), listRoster(teamId), listTeamUnavailable(teamId), listJoinRequests(teamId)]);
-  const guests = await guestList(teamId);
+  const [guests, gr] = await Promise.all([guestList(teamId), teamGroups(teamId)]);
+  const groups = gr?.groups ?? [];
   if (!team) return null;
   const players = roster.filter((r) => r.isPlayer);
   const others = roster.filter((r) => !r.isPlayer);
@@ -134,6 +136,20 @@ export default async function RosterPage({
         </>
       )}
       {guests && <GuestList teamId={teamId} guests={guests.guests} manage={guests.manage} />}
+      {(team.isStaff || groups.length > 0) && (
+        <Link href={`/t/${teamId}/groups`} className="flex min-h-16 items-center gap-3 rounded-lg border border-border p-3 hover:border-border-input">
+          <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-pill bg-team-soft text-team-ink">
+            <UsersRound className="size-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold">Groups</span>
+            <span className="block text-sm text-muted">
+              {groups.length ? groups.map((g) => g.name).join(", ") : "Make a group for your Sunday regulars, with its own chat"}
+            </span>
+          </span>
+          <ChevronRight aria-hidden className="size-5 shrink-0 text-muted" />
+        </Link>
+      )}
       {team.isStaff && (
         <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm font-semibold">
           <span className="text-muted">Export:</span>

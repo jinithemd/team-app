@@ -28,6 +28,8 @@ export interface Series {
   skipDates: string[];
   active: boolean;
   createdBy: string | null;
+  /** Posted to one group only (null = the team and its followers). */
+  groupId?: string | null;
 }
 
 export interface Session {
@@ -49,6 +51,8 @@ export interface Session {
   postAt: string;
   announcedAt: string | null;
   createdBy: string | null;
+  /** Posted to one group only (null = the team and its followers). */
+  groupId?: string | null;
 }
 
 export type BookingStatus = "booked" | "held" | "waitlist" | "cancelled";
@@ -91,13 +95,13 @@ const toSeries = (r: Row): Series => ({
   id: s(r.id)!, teamId: s(r.team_id)!, title: s(r.title)!, weekday: Number(r.weekday), startTime: hm(r.start_time), endTime: hm(r.end_time), tz: s(r.tz) ?? "America/Toronto",
   venueName: s(r.venue_name), venueAddress: s(r.venue_address), priceCents: Number(r.price_cents ?? 0), capacity: Number(r.capacity), memberSpots: Number(r.member_spots ?? 0),
   releaseHours: r.release_hours == null ? null : Number(r.release_hours), postDaysBefore: Number(r.post_days_before ?? 6), postTime: hm(r.post_time), notes: s(r.notes),
-  skipDates: ((r.skip_dates as string[] | null) ?? []).map(String), active: !!r.active, createdBy: s(r.created_by),
+  skipDates: ((r.skip_dates as string[] | null) ?? []).map(String), active: !!r.active, createdBy: s(r.created_by), groupId: s(r.group_id),
 });
 const fromSeries = (x: Partial<Series>): Row => {
   const m: Record<string, string> = {
     teamId: "team_id", title: "title", weekday: "weekday", startTime: "start_time", endTime: "end_time", tz: "tz", venueName: "venue_name", venueAddress: "venue_address",
     priceCents: "price_cents", capacity: "capacity", memberSpots: "member_spots", releaseHours: "release_hours", postDaysBefore: "post_days_before", postTime: "post_time",
-    notes: "notes", skipDates: "skip_dates", active: "active", createdBy: "created_by",
+    notes: "notes", skipDates: "skip_dates", active: "active", createdBy: "created_by", groupId: "group_id",
   };
   const out: Row = {};
   for (const [k, v] of Object.entries(x)) if (m[k]) out[m[k]] = v;
@@ -107,13 +111,13 @@ const toSession = (r: Row): Session => ({
   id: s(r.id)!, teamId: s(r.team_id)!, seriesId: s(r.series_id), title: s(r.title)!, startsAt: new Date(String(r.starts_at)).toISOString(), endsAt: new Date(String(r.ends_at)).toISOString(),
   tz: s(r.tz) ?? "America/Toronto", venueName: s(r.venue_name), venueAddress: s(r.venue_address), priceCents: Number(r.price_cents ?? 0), capacity: Number(r.capacity),
   memberSpots: Number(r.member_spots ?? 0), releaseAt: r.release_at ? new Date(String(r.release_at)).toISOString() : null, notes: s(r.notes), status: r.status as Session["status"],
-  postAt: new Date(String(r.post_at)).toISOString(), announcedAt: s(r.announced_at), createdBy: s(r.created_by),
+  postAt: new Date(String(r.post_at)).toISOString(), announcedAt: s(r.announced_at), createdBy: s(r.created_by), groupId: s(r.group_id),
 });
 const fromSession = (x: Partial<Session>): Row => {
   const m: Record<string, string> = {
     id: "id", teamId: "team_id", seriesId: "series_id", title: "title", startsAt: "starts_at", endsAt: "ends_at", tz: "tz", venueName: "venue_name", venueAddress: "venue_address",
     priceCents: "price_cents", capacity: "capacity", memberSpots: "member_spots", releaseAt: "release_at", notes: "notes", status: "status", postAt: "post_at",
-    announcedAt: "announced_at", createdBy: "created_by",
+    announcedAt: "announced_at", createdBy: "created_by", groupId: "group_id",
   };
   const out: Row = {};
   for (const [k, v] of Object.entries(x)) if (m[k]) out[m[k]] = v;
@@ -189,6 +193,13 @@ export async function sessionsForTeams(teamIds: string[], fromIso: string, nowIs
   if (!teamIds.length) return [];
   if (!LIVE) return mem.sessions.filter((x) => teamIds.includes(x.teamId) && x.endsAt >= fromIso && x.postAt <= nowIso && x.status === "scheduled").sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const { data } = await (await admin()).from("game_sessions").select("*").in("team_id", teamIds).eq("status", "scheduled").gte("ends_at", fromIso).lte("post_at", nowIso).order("starts_at").limit(30);
+  return (data ?? []).map(toSession);
+}
+/** Posted, upcoming sessions of some groups. */
+export async function sessionsForGroups(groupIds: string[], nowIso: string): Promise<Session[]> {
+  if (!groupIds.length) return [];
+  if (!LIVE) return mem.sessions.filter((x) => x.groupId && groupIds.includes(x.groupId) && x.endsAt >= nowIso && x.postAt <= nowIso && x.status === "scheduled").sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+  const { data } = await (await admin()).from("game_sessions").select("*").in("group_id", groupIds).eq("status", "scheduled").gte("ends_at", nowIso).lte("post_at", nowIso).order("starts_at").limit(30);
   return (data ?? []).map(toSession);
 }
 export async function sessionById(id: string): Promise<Session | null> {
@@ -387,6 +398,7 @@ export async function deleteSession(id: string) {
 
 /** Puts a posted session on the team's calendar (schedule, calendar, phone feeds), or updates it. */
 export async function syncCalendarEvent(x: Session) {
+  if (x.groupId) return; // a group's game lives on the group's page and its people's Home, not the team schedule
   const fields = {
     title: x.title, startAt: x.startsAt, endAt: x.endsAt, tz: x.tz, locationText: [x.venueName, x.venueAddress].filter(Boolean).join(", ") || null,
     notes: x.notes, status: x.status === "cancelled" ? ("cancelled" as const) : ("active" as const),

@@ -6,10 +6,11 @@ import { getTeam, listVenues, myPerms } from "@/lib/data";
 import { DEFAULT_TZ, utcToZoned } from "@/lib/time";
 import { EventForm } from "@/components/event-form";
 import { guestList } from "@/lib/guests/service";
+import { teamGroups } from "@/lib/groups/service";
 
 export const metadata: Metadata = { title: "New event" };
 
-export default async function NewEventPage({ params, searchParams }: { params: Promise<{ teamId: string }>; searchParams: Promise<{ type?: string; weekly?: string }> }) {
+export default async function NewEventPage({ params, searchParams }: { params: Promise<{ teamId: string }>; searchParams: Promise<{ type?: string; weekly?: string; group?: string }> }) {
   const { teamId } = await params;
   const sp = await searchParams;
   const [team, perms, venues] = await Promise.all([getTeam(teamId), myPerms(teamId), listVenues(teamId)]);
@@ -21,7 +22,7 @@ export default async function NewEventPage({ params, searchParams }: { params: P
         <p className="text-muted">Ask your captain if something is missing from the schedule.</p>
       </div>
     );
-  const gl = await guestList(teamId);
+  const [gl, gr] = await Promise.all([guestList(teamId), teamGroups(teamId)]);
   const today = utcToZoned(new Date().toISOString(), DEFAULT_TZ).date;
   const type = sp.type === "training" || sp.type === "social" || sp.type === "tournament" ? sp.type : "match";
   return (
@@ -38,6 +39,8 @@ export default async function NewEventPage({ params, searchParams }: { params: P
         canFixtures={perms.games}
         canEvents={perms.events}
         startDropIn={sp.type === "dropin"}
+        groups={gr?.manage ? gr.groups.map((g) => ({ id: g.id, name: g.name })) : undefined}
+        startGroup={sp.group}
         startWeekly={sp.weekly === "1"}
         teamName={team.name}
         today={today}

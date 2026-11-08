@@ -49,7 +49,7 @@ with sync_playwright() as pw:
     p.get_by_role("link", name="New event").first.click()
     p.wait_for_url(re.compile(r"/e/new$"))
     p.get_by_role("radio", name="Drop-in").click()
-    expect(p.get_by_text("A game anyone can book")).to_be_visible()
+    expect(p.get_by_text("A game people book a spot in")).to_be_visible()
     p.fill("#title", "Indoor night game")
     p.fill("#date", day); p.fill("#startTime", "21:00"); p.fill("#endTime", "22:30")
     p.fill("#venueName", "Invista Centre")

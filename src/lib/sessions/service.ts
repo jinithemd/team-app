@@ -31,6 +31,13 @@ async function canManage(teamId: string) {
 async function isMember(uid: string | null | undefined, teamId: string) {
   return !!uid && (await st.teamMemberIds(teamId)).includes(uid);
 }
+/** The groups I'm in (a group's games are only for its people). */
+async function myGroupIds(uid: string | null | undefined): Promise<Set<string>> {
+  if (!uid) return new Set();
+  const { membershipsOf } = await import("../groups/store");
+  return new Set((await membershipsOf(uid)).map((m) => m.groupId));
+}
+const forMe = (s: Session, groups: Set<string>, manage = false) => !s.groupId || manage || groups.has(s.groupId);
 
 // ---------------------------------------------------------------------------
 // spots
@@ -82,7 +89,11 @@ async function announce(s: Session) {
   const team = await st.teamBasics(s.teamId);
   if (!team) return;
   const { followersFor } = await import("../followers");
-  const ids = [...new Set([...(await st.teamMemberIds(s.teamId)), ...(await followersFor(s.teamId, "games"))])].filter((id) => id !== s.createdBy);
+  const groups = s.groupId ? await import("../groups/service") : null;
+  const groupName = groups ? await groups.groupName(s.groupId!) : null;
+  const ids = (
+    groups ? await groups.groupMemberIds(s.groupId!) : [...new Set([...(await st.teamMemberIds(s.teamId)), ...(await followersFor(s.teamId, "games"))])]
+  ).filter((id) => id !== s.createdBy);
   const who = await st.people(ids);
   const sp = spots(s, []);
   const when = `${formatLongDate(s.startsAt, s.tz)}, ${formatTimeRange(s.startsAt, s.endsAt, s.tz)}`;
@@ -90,11 +101,12 @@ async function announce(s: Session) {
     [...who.values()].filter((p) => p.email).map((p) => ({
       key: `session:${s.id}:${p.id}`,
       to: p.email,
-      subject: `${team.name} · ${s.title}, ${formatLongDate(s.startsAt, s.tz)}`,
+      subject: `${groupName ?? team.name} · ${s.title}, ${formatLongDate(s.startsAt, s.tz)}`,
       text: `${when}${s.venueName ? ` at ${s.venueName}` : ""}. ${money(s.priceCents)} to play. ${s.capacity} spots${sp.held ? ` (${sp.held} kept for ${team.name} players)` : ""}. Book yours before it fills up.`,
       links: [{ label: "Book a spot", href: `${APP_URL}/s/${s.id}` }],
     })),
   );
+  if (groups) return; // a group's game is for the group only
   // The team's guest players hear about drop-in games too.
   const { announceSession } = await import("../guests/service");
   await announceSession(
@@ -114,7 +126,7 @@ export async function runDue(nowIso = new Date().toISOString()) {
         teamId: x.teamId, seriesId: x.id, title: x.title, startsAt: o.startsAt, endsAt: o.endsAt, tz: x.tz, venueName: x.venueName, venueAddress: x.venueAddress,
         priceCents: x.priceCents, capacity: x.capacity, memberSpots: x.memberSpots,
         releaseAt: x.releaseHours != null && x.memberSpots ? new Date(Date.parse(o.startsAt) - x.releaseHours * 3600_000).toISOString() : null,
-        notes: x.notes, status: "scheduled", postAt: o.postAt, announcedAt: null, createdBy: x.createdBy,
+        notes: x.notes, status: "scheduled", postAt: o.postAt, announcedAt: null, createdBy: x.createdBy, groupId: x.groupId ?? null,
       });
     }
   }
@@ -165,7 +177,8 @@ export async function teamSessions(teamId: string) {
   if (!u || !team) return null;
   const manage = await canManage(teamId);
   if (!manage && !(await isMember(u.id, teamId))) return null;
-  const list = (await st.sessionsFor(teamId, new Date().toISOString())).filter((s) => manage || (Date.parse(s.postAt) <= Date.now() && s.status === "scheduled"));
+  const groups = await myGroupIds(u.id);
+  const list = (await st.sessionsFor(teamId, new Date().toISOString())).filter((s) => manage || (Date.parse(s.postAt) <= Date.now() && s.status === "scheduled" && forMe(s, groups)));
   const bookings = await st.bookingsFor(list.map((s) => s.id));
   const series: SeriesView[] = manage ? (await st.seriesFor(teamId)).map((x) => ({ ...x, next: occurrences(x).slice(0, 3) })) : [];
   return { team, manage, sessions: list.map((s) => card(s, team.name, bookings, u.id)), series };
@@ -177,7 +190,8 @@ export async function publicSessions(teamId: string): Promise<SessionCard[]> {
   const team = await st.teamBasics(teamId);
   if (!team) return [];
   const u = await me();
-  const list = (await st.sessionsFor(teamId, new Date().toISOString())).filter((s) => Date.parse(s.postAt) <= Date.now() && s.status === "scheduled");
+  const groups = await myGroupIds(u?.id);
+  const list = (await st.sessionsFor(teamId, new Date().toISOString())).filter((s) => Date.parse(s.postAt) <= Date.now() && s.status === "scheduled" && forMe(s, groups));
   const bookings = await st.bookingsFor(list.map((s) => s.id));
   return list.slice(0, 8).map((s) => card(s, team.name, bookings, u?.id ?? null));
 }
@@ -187,7 +201,11 @@ export async function sessionsForMe(teamIds: string[]): Promise<SessionCard[]> {
   const u = await me();
   if (!u) return [];
   const ids = [...new Set([...teamIds, ...(await st.followedTeamIds(u.id))])];
-  const list = await st.sessionsForTeams(ids, new Date().toISOString(), new Date().toISOString());
+  const groups = await myGroupIds(u.id);
+  const nowIso = new Date().toISOString();
+  const [teamList, groupList] = await Promise.all([st.sessionsForTeams(ids, nowIso, nowIso), st.sessionsForGroups([...groups], nowIso)]);
+  const seen = new Set<string>();
+  const list = [...teamList.filter((s) => forMe(s, groups)), ...groupList].filter((s) => !seen.has(s.id) && seen.add(s.id)).sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   const bookings = await st.bookingsFor(list.map((s) => s.id));
   const names = new Map<string, string>();
   for (const id of new Set(list.map((s) => s.teamId))) names.set(id, (await st.teamBasics(id))?.name ?? "");
@@ -216,10 +234,11 @@ export async function sessionPage(id: string): Promise<SessionPage | null> {
   const team = await st.teamBasics(s.teamId);
   if (!team) return null;
   const u = await me();
-  const member = await isMember(u?.id, s.teamId);
   const manage = !!u && (await canManage(s.teamId));
+  // A group's game: only its people (and team staff) see it, and they're the "members".
+  const member = s.groupId ? (await myGroupIds(u?.id)).has(s.groupId) : await isMember(u?.id, s.teamId);
   const posted = Date.parse(s.postAt) <= Date.now();
-  if (!manage && (!posted || (!team.isPublic && !member))) return null;
+  if (!manage && (!posted || (s.groupId ? !member : !team.isPublic && !member))) return null;
   const bookings = await st.bookingsFor([s.id]);
   const sp = spots(s, bookings);
   const now = Date.now();
@@ -252,7 +271,7 @@ export async function book(sessionId: string): Promise<Result<{ status: Booking[
   if (p.mine) return fail(p.mine.status === "waitlist" ? "You're already on the waitlist." : "You've already got a spot.");
   if (!p.canBook) return fail(p.started ? "This session has started." : "This session isn't taking bookings.");
   const status: Booking["status"] = p.canBook === "waitlist" ? "waitlist" : "booked";
-  if (!p.member && p.team.isPublic) await setFollow(p.team.id, true).catch(() => {}); // people who book follow the team
+  if (!p.member && !p.s.groupId && p.team.isPublic) await setFollow(p.team.id, true).catch(() => {}); // people who book follow the team
   const { teamCollector } = await import("../payments/service");
   const online = status === "booked" && p.s.priceCents > 0 && (await teamCollector(p.s.teamId)).active;
   const b = await st.upsertBooking({
@@ -367,6 +386,8 @@ export interface SessionInput {
   postDate?: string;
   postTime?: string;
   postDaysBefore?: string; // weekly
+  /** Post to one of the team's groups only. */
+  groupId?: string;
 }
 
 function validate(input: SessionInput, weekly: boolean) {
@@ -398,9 +419,33 @@ function validate(input: SessionInput, weekly: boolean) {
   };
 }
 
+/** The group a session is posted to, if it's one of this team's. */
+async function teamGroup(teamId: string, groupId?: string): Promise<string | null | false> {
+  if (!groupId) return null;
+  const { groupById } = await import("../groups/store");
+  const g = await groupById(groupId);
+  return g && g.teamId === teamId ? g.id : false;
+}
+
+/** Upcoming posted games for a group (its page): for its people and team staff. */
+export async function groupSessions(groupId: string): Promise<SessionCard[]> {
+  await runDue().catch(() => {});
+  const u = await me();
+  const { groupById } = await import("../groups/store");
+  const g = await groupById(groupId);
+  if (!u || !g) return [];
+  if (!(await myGroupIds(u.id)).has(groupId) && !(await canManage(g.teamId))) return [];
+  const list = await st.sessionsForGroups([groupId], new Date().toISOString());
+  const bookings = await st.bookingsFor(list.map((s) => s.id));
+  const team = await st.teamBasics(g.teamId);
+  return list.map((s) => card(s, team?.name ?? "", bookings, u.id));
+}
+
 export async function createSession(teamId: string, input: SessionInput): Promise<Result<{ id: string }>> {
   const u = await me();
   if (!u || !(await canManage(teamId))) return fail("Only team staff can post sessions.");
+  const groupId = await teamGroup(teamId, input.groupId);
+  if (groupId === false) return fail("Pick one of your team's groups.");
   const v = validate(input, false);
   const tz = DEFAULT_TZ;
   let startsAt = "",
@@ -417,7 +462,7 @@ export async function createSession(teamId: string, input: SessionInput): Promis
   const s = await st.insertSession({
     teamId, seriesId: null, title: v.title, startsAt, endsAt, tz, venueName: v.venueName, venueAddress: v.venueAddress, priceCents: v.priceCents, capacity: v.capacity,
     memberSpots: v.memberSpots, releaseAt: v.releaseHours != null && v.memberSpots ? new Date(Date.parse(startsAt) - v.releaseHours * 3600_000).toISOString() : null,
-    notes: v.notes, status: "scheduled", postAt, announcedAt: null, createdBy: u.id,
+    notes: v.notes, status: "scheduled", postAt, announcedAt: null, createdBy: u.id, groupId,
   });
   if (s && postAt <= new Date().toISOString()) await announce(s);
   return { ok: true, data: { id: s!.id } };
@@ -426,12 +471,14 @@ export async function createSession(teamId: string, input: SessionInput): Promis
 export async function createSeries(teamId: string, input: SessionInput): Promise<Result<{ id: string }>> {
   const u = await me();
   if (!u || !(await canManage(teamId))) return fail("Only team staff can set up weekly sessions.");
+  const groupId = await teamGroup(teamId, input.groupId);
+  if (groupId === false) return fail("Pick one of your team's groups.");
   const v = validate(input, true);
   if (Object.keys(v.fe).length) return fail("Check the highlighted fields.", v.fe);
   const x = await st.insertSeries({
     teamId, title: v.title, weekday: v.weekday, startTime: input.startTime, endTime: input.endTime, tz: DEFAULT_TZ, venueName: v.venueName, venueAddress: v.venueAddress,
     priceCents: v.priceCents, capacity: v.capacity, memberSpots: v.memberSpots, releaseHours: v.releaseHours, postDaysBefore: v.postDaysBefore, postTime: v.postTime,
-    notes: v.notes, skipDates: [], active: true, createdBy: u.id,
+    notes: v.notes, skipDates: [], active: true, createdBy: u.id, groupId,
   });
   await runDue();
   return { ok: true, data: { id: x.id } };

@@ -15,7 +15,7 @@ function input(f: FormData): svc.SessionInput {
     title: str(f, "title"), date: str(f, "date"), weekday: str(f, "weekday"), startTime: str(f, "startTime"), endTime: str(f, "endTime"),
     venueName: str(f, "venueName"), venueAddress: str(f, "venueAddress"), price: str(f, "price"), capacity: str(f, "capacity"), memberSpots: str(f, "memberSpots"),
     releaseHours: str(f, "releaseHours"), notes: str(f, "notes"), postWhen: str(f, "postWhen") === "later" ? "later" : "now", postDate: str(f, "postDate"),
-    postTime: str(f, "postTime"), postDaysBefore: str(f, "postDaysBefore"),
+    postTime: str(f, "postTime"), postDaysBefore: str(f, "postDaysBefore"), groupId: str(f, "groupId") || undefined,
   };
 }
 
