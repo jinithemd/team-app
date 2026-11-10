@@ -1,0 +1,210 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+Malayalam:wght@800&family=Baloo+2:wght@800&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="captions.js"></script>
+<script>
+const W = 1080, H = 1920, FPS = 30, TOTAL = 41.0;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const ML = "'Noto Sans Malayalam', sans-serif", BAL = "'Baloo 2', sans-serif", OSW = "'Oswald', sans-serif", BEB = "'Bebas Neue', sans-serif";
+const SKY = '#3aa6ff', NAVY = '#0b1f4d', LIME = '#c6ff3d', PINK = '#ff3d7f', WHITE = '#ffffff', GOLD = '#ffc928', GREEN = '#22c55e';
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = x => 1 - Math.pow(1 - x, 3), easeIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = x => { const c1 = 1.9, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function rnd(i) { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }
+const isML = s => /[ഀ-ൿ]/.test(s);
+function rr(x, y, w, h, r, fill) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); }
+function circ(x, y, r, fill) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = fill; ctx.fill(); }
+function txt(s, x, y, size, font, color, stroke = 0, align = 'center', sc = 'rgba(0,0,0,.85)') {
+  ctx.save(); ctx.font = `${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (stroke) { ctx.lineWidth = stroke; ctx.strokeStyle = sc; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
+  ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+}
+function tw(s, size, font) { ctx.save(); ctx.font = `${size}px ${font}`; const w = ctx.measureText(s).width; ctx.restore(); return w; }
+function pop(s, x, y, size, color, t, t0, font, rot = -.04) {
+  const p = seg(t, t0, t0 + .22); if (p <= 0) return;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot * (1 - p)); const k = back(p); ctx.scale(k, k);
+  txt(s, 0, 0, size, font || (isML(s) ? ML : BAL), color, size * .16); ctx.restore();
+}
+/* pill label that springs in */
+function pill(s, x, y, size, bg, fg, t, t0, rot = 0) {
+  const p = seg(t, t0, t0 + .25); if (p <= 0) return;
+  const f = isML(s) ? ML : BAL, w = tw(s, size, f) + size * 1.2, h = size * 1.8;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); const k = back(p); ctx.scale(k, k);
+  rr(-w / 2 + 6, -h / 2 + 8, w, h, h / 2, 'rgba(0,0,0,.35)'); rr(-w / 2, -h / 2, w, h, h / 2, bg); txt(s, 0, 3, size, f, fg); ctx.restore();
+}
+function stamp(s, x, y, size, color, t, t0, rot = -.15) {
+  const p = seg(t, t0, t0 + .16); if (p <= 0) return;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); const k = lerp(2.4, 1, easeOut(p)); ctx.scale(k, k); ctx.globalAlpha = p;
+  const f = isML(s) ? ML : BEB; ctx.font = `${size}px ${f}`; const w = ctx.measureText(s).width + size * .7, h = size * 1.3;
+  rr(-w / 2, -h / 2, w, h, 18, 'rgba(255,255,255,.92)'); ctx.lineWidth = size * .08; ctx.strokeStyle = color; ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, 18); ctx.stroke();
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = color; ctx.fillText(s, 0, size * .06); ctx.restore();
+}
+function bubble(s, x, y, size, t, t0, bg, fg, tailX, tailDown = true, maxW = 900) {
+  const p = seg(t, t0, t0 + .25); if (p <= 0) return;
+  ctx.save(); ctx.translate(x, y); const k = back(p); ctx.scale(k, k);
+  ctx.font = `${size}px ${ML}`; const L = s.split('\n'); let w = Math.min(maxW, Math.max(...L.map(l => ctx.measureText(l).width)) + size * 1.2), h = size * (0.8 + 1.25 * L.length);
+  rr(-w / 2, -h / 2, w, h, 34, bg); ctx.fillStyle = bg; ctx.beginPath();
+  const ty = tailDown ? h / 2 - 4 : -h / 2 + 4, dir = tailDown ? 1 : -1;
+  ctx.moveTo(tailX - 30, ty); ctx.lineTo(tailX + 30, ty); ctx.lineTo(tailX, ty + 60 * dir); ctx.fill();
+  L.forEach((l, i) => txt(l, 0, 4 + (i - (L.length - 1) / 2) * size * 1.25, size, ML, fg)); ctx.restore();
+}
+function bg(c1, c2) { const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, c1); g.addColorStop(1, c2); ctx.fillStyle = g; ctx.fillRect(-100, -100, W + 200, H + 200); }
+function rays(cx, cy, c1, c2, t, n = 20) {
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * .2);
+  for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? c1 : c2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 2400, i * 2 * Math.PI / n, (i + 1) * 2 * Math.PI / n); ctx.fill(); }
+  ctx.restore();
+}
+/* a big phone mockup; draws content via callback in local coords (0..560 x 0..1120) */
+function phone(x, y, s, rot, draw) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); ctx.scale(s, s); ctx.translate(-300, -600);
+  rr(14, 18, 600, 1200, 80, 'rgba(0,0,0,.35)'); rr(0, 0, 600, 1200, 80, '#111'); rr(20, 20, 560, 1160, 64, '#f4f6fb');
+  ctx.save(); ctx.beginPath(); ctx.roundRect(20, 20, 560, 1160, 64); ctx.clip(); ctx.translate(20, 20); draw(); ctx.restore();
+  rr(230, 34, 140, 34, 17, '#111'); ctx.restore();
+}
+function confetti(t, t0, n = 60) {
+  const p = t - t0; if (p < 0) return;
+  for (let i = 0; i < n; i++) { const x = rnd(i) * W + Math.sin(p * 3 + i) * 40, y = -50 + ((p * (300 + rnd(i + 3) * 400) + rnd(i + 7) * H) % (H + 100));
+    ctx.save(); ctx.translate(x, y); ctx.rotate(p * 4 + i); ctx.fillStyle = [SKY, LIME, PINK, GOLD, WHITE][i % 5]; ctx.fillRect(-10, -5, 20, 10); ctx.restore(); }
+}
+
+const cache = new Map();
+function loadImg(src) { if (cache.has(src)) return cache.get(src);
+  const p = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  cache.set(src, p); if (cache.size > 40) cache.delete(cache.keys().next().value); return p; }
+async function clip(name, lt, speed = 1, from = 0, zoom = 1) { const k = clamp(Math.floor((from + lt * speed) * FPS) + 1, 1, 180);
+  ctx.drawImage(await loadImg(`frames/${name}/${String(k).padStart(4, '0')}.jpg`), W / 2 - W * zoom / 2, H - H * zoom, W * zoom, H * zoom); }
+
+/* running checklist of everything this guy does */
+const TASKS = [['🤝 സ്പോൺസർ', 7.6], ['👕 ജേഴ്സി', 10.4], ['🏟️ ടർഫ്', 13.4], ['⚽ മാച്ച്', 16.4], ['🏃 ട്രെയിനിങ്', 19.4], ['🔥 കളിക്കാരൻ', 23.3]];
+function checklist(t) {
+  if (t < 7.4 || t > 30.5) return;
+  const a = seg(t, 7.4, 7.7) * (1 - seg(t, 30.2, 30.5)); ctx.save(); ctx.globalAlpha = a;
+  const slot = 158, x0 = W / 2 - slot * 3 + slot / 2;
+  rr(40, 150, W - 80, 120, 30, 'rgba(11,31,77,.78)');
+  TASKS.forEach(([s, t0], i) => { const x = x0 + i * slot, y = 210, p = seg(t, t0, t0 + .25);
+    circ(x, y, 44, p > 0 ? WHITE : 'rgba(255,255,255,.18)');
+    if (p > 0) { ctx.save(); ctx.translate(x, y); ctx.scale(back(p), back(p)); txt(s.split(' ')[0], 0, 2, 46, BAL, '#000'); circ(32, 30, 18, GREEN); txt('✓', 32, 32, 24, BAL, WHITE); ctx.restore(); } });
+  ctx.restore();
+}
+const S = [
+  { a: 0, async draw(t) {   // intro: the guy on the phone at practice
+      await clip('f1', t, 1.1);
+      pill('എല്ലാ ടീമിലും ഉണ്ട് ഇവൻ 👇', W / 2, 330, 54, LIME, NAVY, t, .5, -.03);
+      if (t > 1.6) { const k = back(seg(t, 1.6, 1.9)); ctx.save(); ctx.translate(W / 2 + 230, 820); ctx.scale(k, k); ctx.rotate(Math.sin(t * 6) * .08);
+        rr(-170, -60, 340, 120, 60, PINK); txt('ALL IN ALL', 0, 4, 64, BEB, WHITE); ctx.restore(); }
+    } },
+  { a: 4.2, async draw(t) {   // sponsor
+      await clip('f4', t, 1.15, 0, 1.14);
+      pill('സ്പോൺസർ വേട്ട 💼', W / 2, 360, 56, SKY, WHITE, t, .3, .03);
+      stamp('DEAL ✓', W / 2 + 120, 1250, 120, GREEN, t, 3.4, -.15);
+    } },
+  { a: 9.2, async draw(t) {   // jersey
+      await clip('f5', t, 1.0, 1.3);
+      pill('ജേഴ്സി റെഡി 👕', W / 2, 360, 56, PINK, WHITE, t, .3, -.03);
+    } },
+  { a: 12.0, draw(t) {   // turf booking + message flood
+      bg('#1a7f3c', '#0b4d22'); ctx.strokeStyle = 'rgba(255,255,255,.18)'; ctx.lineWidth = 8; for (let i = 0; i < 6; i++) { ctx.strokeRect(80 + i * 6, 260 + i * 6, W - 160 - i * 12, H - 520 - i * 12); break; }
+      ctx.beginPath(); ctx.arc(W / 2, H / 2, 200, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.moveTo(80, H / 2); ctx.lineTo(W - 80, H / 2); ctx.stroke();
+      const booked = t > 1.0;
+      phone(W / 2, 1000, .95, -.04, () => {
+        rr(0, 0, 560, 160, 0, booked ? GREEN : NAVY); txt(booked ? 'BOOKED ✅' : 'TURF BOOKING', 280, 100, 52, BEB, WHITE);
+        txt('ശനി · Saturday', 280, 230, 36, ML, '#555');
+        ['5 PM', '6 PM', '7 PM', '8 PM', '9 PM'].forEach((s, i) => { const sel = i === 2, y = 300 + i * 120;
+          rr(40, y, 480, 96, 24, sel && booked ? GREEN : sel ? SKY : '#e2e8f0'); txt(s + (sel && booked ? '  ✓' : ''), 280, y + 50, 44, OSW, sel ? WHITE : '#334155'); });
+        if (t > .6 && t < 1.0) circ(280, 300 + 2 * 120 + 48, 60 * (1 + (t - .6) * 2), 'rgba(58,166,255,.35)');   // tap
+        txt('₹1,500', 280, 960, 64, OSW, NAVY);
+      });
+      const msgs = ['മച്ചാനെ, നാളെ കളിയുണ്ടോ? ⚽', 'ജേഴ്സി സൈസ് L മതി 😅', 'ബോൾ ആര് കൊണ്ടുവരും?', 'ടർഫ് എവിടെയാ? 📍', 'ഞാൻ ലേറ്റ് ആകും 🙏'];
+      msgs.forEach((m, i) => { const t0 = 1.5 + i * .3; const p = seg(t, t0, t0 + .2); if (p <= 0) return;
+        ctx.save(); const x = i % 2 ? 640 : 440, y = 420 + i * 230; ctx.translate(x, y); ctx.rotate((rnd(i) - .5) * .12); ctx.scale(back(p), back(p));
+        const w = tw(m, 38, ML) + 120; rr(-w / 2, -54, w, 108, 26, WHITE); circ(-w / 2 + 50, 0, 30, [SKY, PINK, GOLD, LIME, GREEN][i]); txt(m, -w / 2 + 96, 2, 38, ML, '#111', 0, 'left'); ctx.restore(); });
+    } },
+  { a: 15.2, draw(t) {   // fixing the match on a call
+      rays(W / 2, 900, '#ff3d7f', '#ff5c93', t, 22);
+      phone(W / 2, 980, .9, .04, () => {
+        bg2(); function bg2() { const g = ctx.createLinearGradient(0, 0, 0, 1160); g.addColorStop(0, '#1e293b'); g.addColorStop(1, '#0f172a'); ctx.fillStyle = g; ctx.fillRect(0, 0, 560, 1160); }
+        circ(280, 330, 110, '#e11d48'); txt('R', 280, 338, 120, BEB, WHITE);
+        txt('Red FC ക്യാപ്റ്റൻ', 280, 510, 44, ML, WHITE); txt(t < 1.2 ? 'calling…' : '00:0' + Math.min(9, Math.floor((t - 1.2) * 4)), 280, 575, 34, OSW, '#94a3b8');
+        circ(170, 980, 56, '#ef4444'); circ(390, 980, 56, '#22c55e'); txt('📞', 390, 984, 50, BAL, WHITE); txt('✕', 170, 984, 48, BAL, WHITE);
+      });
+      bubble('ഞായർ 7 മണി? ഓക്കേ! 🔥', W / 2, 400, 54, t, .35, WHITE, NAVY, 0, true);
+      stamp('MATCH FIXED', W / 2, 1600, 110, '#e11d48', t, 1.2, -.08);
+    } },
+  { a: 17.7, async draw(t) {   // training
+      await clip('f6', t, 1.3);
+      pill('ട്രെയിനിങ് ക്യാമ്പ് 📣', W / 2, 360, 56, GOLD, NAVY, t, .3, .03);
+    } },
+  { a: 21.5, draw(t) {   // phone away, player mode on
+      rays(W / 2, 900, SKY, '#56b4ff', t * 2, 24);
+      const p = easeIO(seg(t, .2, 1.0));
+      phone(lerp(W / 2, W / 2 + 80, p), lerp(900, 2300, p), lerp(.8, .4, p), lerp(0, 1.2, p), () => { ctx.fillStyle = NAVY; ctx.fillRect(0, 0, 560, 1160); txt('📞 ✓', 280, 580, 90, BAL, WHITE); });
+      const j = back(seg(t, 1.0, 1.4)); ctx.save(); ctx.translate(W / 2, 950); ctx.rotate((1 - seg(t, 1.0, 1.4)) * 3); ctx.scale(j, j);   // jersey
+      ctx.fillStyle = SKY; ctx.beginPath(); ctx.moveTo(-200, -300); ctx.lineTo(-90, -340); ctx.quadraticCurveTo(0, -270, 90, -340); ctx.lineTo(200, -300); ctx.lineTo(330, -160); ctx.lineTo(240, -80); ctx.lineTo(190, -140); ctx.lineTo(190, 300); ctx.lineTo(-190, 300); ctx.lineTo(-190, -140); ctx.lineTo(-240, -80); ctx.lineTo(-330, -160); ctx.closePath(); ctx.fill();
+      ctx.lineWidth = 10; ctx.strokeStyle = WHITE; ctx.stroke(); txt('10', 0, 20, 300, BEB, WHITE); ctx.restore();
+      pop('PLAYER MODE: ON 🔥', W / 2, 420, 78, LIME, t, 1.5, BAL);
+    } },
+  { a: 24.6, async draw(t) {   // the gag: paying for the turf mid-match
+      await clip('f7', t, 1.0);
+      if (t > 1.05 && t < 3.0) bubble('ഡാ, പാസ് കൊടുക്ക്! 😤', W / 2 + 60, 420, 58, t, 1.1, PINK, WHITE, 120, true);
+      if (t > 2.95) bubble('ഒരു സെക്കൻഡ്…\nടർഫിന്റെ കാശ് കൊടുക്കട്ടെ! 📱', W / 2, 470, 50, t, 3.0, WHITE, NAVY, -40, true, 1020);
+      if (t > 5.25) { const k = back(seg(t, 5.25, 5.5)); ctx.save(); ctx.translate(W / 2, 1250); ctx.scale(k, k);
+        rr(-300, -150, 600, 300, 40, WHITE); circ(0, -60, 54, GREEN); txt('✓', 0, -56, 70, BAL, WHITE); txt('₹1,500 PAID', 0, 40, 60, OSW, NAVY); txt('Turf · ശനി 7 PM', 0, 100, 34, ML, '#64748b'); ctx.restore(); }
+    } },
+  { a: 30.6, async draw(t) {   // win
+      await clip('f3', t, 1.0);
+      confetti(t, .1, 70);
+      if (t > 2.7) { const k = back(seg(t, 2.7, 3.0)); ctx.save(); ctx.translate(W / 2, 360); ctx.scale(k, k); rr(-400, -80, 800, 160, 80, NAVY); txt('ടീമിന്റെ ശക്തി 💪', 0, 6, 70, ML, LIME); ctx.restore(); }
+    } },
+  { a: 36.6, async draw(t) {   // end card over the frozen win
+      ctx.filter = 'blur(10px) brightness(.55)'; await clip('f3', 5.9); ctx.filter = 'none';
+      confetti(t + 6, 0, 50);
+      const k = back(seg(t, .1, .45)); ctx.save(); ctx.translate(W / 2, 700); ctx.scale(k, k); ctx.rotate(-.03);
+      rr(-470, -170, 940, 340, 44, WHITE); txt('❤️ നിങ്ങളുടെ ടീമിലെ', 0, -70, 58, ML, NAVY); txt('ആ ഓൾ ഇൻ ഓൾ ആരാണ്?', 0, 50, 54, ML, PINK); ctx.restore();
+      const p = seg(t, .9, 1.2); if (p > 0) { ctx.save(); ctx.translate(W / 2, 1160); const s = back(p) * (1 + .05 * Math.sin(t * 8)); ctx.scale(s, s);
+        rr(-480, -90, 960, 180, 90, LIME); txt('👇 അവനെ കമന്റിൽ TAG ചെയ്യൂ! ⚽', 0, 5, 44, ML, NAVY); ctx.restore(); }
+      pop('കഥ ഫയൽസ് · FOLLOW', W / 2, 1450, 50, WHITE, t, 1.8);
+    } },
+];
+for (let i = 0; i < S.length; i++) S[i].d = (i + 1 < S.length ? S[i + 1].a : TOTAL) - S[i].a;
+
+function caption(t) {
+  const c = (window.CAPS || []).find(c => t >= c.s && t < c.e); if (!c) return;
+  let size = 46; const y = 1680;
+  ctx.save(); ctx.font = `${size}px ${ML}`; { const full = c.w.map(w => w.t).join(' '); const wd = ctx.measureText(full).width; if (wd > W - 140) { size = Math.floor(size * (W - 140) / wd); ctx.font = `${size}px ${ML}`; } } ctx.textBaseline = 'middle';
+  const gap = ctx.measureText(' ').width, ws = c.w.map(w => ctx.measureText(w.t).width), tot = ws.reduce((a, b) => a + b, 0) + gap * (c.w.length - 1);
+  ctx.globalAlpha = seg(t, c.s, c.s + .1); rr(W / 2 - tot / 2 - 28, y - 48, tot + 56, 96, 24, 'rgba(11,31,77,.82)');
+  let x = W / 2 - tot / 2; const cur = c.w.filter(q => t >= q.s - .03).length - 1;
+  c.w.forEach((w, i) => { ctx.fillStyle = t >= w.s - .03 ? (i === cur ? LIME : WHITE) : 'rgba(255,255,255,.5)'; ctx.textAlign = 'left'; ctx.fillText(w.t, x, y + 2); x += ws[i] + gap; });
+  ctx.restore();
+}
+const HITS = [[7.6, .5], [16.4, .6], [24.2, .4], [29.85, .4], [30.6, 1]];
+async function frame(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
+  let i = S.findIndex(s => t >= s.a && t < s.a + s.d); if (i < 0) i = S.length - 1;
+  const s = S[i], lt = t - s.a;
+  let sh = 0; for (const [ht, k] of HITS) if (t >= ht) sh += 20 * k * Math.max(0, 1 - (t - ht) / .35);
+  ctx.save(); const z = 1 + .06 * (1 - easeOut(seg(lt, 0, .3))) + .03 * seg(lt, 0, s.d);
+  ctx.translate(W / 2 + Math.sin(t * 91) * sh, H / 2 + Math.cos(t * 77) * sh); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
+  await s.draw(lt); ctx.restore();
+  for (const [ht, k] of HITS) { const f = seg(t, ht, ht + .2); if (t >= ht && f < 1) { ctx.fillStyle = `rgba(255,255,255,${.45 * k * (1 - f)})`; ctx.fillRect(0, 0, W, H); } }
+  if (lt < .1 && i > 0) { ctx.fillStyle = `rgba(255,255,255,${.3 * (1 - lt / .1)})`; ctx.fillRect(0, 0, W, H); }
+  checklist(t);
+  caption(t);
+  rr(W - 290, 60, 250, 64, 16, 'rgba(0,0,0,.55)'); txt('കഥ ഫയൽസ്', W - 165, 92, 34, ML, LIME);
+  rr(60, H - 60, W - 120, 8, 4, 'rgba(255,255,255,.25)'); rr(60, H - 60, (W - 120) * clamp(t / TOTAL), 8, 4, LIME);
+}
+window.FPS = FPS;
+window.grab = async (t) => { await frame(t); return cv.toDataURL('image/jpeg', 0.9); };
+window.ready = (async () => { await document.fonts.load("800 48px 'Noto Sans Malayalam'"); await document.fonts.load("800 48px 'Baloo 2'");
+  await document.fonts.load("500 48px 'Oswald'"); await document.fonts.load("48px 'Bebas Neue'"); await document.fonts.ready; return TOTAL; })();
+</script>
+</body>
+</html>
