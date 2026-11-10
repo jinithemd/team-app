@@ -2,7 +2,7 @@
 
 | # | Time | Narration (Malayalam) | Visual |
 |---|------|------------------------|--------|
-| 1 | 0-4 | ഈഫൽ ടവർ വിറ്റ് പൈസയുമായി മുങ്ങിയ ഒരു തട്ടിപ്പുകാരൻ! അതും രണ്ട് തവണ! 😳 | Eiffel Tower, a "SOLD" stamp slams on it, money bag flies off. |
+| 1 | 0-4 | ഈഫൽ ടവർ വിറ്റ് പൈസയുമായി മുങ്ങിയ ഒരു തട്ടിപ്പുകാരൻ! എന്നിട്ട് അതേ ടവർ വീണ്ടും വിൽക്കാൻ വന്നു! 😳 | Eiffel Tower, a "SOLD" stamp slams on it, money bag flies off. |
 | 2 | 4-10 | 1925, പാരീസ്. വിക്ടർ ലസ്റ്റിഗ് പത്രത്തിൽ ഒരു വാർത്ത വായിച്ചു: "ഈഫൽ ടവർ നന്നാക്കാൻ ഭയങ്കര ചിലവ്!" | Café, man in a suit with a newspaper, headline zooms in, lightbulb 💡 over his head. |
 | 3 | 10-17 | ഉടനെ ഒരു ഐഡിയ! സർക്കാർ ഉദ്യോഗസ്ഥനായി വേഷം കെട്ടി. വ്യാജ സർക്കാർ ലെറ്റർ ഉണ്ടാക്കി. പാരീസിലെ വലിയ ഇരുമ്പ് കച്ചവടക്കാരെ ഒരു ആഡംബര ഹോട്ടലിലേക്ക് വിളിച്ചു. | Costume change into an official's suit, forged letter stamped "OFFICIAL", 5 businessmen walk into a fancy hotel. |
 | 4 | 17-24 | "ടവർ പൊളിച്ച് ഇരുമ്പ് വിൽക്കാൻ സർക്കാർ തീരുമാനിച്ചു. പക്ഷേ ഇത് ടോപ്പ് സീക്രട്ട്! ആരോടും പറയരുത്!" | Hotel meeting, Lustig whispering, 🤫 icon, the tower cut into scrap pieces in a thought bubble. |
@@ -14,4 +14,3 @@
 | 10 | 54-60 | കടം വാങ്ങിയാൽ ഒരിക്കലും തിരിച്ചു തരാത്ത ആ ഫ്രണ്ടിനെ ടാഗ് ചെയ്യൂ. ലസ്റ്റിഗ് പോലും തിരിച്ചു കൊടുത്തു! 😂 | Tag-your-friend end card with the Eiffel Tower. |
 
 Facts: Victor Lustig, 1925. A newspaper reported that the Eiffel Tower was expensive to maintain (it had been meant to stand only 20 years). Posing as a government official, he used forged government letterheads and invited scrap-metal dealers to the Hôtel de Crillon. André Poisson paid, plus a bribe after his wife grew suspicious. Lustig fled to Vienna. Poisson was too embarrassed to report it. About a month later Lustig tried the same scam again; that dealer went to the police and Lustig fled to the USA. Al Capone gave him $50,000 to "double"; Lustig returned it and Capone rewarded his "honesty" with $5,000. He was arrested for counterfeiting in 1935 and died at Alcatraz in 1947.
-Note: line 1 says "രണ്ട് തവണ" (two times). The second sale was attempted but not completed, which the script makes clear in line 8. If you want to be strict, change line 1 to "…മുങ്ങിയ ഒരു തട്ടിപ്പുകാരൻ! പിന്നെ വീണ്ടും വിൽക്കാൻ വന്നു!"
