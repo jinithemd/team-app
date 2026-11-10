@@ -2,7 +2,7 @@
 import numpy as np
 from scipy.signal import butter, sosfilt
 from scipy.io import wavfile
-SR = 44100; T = 41.0; N = int(T * SR); rng = np.random.default_rng(3)
+SR = 44100; T = 35.0; N = int(T * SR); rng = np.random.default_rng(3)
 out = np.zeros((N, 2), np.float32)
 def lp(x, f): return sosfilt(butter(2, f, 'lowpass', fs=SR, output='sos'), x)
 def bp(x, a, b): return sosfilt(butter(2, [a, b], 'bandpass', fs=SR, output='sos'), x)
@@ -24,8 +24,8 @@ for b in range(bars):
     for s in range(16):   # 16th-note grid
         t = b * 2 + s * beat / 4
         if t >= T - .2: break
-        gag = 24.5 <= t < 30.55            # sneaky section: no kick/clap, staccato bass only
-        final = t >= 30.55
+        gag = False            # sneaky section: no kick/clap, staccato bass only
+        final = t >= 24.6
         lvl = .6 if t < 4 else .85 if t < 21.5 else 1.0
         if 24.2 <= t < 24.6: continue      # tiny silence before the whistle
         if s % 4 == 0 and not gag: add(kick(), t, .9 * lvl)
@@ -38,8 +38,8 @@ for b in range(bars):
         if t >= 4 and not gag and HOOK[s] and (b % 2 == 0 or final): add(pluck(HOOK[s] * (1.0 if not final else 1.0)), t, .14 * lvl, -.15)
         if gag and s in (0, 6, 10): add(pluck(BASS[s % 8] * 4, .15), t, .12, .2)
 # chenda roll into the final section and a big hit on the win
-for k in range(16): add(chenda(240 + 10 * k, .12), 29.75 + k * .05, .25 + .03 * k, .2)
-add(kick(), 30.6, 1.3); add(clap(), 30.6, .8)
+for k in range(16): add(chenda(240 + 10 * k, .12), 23.4 + k * .05, .25 + .03 * k, .2)
+add(kick(), 24.6, 1.3); add(clap(), 24.6, .8)
 out[int((T - 1.5) * SR):] *= np.linspace(1, 0, N - int((T - 1.5) * SR))[:, None]
 out /= np.abs(out).max() / .9
 wavfile.write('sfx/music.wav', SR, (out * 32767).astype(np.int16)); print('music', T)

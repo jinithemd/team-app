@@ -21,8 +21,8 @@ vo = np.tanh(vo * 1.6) / 1.6
 EV = [('ring', .1, .5), ('whoosh', 4.1, .4), ('stamp', 7.6, .8), ('kaching', 7.7, .5), ('whoosh', 9.1, .4), ('twinkle', 10.4, .5),
       ('whoosh', 11.9, .4), ('pay', 13.0, .6), ('notif', 13.4, .7), ('whoosh', 15.1, .4), ('ring', 15.3, .5), ('stamp', 16.4, .9),
       ('whoosh', 17.6, .4), ('whistle', 18.0, .25), ('whoosh', 21.4, .5), ('twinkle', 22.5, .6), ('whoosh', 23.0, .4),
-      ('whistle', 24.4, .8), ('kick', 24.9, .6), ('pay', 29.85, .9), ('laugh', 30.1, .6), ('cheer', 30.6, .9), ('cheer', 33.6, .6),
-      ('whoosh', 36.5, .4), ('twinkle', 37.5, .6), ('twinkle', 38.4, .5)]
+      ('whistle', 23.9, .8), ('cheer', 24.6, .9), ('cheer', 27.6, .6),
+      ('whoosh', 30.5, .4), ('twinkle', 31.5, .6), ('twinkle', 32.4, .5)]
 for n, t, g in EV: add(fx, load(n), t, g * .75)
 env = np.abs(vo).mean(1); k = int(.2 * SR); c = np.concatenate([[0], np.cumsum(env)])
 idx = np.arange(N); env = (c[np.minimum(idx + k // 2, N)] - c[np.maximum(idx - k // 2, 0)]) / k

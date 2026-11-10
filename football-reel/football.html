@@ -9,7 +9,7 @@
 <canvas id="c" width="1080" height="1920"></canvas>
 <script src="captions.js"></script>
 <script>
-const W = 1080, H = 1920, FPS = 30, TOTAL = 41.0;
+const W = 1080, H = 1920, FPS = 30, TOTAL = 35.0;
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const ML = "'Noto Sans Malayalam', sans-serif", BAL = "'Baloo 2', sans-serif", OSW = "'Oswald', sans-serif", BEB = "'Bebas Neue', sans-serif";
 const SKY = '#3aa6ff', NAVY = '#0b1f4d', LIME = '#c6ff3d', PINK = '#ff3d7f', WHITE = '#ffffff', GOLD = '#ffc928', GREEN = '#22c55e';
@@ -85,8 +85,8 @@ async function clip(name, lt, speed = 1, from = 0, zoom = 1) { const k = clamp(M
 /* running checklist of everything this guy does */
 const TASKS = [['🤝 സ്പോൺസർ', 7.6], ['👕 ജേഴ്സി', 10.4], ['🏟️ ടർഫ്', 13.4], ['⚽ മാച്ച്', 16.4], ['🏃 ട്രെയിനിങ്', 19.4], ['🔥 കളിക്കാരൻ', 23.3]];
 function checklist(t) {
-  if (t < 7.4 || t > 30.5) return;
-  const a = seg(t, 7.4, 7.7) * (1 - seg(t, 30.2, 30.5)); ctx.save(); ctx.globalAlpha = a;
+  if (t < 7.4 || t > 24.5) return;
+  const a = seg(t, 7.4, 7.7) * (1 - seg(t, 24.2, 24.5)); ctx.save(); ctx.globalAlpha = a;
   const slot = 158, x0 = W / 2 - slot * 3 + slot / 2;
   rr(40, 150, W - 80, 120, 30, 'rgba(11,31,77,.78)');
   TASKS.forEach(([s, t0], i) => { const x = x0 + i * slot, y = 210, p = seg(t, t0, t0 + .25);
@@ -151,26 +151,18 @@ const S = [
       ctx.lineWidth = 10; ctx.strokeStyle = WHITE; ctx.stroke(); txt('10', 0, 20, 300, BEB, WHITE); ctx.restore();
       pop('PLAYER MODE: ON 🔥', W / 2, 420, 78, LIME, t, 1.5, BAL);
     } },
-  { a: 24.6, async draw(t) {   // the gag: paying for the turf mid-match
-      await clip('f7', t, 1.0);
-      if (t > 1.05 && t < 3.0) bubble('ഡാ, പാസ് കൊടുക്ക്! 😤', W / 2 + 60, 420, 58, t, 1.1, PINK, WHITE, 120, true);
-      if (t > 2.95) bubble('ഒരു സെക്കൻഡ്…\nടർഫിന്റെ കാശ് കൊടുക്കട്ടെ! 📱', W / 2, 470, 50, t, 3.0, WHITE, NAVY, -40, true, 1020);
-      if (t > 5.25) { const k = back(seg(t, 5.25, 5.5)); ctx.save(); ctx.translate(W / 2, 1250); ctx.scale(k, k);
-        rr(-300, -150, 600, 300, 40, WHITE); circ(0, -60, 54, GREEN); txt('✓', 0, -56, 70, BAL, WHITE); txt('₹1,500 PAID', 0, 40, 60, OSW, NAVY); txt('Turf · ശനി 7 PM', 0, 100, 34, ML, '#64748b'); ctx.restore(); }
-    } },
-  { a: 30.6, async draw(t) {   // win
+  { a: 24.6, async draw(t) {   // win
       await clip('f3', t, 1.0);
       confetti(t, .1, 70);
       if (t > 2.7) { const k = back(seg(t, 2.7, 3.0)); ctx.save(); ctx.translate(W / 2, 360); ctx.scale(k, k); rr(-400, -80, 800, 160, 80, NAVY); txt('ടീമിന്റെ ശക്തി 💪', 0, 6, 70, ML, LIME); ctx.restore(); }
     } },
-  { a: 36.6, async draw(t) {   // end card over the frozen win
+  { a: 30.6, async draw(t) {   // end card over the frozen win
       ctx.filter = 'blur(10px) brightness(.55)'; await clip('f3', 5.9); ctx.filter = 'none';
       confetti(t + 6, 0, 50);
       const k = back(seg(t, .1, .45)); ctx.save(); ctx.translate(W / 2, 700); ctx.scale(k, k); ctx.rotate(-.03);
       rr(-470, -170, 940, 340, 44, WHITE); txt('❤️ നിങ്ങളുടെ ടീമിലെ', 0, -70, 58, ML, NAVY); txt('ആ ഓൾ ഇൻ ഓൾ ആരാണ്?', 0, 50, 54, ML, PINK); ctx.restore();
       const p = seg(t, .9, 1.2); if (p > 0) { ctx.save(); ctx.translate(W / 2, 1160); const s = back(p) * (1 + .05 * Math.sin(t * 8)); ctx.scale(s, s);
         rr(-480, -90, 960, 180, 90, LIME); txt('👇 അവനെ കമന്റിൽ TAG ചെയ്യൂ! ⚽', 0, 5, 44, ML, NAVY); ctx.restore(); }
-      pop('കഥ ഫയൽസ് · FOLLOW', W / 2, 1450, 50, WHITE, t, 1.8);
     } },
 ];
 for (let i = 0; i < S.length; i++) S[i].d = (i + 1 < S.length ? S[i + 1].a : TOTAL) - S[i].a;
@@ -185,7 +177,7 @@ function caption(t) {
   c.w.forEach((w, i) => { ctx.fillStyle = t >= w.s - .03 ? (i === cur ? LIME : WHITE) : 'rgba(255,255,255,.5)'; ctx.textAlign = 'left'; ctx.fillText(w.t, x, y + 2); x += ws[i] + gap; });
   ctx.restore();
 }
-const HITS = [[7.6, .5], [16.4, .6], [24.2, .4], [29.85, .4], [30.6, 1]];
+const HITS = [[7.6, .5], [16.4, .6], [24.6, 1]];
 async function frame(t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none';
   let i = S.findIndex(s => t >= s.a && t < s.a + s.d); if (i < 0) i = S.length - 1;
@@ -198,7 +190,6 @@ async function frame(t) {
   if (lt < .1 && i > 0) { ctx.fillStyle = `rgba(255,255,255,${.3 * (1 - lt / .1)})`; ctx.fillRect(0, 0, W, H); }
   checklist(t);
   caption(t);
-  rr(W - 290, 60, 250, 64, 16, 'rgba(0,0,0,.55)'); txt('കഥ ഫയൽസ്', W - 165, 92, 34, ML, LIME);
   rr(60, H - 60, W - 120, 8, 4, 'rgba(255,255,255,.25)'); rr(60, H - 60, (W - 120) * clamp(t / TOTAL), 8, 4, LIME);
 }
 window.FPS = FPS;
