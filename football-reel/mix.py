@@ -16,7 +16,7 @@ for a, b, at, _ in SEGS:
     add(vo, piece, at, 1.0)
 for who, at, _ in DIALOG: add(vo, load(who), at, 1.1)
 # soften the voices: roll off harsh highs and tame peaks so they sit gently on the music
-vo = sosfilt(butter(2, 6500, 'lowpass', fs=SR, output='sos'), vo, axis=0).astype(np.float32)
+vo = sosfilt(butter(2, 4200, 'lowpass', fs=SR, output='sos'), vo, axis=0).astype(np.float32)
 vo = np.tanh(vo * 1.6) / 1.6
 EV = [('ring', .1, .5), ('whoosh', 4.1, .4), ('stamp', 7.6, .8), ('kaching', 7.7, .5), ('whoosh', 9.1, .4), ('twinkle', 10.4, .5),
       ('whoosh', 11.9, .4), ('pay', 13.0, .6), ('notif', 13.4, .7), ('whoosh', 15.1, .4), ('ring', 15.3, .5), ('stamp', 16.4, .9),
@@ -28,7 +28,8 @@ env = np.abs(vo).mean(1); k = int(.2 * SR); c = np.concatenate([[0], np.cumsum(e
 idx = np.arange(N); env = (c[np.minimum(idx + k // 2, N)] - c[np.maximum(idx - k // 2, 0)]) / k
 speak = np.clip(env / (env.max() * .25), 0, 1)
 m = load('music', 'wav'); m = np.pad(m, ((0, max(0, N - len(m))), (0, 0)))[:N]
-out = fx * (1 - .3 * speak[:, None]) + m * .55 * (1 - .35 * speak)[:, None] + vo * .8
+out = fx * (1 - .1 * speak[:, None]) + m * .75 * (1 - .25 * speak)[:, None] + vo * .8
 out[-int(.5 * SR):] *= np.linspace(1, 0, int(.5 * SR))[:, None]
 out /= max(1e-9, np.abs(out).max()) / .95
+vr = np.sqrt((vo[speak > .5] ** 2).mean()) * .8; mr = np.sqrt((m ** 2).mean()) * .75; print('voice/music dB', round(20 * np.log10(vr / mr), 1))
 wavfile.write('mix.wav', SR, (out * 32767).astype(np.int16)); print('mixed', TOTAL)
