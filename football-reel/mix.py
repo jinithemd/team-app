@@ -1,6 +1,7 @@
 """Football reel mix: narration segments + dialogue placed on the edit, synth groove ducked under voices, SFX on the hits."""
 import subprocess, numpy as np
 from scipy.io import wavfile
+from scipy.signal import butter, sosfilt
 from timeline import SEGS, DIALOG, TOTAL
 SR = 44100; N = int(TOTAL * SR)
 def load(n, ext='mp3'):
@@ -14,6 +15,9 @@ for a, b, at, _ in SEGS:
     piece = nar[int(a * SR):int(b * SR)].copy(); f = int(.01 * SR); piece[:f] *= np.linspace(0, 1, f)[:, None]; piece[-f:] *= np.linspace(1, 0, f)[:, None]
     add(vo, piece, at, 1.0)
 for who, at, _ in DIALOG: add(vo, load(who), at, 1.1)
+# soften the voices: roll off harsh highs and tame peaks so they sit gently on the music
+vo = sosfilt(butter(2, 6500, 'lowpass', fs=SR, output='sos'), vo, axis=0).astype(np.float32)
+vo = np.tanh(vo * 1.6) / 1.6
 EV = [('ring', .1, .5), ('whoosh', 4.1, .4), ('stamp', 7.6, .8), ('kaching', 7.7, .5), ('whoosh', 9.1, .4), ('twinkle', 10.4, .5),
       ('whoosh', 11.9, .4), ('pay', 13.0, .6), ('notif', 13.4, .7), ('whoosh', 15.1, .4), ('ring', 15.3, .5), ('stamp', 16.4, .9),
       ('whoosh', 17.6, .4), ('whistle', 18.0, .25), ('whoosh', 21.4, .5), ('twinkle', 22.5, .6), ('whoosh', 23.0, .4),
@@ -24,7 +28,7 @@ env = np.abs(vo).mean(1); k = int(.2 * SR); c = np.concatenate([[0], np.cumsum(e
 idx = np.arange(N); env = (c[np.minimum(idx + k // 2, N)] - c[np.maximum(idx - k // 2, 0)]) / k
 speak = np.clip(env / (env.max() * .25), 0, 1)
 m = load('music', 'wav'); m = np.pad(m, ((0, max(0, N - len(m))), (0, 0)))[:N]
-out = fx * (1 - .3 * speak[:, None]) + m * .55 * (1 - .55 * speak)[:, None] + vo * 1.3
+out = fx * (1 - .3 * speak[:, None]) + m * .55 * (1 - .35 * speak)[:, None] + vo * .8
 out[-int(.5 * SR):] *= np.linspace(1, 0, int(.5 * SR))[:, None]
 out /= max(1e-9, np.abs(out).max()) / .95
 wavfile.write('mix.wav', SR, (out * 32767).astype(np.int16)); print('mixed', TOTAL)
