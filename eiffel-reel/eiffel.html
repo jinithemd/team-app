@@ -1,0 +1,325 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Noto+Sans+Malayalam:wght@800&family=Baloo+2:wght@800&family=Abril+Fatface&family=Special+Elite&display=swap" rel="stylesheet">
+<style>html,body{margin:0;background:#000}canvas{display:block}</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="captions.js"></script>
+<script>
+const W = 1080, H = 1920, FPS = 30, TOTAL = 83.0;
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const ML = "'Noto Sans Malayalam', sans-serif", BAL = "'Baloo 2', sans-serif", OSW = "'Oswald', sans-serif", ABR = "'Abril Fatface', serif", TYPE = "'Special Elite', monospace";
+const PAPER = '#f3e6c8', INK = '#1d2240', RED = '#d62839', GOLD = '#f2b134', TEAL = '#1a8f8a', SKIN = '#f0c39a';
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const easeOut = x => 1 - Math.pow(1 - x, 3), easeIO = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = x => { const c1 = 1.9, c3 = c1 + 1; return x <= 0 ? 0 : 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+function rnd(i) { const x = Math.sin(i * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); }
+const isML = s => /[ഀ-ൿ]/.test(s);
+function rr(x, y, w, h, r, fill) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.fillStyle = fill; ctx.fill(); }
+function circ(x, y, r, fill) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fillStyle = fill; ctx.fill(); }
+function ell(x, y, rx, ry, fill, rot = 0) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, 7); ctx.fillStyle = fill; ctx.fill(); }
+function txt(s, x, y, size, font, color, stroke = 0, align = 'center', sc = 'rgba(0,0,0,.85)') {
+  ctx.save(); ctx.font = `${size}px ${font}`; ctx.textAlign = align; ctx.textBaseline = 'middle';
+  if (stroke) { ctx.lineWidth = stroke; ctx.strokeStyle = sc; ctx.lineJoin = 'round'; ctx.strokeText(s, x, y); }
+  ctx.fillStyle = color; ctx.fillText(s, x, y); ctx.restore();
+}
+function pop(s, x, y, size, color, t, t0, font, rot = -.04) {
+  const p = seg(t, t0, t0 + .22); if (p <= 0) return;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot * (1 - p)); const k = back(p); ctx.scale(k, k);
+  txt(s, 0, 0, size, font || (isML(s) ? ML : BAL), color, size * .16); ctx.restore();
+}
+/* rubber stamp that slams down from big to normal */
+function stamp(s, x, y, size, color, t, t0, rot = -.2, font = OSW) {
+  const p = seg(t, t0, t0 + .18); if (p <= 0) return;
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot); const k = lerp(2.6, 1, easeOut(p)); ctx.scale(k, k); ctx.globalAlpha = p;
+  ctx.font = `${size}px ${font}`; const w = ctx.measureText(s).width + size * .7, h = size * 1.35;
+  ctx.lineWidth = size * .09; ctx.strokeStyle = color; ctx.strokeRect(-w / 2, -h / 2, w, h);
+  ctx.lineWidth = size * .03; ctx.strokeRect(-w / 2 + size * .12, -h / 2 + size * .12, w - size * .24, h - size * .24);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = color; ctx.fillText(s, 0, size * .05);
+  ctx.restore();
+}
+function paper(c = PAPER) {
+  ctx.fillStyle = c; ctx.fillRect(-100, -100, W + 200, H + 200);
+  for (let i = 0; i < 90; i++) { ctx.globalAlpha = .05; circ(rnd(i) * W, rnd(i + 99) * H, 30 + rnd(i + 7) * 120, rnd(i + 3) > .5 ? '#8a6a3a' : '#ffffff'); }
+  ctx.globalAlpha = 1;
+}
+function rays(cx, cy, c1, c2, t, n = 18) {
+  ctx.save(); ctx.translate(cx, cy); ctx.rotate(t * .15);
+  for (let i = 0; i < n; i++) { ctx.fillStyle = i % 2 ? c1 : c2; ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, 2400, i * 2 * Math.PI / n, (i + 1) * 2 * Math.PI / n); ctx.fill(); }
+  ctx.restore();
+}
+/* Eiffel tower silhouette */
+function tower(x, y, s, col = INK, cracks = 0) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s); ctx.fillStyle = col; ctx.strokeStyle = col;
+  ctx.beginPath(); ctx.moveTo(-200, 0); ctx.quadraticCurveTo(-90, -220, -55, -420); ctx.lineTo(-30, -700); ctx.lineTo(-8, -900); ctx.lineTo(8, -900); ctx.lineTo(30, -700);
+  ctx.lineTo(55, -420); ctx.quadraticCurveTo(90, -220, 200, 0); ctx.lineTo(120, 0); ctx.quadraticCurveTo(60, -150, 0, -170); ctx.quadraticCurveTo(-60, -150, -120, 0); ctx.closePath(); ctx.fill();
+  ctx.fillRect(-95, -260, 190, 22); ctx.fillRect(-60, -470, 120, 18); ctx.fillRect(-4, -980, 8, 90);
+  ctx.globalCompositeOperation = 'destination-out'; ctx.lineWidth = 3;   // lattice
+  for (let i = -900; i < 0; i += 34) { const hw = i > -420 ? lerp(200, 55, (i + 420) / -420 * -1 + 1) : lerp(55, 8, (i + 420) / -480); ctx.beginPath(); ctx.moveTo(-hw * .8, i); ctx.lineTo(hw * .8, i + 34); ctx.moveTo(hw * .8, i); ctx.lineTo(-hw * .8, i + 34); ctx.stroke(); }
+  ctx.globalCompositeOperation = 'source-over';
+  if (cracks) { ctx.strokeStyle = RED; ctx.lineWidth = 7; ctx.beginPath(); ctx.moveTo(-40, -600); ctx.lineTo(-10, -540); ctx.lineTo(-30, -490); ctx.lineTo(5, -430); ctx.moveTo(60, -300); ctx.lineTo(30, -250); ctx.lineTo(55, -200); ctx.stroke(); }
+  ctx.restore();
+}
+/* cartoon man. o: {suit, hat:'fedora'|'bowler'|'top', band, mus:'thin'|'walrus'|0, glasses, cigar, scar, eyes:'n'|'wink'|'wide'|'sus'|'shut', mouth:'smile'|'smirk'|'o'|'frown'|'grin', blush, sash, arm:'rub'|'up'|'point'|0} */
+function man(x, y, s, o = {}) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  const suit = o.suit || INK, fat = o.fat || 0;
+  // body
+  ctx.fillStyle = suit; ctx.beginPath(); ctx.moveTo(-150 - fat, 420); ctx.quadraticCurveTo(-160 - fat, 130, -60, 100); ctx.lineTo(60, 100); ctx.quadraticCurveTo(160 + fat, 130, 150 + fat, 420); ctx.fill();
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(-40, 100); ctx.lineTo(0, 200); ctx.lineTo(40, 100); ctx.fill();
+  ctx.fillStyle = o.tie || RED; ctx.beginPath(); ctx.moveTo(-12, 110); ctx.lineTo(12, 110); ctx.lineTo(18, 190); ctx.lineTo(0, 215); ctx.lineTo(-18, 190); ctx.fill();
+  if (o.sash) { ctx.save(); ctx.rotate(-.5); rr(-190, 150, 330, 46, 8, GOLD); txt('OFFICIEL', -25, 174, 30, OSW, INK); ctx.restore(); }
+  if (o.badge) { circ(-80, 200, 26, GOLD); txt('★', -80, 202, 32, BAL, INK); }
+  // arms
+  if (o.arm === 'rub') { const r = Math.sin((o.t || 0) * 22) * 10; circ(-30 + r, 300, 44, SKIN); circ(30 - r, 300, 44, SKIN); }
+  if (o.arm === 'up') { ctx.strokeStyle = suit; ctx.lineWidth = 60; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(110, 180); ctx.lineTo(200, 20); ctx.stroke(); circ(205, 5, 36, SKIN); }
+  if (o.arm === 'face') { circ(-55, -40, 50, SKIN); circ(55, -40, 50, SKIN); }
+  // head
+  circ(0, 0, 120, SKIN); ell(-118, 10, 20, 30, SKIN); ell(118, 10, 20, 30, SKIN);
+  if (o.blush) { ctx.globalAlpha = o.blush; ell(-62, 35, 30, 18, '#ff6b6b'); ell(62, 35, 30, 18, '#ff6b6b'); ctx.globalAlpha = 1; }
+  // eyes
+  const e = o.eyes || 'n';
+  const eye = (ex, kind) => {
+    if (kind === 'wink' || kind === 'shut') { ctx.strokeStyle = INK; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(ex, -10, 16, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke(); return; }
+    const r = kind === 'wide' ? 26 : 20; ell(ex, -12, r, kind === 'sus' ? r * .45 : r, '#fff'); circ(ex + (kind === 'sus' ? 8 : 0), -12, kind === 'wide' ? 10 : 11, INK);
+    if (kind === 'sus') { ctx.strokeStyle = INK; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(ex - 26, -30); ctx.lineTo(ex + 26, -24); ctx.stroke(); }
+  };
+  if (o.arm !== 'face') { eye(-42, e === 'wink' ? 'n' : e); eye(42, e === 'wink' ? 'wink' : e); }
+  if (o.glasses && o.arm !== 'face') { ctx.strokeStyle = '#3a2a1a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(-42, -12, 32, 0, 7); ctx.moveTo(74, -12); ctx.arc(42, -12, 32, 0, 7); ctx.moveTo(-10, -12); ctx.lineTo(10, -12); ctx.stroke(); }
+  // nose + moustache
+  ell(0, 18, 16, 22, '#e3a87e');
+  if (o.mus === 'thin') { ctx.fillStyle = '#2b1d14'; ctx.beginPath(); ctx.moveTo(-50, 50); ctx.quadraticCurveTo(0, 30, 50, 50); ctx.quadraticCurveTo(0, 42, -50, 50); ctx.fill(); ctx.lineWidth = 10; ctx.strokeStyle = '#2b1d14'; ctx.beginPath(); ctx.moveTo(-50, 50); ctx.quadraticCurveTo(0, 32, 50, 50); ctx.stroke(); }
+  if (o.mus === 'walrus') { ell(0, 52, 56, 20, '#5a3b22'); }
+  // mouth
+  const m = o.mouth || 'smile'; ctx.strokeStyle = '#7a2b1e'; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.beginPath();
+  if (m === 'smile') ctx.arc(0, 62, 30, .2 * Math.PI, .8 * Math.PI);
+  if (m === 'grin') { ctx.stroke(); ctx.beginPath(); ctx.moveTo(-45, 70); ctx.quadraticCurveTo(0, 120, 45, 70); ctx.closePath(); ctx.fillStyle = '#fff'; ctx.fill(); ctx.stroke(); ctx.beginPath(); }
+  if (m === 'smirk') { ctx.moveTo(-25, 78); ctx.quadraticCurveTo(15, 86, 40, 66); }
+  if (m === 'frown') ctx.arc(0, 100, 30, 1.2 * Math.PI, 1.8 * Math.PI);
+  ctx.stroke(); if (m === 'o') ell(0, 82, 16, 22, '#7a2b1e');
+  if (o.cigar) { ctx.save(); ctx.translate(30, 80); ctx.rotate(.15); rr(0, -9, 80, 18, 6, '#6b3e1f'); circ(82, 0, 9, '#ff7b3a'); ctx.restore(); ctx.globalAlpha = .4; for (let i = 0; i < 4; i++) circ(125 + i * 10, 60 - i * 40 - ((o.t || 0) * 60 % 40), 14 + i * 5, '#ddd'); ctx.globalAlpha = 1; }
+  if (o.scar) { ctx.strokeStyle = '#b5665a'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-90, 10); ctx.lineTo(-60, 60); ctx.moveTo(-85, 30); ctx.lineTo(-70, 28); ctx.moveTo(-77, 45); ctx.lineTo(-62, 43); ctx.stroke(); }
+  // hat
+  const hc = o.hatc || '#2a2a2a', h = o.hat || 'fedora';
+  if (h === 'fedora') { ell(0, -82, 175, 30, hc); ctx.fillStyle = hc; ctx.beginPath(); ctx.moveTo(-100, -85); ctx.quadraticCurveTo(-110, -190, 0, -185); ctx.quadraticCurveTo(110, -190, 100, -85); ctx.fill(); rr(-102, -118, 204, 26, 4, o.band || RED); }
+  if (h === 'bowler') { ell(0, -78, 150, 24, hc); ctx.fillStyle = hc; ctx.beginPath(); ctx.arc(0, -82, 102, Math.PI, 0); ctx.fill(); }
+  if (h === 'top') { ell(0, -82, 160, 26, hc); rr(-95, -280, 190, 200, 10, hc); rr(-95, -120, 190, 26, 2, GOLD); }
+  ctx.restore();
+}
+function moneyBag(x, y, s, label, col = '#3b8f4a') {
+  ctx.save(); ctx.translate(x, y); ctx.scale(s, s);
+  ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(-40, -110); ctx.quadraticCurveTo(-140, 0, -120, 80); ctx.quadraticCurveTo(-100, 140, 0, 140); ctx.quadraticCurveTo(100, 140, 120, 80); ctx.quadraticCurveTo(140, 0, 40, -110); ctx.fill();
+  ctx.fillStyle = '#2d6e39'; ctx.beginPath(); ctx.moveTo(-50, -110); ctx.lineTo(-70, -160); ctx.lineTo(70, -160); ctx.lineTo(50, -110); ctx.fill(); rr(-60, -122, 120, 20, 8, GOLD);
+  txt('$', 0, 40, 130, ABR, GOLD); if (label) txt(label, 0, 210, 64, OSW, '#fff', 12);
+  ctx.restore();
+}
+function coins(t, t0, cx, cy, n = 14) {
+  const p = t - t0; if (p < 0 || p > 1.6) return;
+  for (let i = 0; i < n; i++) { const a = rnd(i) * Math.PI * 2, v = 500 + rnd(i + 5) * 600;
+    const x = cx + Math.cos(a) * v * p, y = cy + Math.sin(a) * v * p * .6 - 900 * p + 1300 * p * p;
+    ctx.save(); ctx.translate(x, y); ctx.scale(Math.cos(p * 12 + i), 1); circ(0, 0, 30, GOLD); txt('₣', 0, 2, 34, ABR, '#a8741a'); ctx.restore(); }
+}
+function bubble(s, x, y, size, t, t0, col = '#fff', tc = INK, tailX = 0) {
+  const p = seg(t, t0, t0 + .25); if (p <= 0) return;
+  ctx.save(); ctx.translate(x, y); const k = back(p); ctx.scale(k, k);
+  ctx.font = `${size}px ${isML(s) ? ML : BAL}`; const w = ctx.measureText(s).width + size * 1.1, h = size * 1.9;
+  rr(-w / 2, -h / 2, w, h, h / 2.2, col); ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(tailX - 30, h / 2 - 6); ctx.lineTo(tailX + 20, h / 2 - 6); ctx.lineTo(tailX - 40, h / 2 + 60); ctx.fill();
+  ctx.lineWidth = 6; ctx.strokeStyle = INK; ctx.beginPath(); ctx.roundRect(-w / 2, -h / 2, w, h, h / 2.2); ctx.stroke();
+  txt(s, 0, 4, size, isML(s) ? ML : BAL, tc); ctx.restore();
+}
+function sparkle(x, y, t, t0, col = GOLD) {
+  const p = seg(t, t0, t0 + .6); if (p <= 0 || p >= 1) return;
+  for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4, r = 40 + 160 * easeOut(p); ctx.save(); ctx.translate(x + Math.cos(a) * r, y + Math.sin(a) * r); ctx.rotate(a); ctx.globalAlpha = 1 - p;
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(7, 0); ctx.lineTo(0, 24); ctx.lineTo(-7, 0); ctx.fill(); ctx.restore(); }
+}
+const LUSTIG = { suit: INK, hat: 'fedora', mus: 'thin', band: RED };
+const POISSON = { suit: '#7a4b2a', hat: 'bowler', glasses: 1, mus: 'walrus', fat: 30, tie: TEAL, hatc: '#3a2a1a' };
+const CAPONE = { suit: '#4a4a52', hat: 'fedora', hatc: '#e8e2d0', band: '#222', cigar: 1, scar: 1, tie: GOLD, fat: 25 };
+
+const cache = new Map();
+function loadImg(src) { if (cache.has(src)) return cache.get(src);
+  const p = new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
+  cache.set(src, p); if (cache.size > 40) cache.delete(cache.keys().next().value); return p; }
+async function clip(name, lt, n = 180, speed = 1) { const k = clamp(Math.floor(lt * speed * FPS) + 1, 1, n);
+  ctx.drawImage(await loadImg(`frames/${name}/${String(k).padStart(4, '0')}.jpg`), 0, 0, W, H); }
+
+/* ---------- scenes: absolute start times, matched to the narration ---------- */
+const S = [
+  { a: 0, async draw(t) {   // hook over the real Paris footage
+      await clip('e1', t);
+      ctx.fillStyle = 'rgba(0,0,0,.18)'; ctx.fillRect(0, 0, W, H);
+      stamp('SOLD!', W / 2, 820, 150, RED, t, .9, -.18);
+      coins(t, 1.0, W / 2, 820);
+      pop('വിറ്റു! 💰', W / 2, 1060, 90, GOLD, t, 1.4);
+      if (t > 3.3) { ctx.fillStyle = `rgba(0,0,0,${.35 * seg(t, 3.3, 3.5)})`; ctx.fillRect(0, 0, W, H); }
+      stamp('AGAIN?!', W / 2, 560, 130, GOLD, t, 3.6, .14);
+      pop('വീണ്ടും?! 😳', W / 2, 1260, 96, '#fff', t, 4.4);
+    } },
+  { a: 6.0, async draw(t) {   // 1925 Paris title over a frozen, slowly zooming frame
+      ctx.save(); const z = 1 + .06 * t; ctx.translate(W / 2, H / 2); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2); await clip('e1', 5.9); ctx.restore();
+      ctx.fillStyle = 'rgba(20,12,4,.45)'; ctx.fillRect(0, 0, W, H);
+      const n = Math.round(lerp(1889, 1925, easeOut(seg(t, 0, .9))));
+      pop(String(n), W / 2, 700, 260, GOLD, t, .05, ABR); pop('PARIS', W / 2, 900, 130, '#fff', t, .35, TYPE);
+      pop('🇫🇷', W / 2, 1080, 110, '#fff', t, .6);
+    } },
+  { a: 7.9, draw(t) {   // the newspaper
+      paper('#e9dcbc'); rays(W / 2, 820, 'rgba(214,40,57,.10)', 'rgba(242,177,52,.10)', t);
+      const p = easeOut(seg(t, 0, .6)); ctx.save(); ctx.translate(W / 2, 830); ctx.rotate((1 - p) * 6.3); ctx.scale(p, p);
+      rr(-420, -520, 840, 1040, 6, '#fbf6ea'); ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 4; ctx.strokeRect(-390, -490, 780, 980);
+      txt('LE JOURNAL', 0, -420, 96, ABR, '#1a1a1a'); ctx.fillStyle = '#1a1a1a'; ctx.fillRect(-370, -360, 740, 6); txt('PARIS · 1925', 0, -330, 30, TYPE, '#333');
+      txt('LA TOUR EIFFEL', 0, -250, 70, OSW, RED); txt('RÉPARATIONS TRÈS CHÈRES!', 0, -175, 50, OSW, '#1a1a1a');
+      rr(-330, -120, 660, 480, 4, '#d9cfb8'); tower(0, 340, .45, '#3a3a3a', t > 3.7 ? 1 : 0);
+      for (let i = 0; i < 4; i++) rr(-330, 390 + i * 26, 660 - (i === 3 ? 260 : 0), 10, 4, '#bbb');
+      ctx.restore();
+      if (t > 3.7) { coins(t, 3.75, W / 2, 900, 18); pop('ഭയങ്കര ചിലവ്! 💸', W / 2, 1480, 92, RED, t, 3.8); }
+    } },
+  { a: 14.25, draw(t) {   // idea -> disguise -> forged letter
+      paper(); rays(W / 2, 760, 'rgba(26,143,138,.12)', 'rgba(242,177,52,.14)', t);
+      const official = t > 1.65;
+      man(W / 2, 760, 1.25, Object.assign({}, LUSTIG, official ? { hat: 'top', sash: 1, badge: 1, mouth: 'smirk' } : { mouth: 'grin' }));
+      if (t < 1.65) { const p = back(seg(t, .15, .45)); ctx.save(); ctx.translate(W / 2 + 230, 400); ctx.scale(p, p);   // light bulb
+        circ(0, 0, 90, '#ffe066'); rr(-34, 80, 68, 50, 8, '#999'); ctx.globalAlpha = .5 + .5 * Math.sin(t * 20); for (let i = 0; i < 8; i++) { ctx.save(); ctx.rotate(i * Math.PI / 4); rr(-6, -170, 12, 50, 6, GOLD); ctx.restore(); } ctx.restore(); }
+      sparkle(W / 2, 600, t, 1.65); pop('സർക്കാർ ഉദ്യോഗസ്ഥൻ 😎', W / 2, 280, 70, INK, t, 1.8);
+      if (t > 3.6) { const p = easeOut(seg(t, 3.6, 4.0)); ctx.save(); ctx.translate(W / 2, lerp(2300, 1350, p)); ctx.rotate(-.05);
+        rr(-360, -230, 720, 460, 6, '#fffaf0'); ctx.strokeStyle = '#bba'; ctx.lineWidth = 3; ctx.strokeRect(-340, -210, 680, 420);
+        txt('RÉPUBLIQUE FRANÇAISE', 0, -160, 40, OSW, INK); txt('Ministère des Postes', 0, -110, 34, TYPE, '#444');
+        for (let i = 0; i < 5; i++) rr(-280, -50 + i * 34, 560 - (i === 4 ? 200 : 0), 10, 4, '#ccc');
+        ctx.restore(); stamp('OFFICIEL', W / 2 + 120, 1470, 70, RED, t, 4.2, -.25); pop('വ്യാജം! 🤭', W / 2 - 200, 1120, 70, RED, t, 4.5); }
+    } },
+  { a: 19.75, async draw(t) {   // the luxury hotel meeting (AI clip)
+      await clip('e2', t, 180);
+      pop('🏨 ആഡംബര ഹോട്ടൽ', W / 2, 330, 66, GOLD, t, .4);
+    } },
+  { a: 23.9, draw(t) {   // tower to scrap -> top secret
+      ctx.fillStyle = '#2a0f14'; ctx.fillRect(0, 0, W, H); rays(W / 2, 900, 'rgba(214,40,57,.25)', 'rgba(0,0,0,0)', t, 16);
+      const br = seg(t, .4, 2.4);
+      if (br <= 0) tower(W / 2, 1300, 1.05, '#b9a27c');
+      else { for (let i = 0; i < 9; i++) {   // tower falls apart into scrap
+          const px = (i % 3 - 1) * 90, py = -Math.floor(i / 3) * 330 - 120, g = easeIO(br), fx = px * (1 + 2.5 * g) + (rnd(i) - .5) * 500 * g, fy = lerp(1300 + py, 1500 + rnd(i + 3) * 160, g);
+          ctx.save(); ctx.translate(W / 2 + fx, fy); ctx.rotate((rnd(i + 9) - .5) * 3 * g); ctx.fillStyle = '#b9a27c'; ctx.fillRect(-60, -40, 120, 80);
+          ctx.strokeStyle = '#2a0f14'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(-60, -40); ctx.lineTo(60, 40); ctx.moveTo(60, -40); ctx.lineTo(-60, 40); ctx.stroke(); ctx.restore(); } }
+      pop('ഇരുമ്പ് വിൽപ്പന! 🔩', W / 2, 330, 78, GOLD, t, .9);
+      stamp('TOP SECRET', W / 2, 760, 120, RED, t, 3.1, -.12);
+      if (t > 4.8) { const k = back(seg(t, 4.8, 5.1)); ctx.save(); ctx.translate(W / 2, 1120); ctx.scale(k, k); txt('🤫', 0, 0, 260, BAL, '#fff'); ctx.restore(); }
+    } },
+  { a: 30.1, draw(t) {   // André Poisson takes the bait
+      paper('#dfeef0'); rays(W / 2, 900, 'rgba(26,143,138,.10)', 'rgba(255,255,255,.0)', t);
+      const caught = seg(t, .2, .8);
+      ctx.strokeStyle = '#555'; ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(W / 2 + 60, -10); ctx.lineTo(W / 2 + 60, lerp(-10, 560, easeOut(caught))); ctx.stroke();
+      ctx.lineWidth = 10; ctx.strokeStyle = '#777'; ctx.beginPath(); ctx.arc(W / 2 + 40, lerp(-10, 560, easeOut(caught)) + 30, 26, 0, Math.PI); ctx.stroke();
+      if (t < 2.2) { moneyBag(W / 2 + 40, lerp(-200, 470, easeOut(caught)), .5); }
+      const ph = t < 2.75 ? 'bait' : t < 4.95 ? 'doubt' : t < 7.4 ? 'bribe' : 'happy';
+      const ex = { bait: { eyes: 'wide', mouth: 'grin' }, doubt: { eyes: 'sus', mouth: 'frown' }, bribe: { eyes: 'wide', mouth: 'o' }, happy: { eyes: 'n', mouth: 'grin', blush: .6 } }[ph];
+      man(ph === 'bribe' ? 760 : W / 2, 1050 + Math.sin(t * 3) * 8, ph === 'bribe' ? .95 : 1.15, Object.assign({}, POISSON, ex));
+      pop('ANDRÉ POISSON', W / 2, 250, 76, INK, t, .1, OSW);
+      if (t < 2.75) pop('🐟 Poisson = മീൻ!', W / 2, 1585, 60, TEAL, t, 1.1);
+      if (ph === 'doubt') { for (let i = 0; i < 3; i++) pop('?', W / 2 - 150 + i * 150, 680 - (i % 2) * 60, 140, RED, t, 2.85 + i * .15, ABR); }
+      if (ph === 'bribe') { man(280, 1130, .95, Object.assign({}, LUSTIG, { hat: 'top', sash: 1, arm: 'rub', t, eyes: 'wink', mouth: 'smirk' }));
+        bubble('കൈക്കൂലി? 💰', 330, 560, 64, t, 5.1, '#fff', INK, -40); coins(t, 5.3, 280, 900, 10); }
+      if (ph === 'happy') { stamp('ഒറിജിനൽ ✓', W / 2, 560, 90, '#1f8a3b', t, 9.8, -.15, ML); pop('😂', W / 2 + 330, 1400, 150, '#fff', t, 10.2); }
+    } },
+  { a: 42.35, async draw(t) {   // the escape by train (AI clip)
+      await clip('e3', t * .95, 180);
+      pop('🚂 രാജ്യം വിട്ടു!', W / 2, 330, 76, GOLD, t, 2.0);
+      if (t > .8) moneyBag(W - 170, 1450, .45, '', '#3b8f4a');
+    } },
+  { a: 46.85, draw(t) {   // too embarrassed to complain
+      paper('#f6dede');
+      rr(560, 520, 420, 880, 10, '#3b4a6b'); rr(600, 560, 340, 800, 8, '#2c3854'); circ(880, 980, 18, GOLD);
+      rr(560, 420, 420, 110, 10, '#1d2240'); txt('POLICE', 770, 476, 70, OSW, '#fff');
+      man(330 + Math.sin(t * 2) * 6, 1080, 1.0, Object.assign({}, POISSON, { arm: 'face', blush: 1 }));
+      for (let i = 0; i < 3; i++) { const y = 870 + ((t * 300 + i * 90) % 260); ell(190 + i * 70, y, 12, 20, '#7ec8e3'); }
+      pop('നാണക്കേട്! 🙈', W / 2, 320, 88, RED, t, .3); pop('NO COMPLAINT ✗', 770, 1480, 54, INK, t, 1.4, OSW);
+    } },
+  { a: 50.45, draw(t) {   // round 2
+      if (t < 2.4) { rays(W / 2, 900, RED, GOLD, t * 3, 20); const k = back(seg(t, .1, .4)); ctx.save(); ctx.translate(W / 2, 900); ctx.rotate(-.06); ctx.scale(k, k);
+          txt('ROUND', 0, -130, 170, ABR, '#fff', 20); txt('2', 0, 120, 340, ABR, GOLD, 26); ctx.restore(); pop('ലസ്റ്റിഗ് തിരിച്ചു വന്നു! 😈', W / 2, 1450, 72, '#fff', t, .7); return; }
+      if (t < 4.4) { paper(); tower(W / 2, 1450, 1.0, INK); stamp('FOR SALE', W / 2, 900, 120, RED, t, 2.6, .12); pop('വീണ്ടും വിൽപ്പന! 🙄', W / 2, 330, 76, INK, t, 2.8); return; }
+      if (t < 6.75) { ctx.fillStyle = '#16213e'; ctx.fillRect(0, 0, W, H); const fl = Math.floor(t * 6) % 2; ctx.fillStyle = fl ? 'rgba(214,40,57,.35)' : 'rgba(40,90,220,.35)'; ctx.fillRect(0, 0, W, H);
+        man(W / 2 + lerp(-600, 0, easeOut(seg(t, 4.4, 4.9))), 1050, 1.05, Object.assign({}, POISSON, { suit: '#556b2f', hat: 'bowler', eyes: 'wide', mouth: 'o', glasses: 0, mus: 0 }));
+        pop('🚨 POLICE!', W / 2, 420, 120, '#fff', t, 4.5, OSW); return; }
+      // escape to America across the map
+      paper('#cfe3ef'); ctx.fillStyle = '#9cc08a';
+      ctx.beginPath(); ctx.ellipse(220, 900, 230, 330, .3, 0, 7); ctx.fill(); ctx.beginPath(); ctx.ellipse(900, 760, 200, 260, -.2, 0, 7); ctx.fill();
+      txt('USA', 220, 900, 70, OSW, INK); txt('FRANCE', 900, 740, 50, OSW, INK);
+      const p = easeIO(seg(t, 6.9, 8.4)); ctx.setLineDash([18, 14]); ctx.strokeStyle = RED; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(880, 800);
+      ctx.quadraticCurveTo(560, 560, lerp(880, 260, p), 800 - Math.sin(p * Math.PI) * 240); ctx.stroke(); ctx.setLineDash([]);
+      txt('🚢', lerp(880, 260, p), 800 - Math.sin(p * Math.PI) * 240 - 40, 100, BAL, '#fff');
+      pop('അമേരിക്കയിലേക്ക് മുങ്ങി! 💨', W / 2, 330, 56, INK, t, 6.9);
+    } },
+  { a: 59.05, draw(t) {   // Al Capone
+      ctx.fillStyle = '#0d0d12'; ctx.fillRect(0, 0, W, H);
+      const lit = seg(t, 2.6, 3.0);
+      const g = ctx.createRadialGradient(W / 2, 900, 50, W / 2, 900, 700); g.addColorStop(0, `rgba(255,230,160,${.25 + .35 * lit})`); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      if (t < 2.6) { ctx.filter = 'brightness(0)'; man(W / 2, 980, 1.2, Object.assign({}, CAPONE, { t })); ctx.filter = 'none';
+        pop('???', W / 2, 920, 200, GOLD, t, .5, ABR); pop('ആരെയാണെന്ന് അറിയാമോ? 🤔', W / 2, 330, 58, '#fff', t, .3); return; }
+      if (t < 4.85) { man(W / 2, 980, 1.2, Object.assign({}, CAPONE, { t, eyes: 'sus', mouth: 'smirk' }));
+        pop('AL CAPONE', W / 2, 330, 120, GOLD, t, 2.75, ABR); pop('ഗുണ്ടാത്തലവൻ 🔫', W / 2, 1500, 80, RED, t, 3.1); return; }
+      const cap = { t, eyes: t > 11 ? 'wide' : 'n', mouth: t > 11 ? 'o' : 'smirk' };
+      man(260, 1120, .8, Object.assign({}, CAPONE, cap));
+      man(820, 1120, .8, Object.assign({}, LUSTIG, { eyes: t > 15.3 ? 'wink' : 'n', mouth: t > 15.3 ? 'grin' : 'smile' }));
+      // $50,000 goes over, two months pass, and it comes back
+      const go = easeIO(seg(t, 5.0, 5.8)), back2 = easeIO(seg(t, 7.6, 8.4));
+      if (t < 11) moneyBag(lerp(lerp(260, 820, go), 260, back2), 560 - Math.sin(go * Math.PI) * 120 - Math.sin(back2 * Math.PI) * 120, .6, '$50,000');
+      if (t > 5.9 && t < 7.7) { const pg = Math.floor(seg(t, 5.9, 7.5) * 8); rr(W / 2 - 130, 300, 260, 260, 16, '#fff'); rr(W / 2 - 130, 300, 260, 70, 16, RED);
+        txt(['JAN', 'JAN', 'FEB', 'FEB', 'MAR', 'MAR', 'MAR', 'MAR', 'MAR'][pg], W / 2, 336, 44, OSW, '#fff'); txt(String(1 + pg * 7 % 28), W / 2, 470, 110, ABR, INK); pop('2 മാസം', W / 2, 640, 64, '#fff', t, 6.0); }
+      if (t > 9.25 && t < 11) bubble('ബിസിനസ് പൊളിഞ്ഞു, സോറി 🙏', W / 2, 520, 50, t, 9.3, '#fff', INK, 220);
+      if (t > 11) { pop('😲', 260, 760, 140, '#fff', t, 11.1); const gv = easeIO(seg(t, 12.2, 13.0)); moneyBag(lerp(260, 820, gv), 560 - Math.sin(gv * Math.PI) * 140, .5, '$5,000 🎁', '#c9a227'); }
+      if (t > 15.25) { sparkle(820, 960, t, 15.3); stamp('PLAN ✓', W / 2, 1540, 100, GOLD, t, 15.4, -.1); }
+    } },
+  { a: 75.95, draw(t) {   // tag your friend + follow
+      rays(W / 2, 900, '#f2b134', '#f7c95c', t, 22);
+      tower(W / 2, 1380, .85, INK);
+      const k = back(seg(t, .1, .45)); ctx.save(); ctx.translate(W / 2, 470); ctx.scale(k, k); ctx.rotate(-.04);
+      rr(-490, -150, 980, 300, 40, RED); txt('ഈഫൽ ടവർ വരെ', 0, -55, 74, ML, '#fff'); txt('വിൽക്കാൻ കഴിവുള്ള ഫ്രണ്ട്? 😂', 0, 55, 54, ML, '#fff'); ctx.restore();
+      const p = seg(t, .9, 1.2); if (p > 0) { ctx.save(); ctx.translate(W / 2, 1520); const s = back(p) * (1 + .05 * Math.sin(t * 8)); ctx.scale(s, s);
+        rr(-330, -80, 660, 160, 80, INK); txt('@ TAG ചെയ്യൂ 👇', 0, 4, 66, ML, '#fff'); ctx.restore(); }
+      if (t > 4.6) { const f = back(seg(t, 4.6, 4.95)); ctx.save(); ctx.translate(W / 2, 980); ctx.scale(f, f);
+        rr(-300, -110, 600, 220, 24, PAPER); txt('കഥ ഫയൽസ്', 0, -30, 80, ML, INK); txt('FOLLOW for more', 0, 55, 44, OSW, RED); ctx.restore(); }
+    } },
+];
+for (let i = 0; i < S.length; i++) S[i].d = (i + 1 < S.length ? S[i + 1].a : TOTAL) - S[i].a;
+
+function caption(t) {
+  const c = (window.CAPS || []).find(c => t >= c.s && t < c.e); if (!c) return;
+  const size = 44, y = 1690;
+  ctx.save(); ctx.font = `${size}px ${ML}`; ctx.textBaseline = 'middle';
+  const gap = ctx.measureText(' ').width, ws = c.w.map(w => ctx.measureText(w.t).width), tot = ws.reduce((a, b) => a + b, 0) + gap * (c.w.length - 1);
+  ctx.globalAlpha = seg(t, c.s, c.s + .1); rr(W / 2 - tot / 2 - 28, y - 46, tot + 56, 92, 22, 'rgba(0,0,0,.62)');
+  let x = W / 2 - tot / 2; const cur = c.w.filter(q => t >= q.s - .03).length - 1;
+  c.w.forEach((w, i) => { ctx.fillStyle = t >= w.s - .03 ? (i === cur ? GOLD : '#fff') : 'rgba(255,255,255,.55)'; ctx.textAlign = 'left'; ctx.fillText(w.t, x, y + 2); x += ws[i] + gap; });
+  ctx.restore();
+}
+const HITS = [[0.9, .8], [3.6, .7], [18.0 + 0.45, .4], [27.0, .7], [39.9, .5], [53.05, .6], [65.5, .3], [74.45, .5]];
+let grainSeed = 0;
+async function frame(t) {
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.filter = 'none'; ctx.globalCompositeOperation = 'source-over';
+  let i = S.findIndex(s => t >= s.a && t < s.a + s.d); if (i < 0) i = S.length - 1;
+  const s = S[i], lt = t - s.a;
+  let sh = 0; for (const [ht, k] of HITS) if (t >= ht) sh += 22 * k * Math.max(0, 1 - (t - ht) / .4);
+  ctx.save(); const z = 1 + .06 * (1 - easeOut(seg(lt, 0, .3))) + .025 * seg(lt, 0, s.d);
+  ctx.translate(W / 2 + Math.sin(t * 91) * sh, H / 2 + Math.cos(t * 77) * sh); ctx.scale(z, z); ctx.translate(-W / 2, -H / 2);
+  await s.draw(lt); ctx.restore();
+  // old-film look on everything: grain specks, scratches, vignette
+  grainSeed = Math.floor(t * FPS);
+  ctx.globalAlpha = .07; for (let k = 0; k < 140; k++) circ(rnd(grainSeed * 7 + k) * W, rnd(grainSeed * 13 + k) * H, 1 + rnd(k + grainSeed) * 3, k % 2 ? '#000' : '#fff');
+  ctx.globalAlpha = .12; if (rnd(grainSeed) > .6) { ctx.fillStyle = '#000'; ctx.fillRect(rnd(grainSeed + 1) * W, 0, 2, H); } ctx.globalAlpha = 1;
+  const v = ctx.createRadialGradient(W / 2, H / 2, H * .35, W / 2, H / 2, H * .75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(30,15,0,.45)'); ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);
+  for (const [ht, k] of HITS) { const f = seg(t, ht, ht + .2); if (t >= ht && f < 1) { ctx.fillStyle = `rgba(255,255,255,${.5 * k * (1 - f)})`; ctx.fillRect(0, 0, W, H); } }
+  if (lt < .12 && i > 0) { ctx.fillStyle = `rgba(255,255,255,${.35 * (1 - lt / .12)})`; ctx.fillRect(0, 0, W, H); }
+  caption(t);
+  rr(40, 60, 250, 64, 16, 'rgba(0,0,0,.55)'); txt('കഥ ഫയൽസ്', 165, 92, 34, ML, GOLD);
+  rr(60, H - 60, W - 120, 8, 4, 'rgba(255,255,255,.25)'); rr(60, H - 60, (W - 120) * clamp(t / TOTAL), 8, 4, GOLD);
+}
+window.FPS = FPS;
+window.grab = async (t) => { await frame(t); return cv.toDataURL('image/jpeg', 0.9); };
+window.ready = (async () => { await document.fonts.load("800 48px 'Noto Sans Malayalam'"); await document.fonts.load("800 48px 'Baloo 2'");
+  await document.fonts.load("500 48px 'Oswald'"); await document.fonts.load("48px 'Abril Fatface'"); await document.fonts.load("48px 'Special Elite'"); await document.fonts.ready; return TOTAL; })();
+</script>
+</body>
+</html>
