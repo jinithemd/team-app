@@ -276,9 +276,9 @@ const S = [
       rays(W / 2, 900, '#f2b134', '#f7c95c', t, 22);
       tower(W / 2, 1380, .85, INK);
       const k = back(seg(t, .1, .45)); ctx.save(); ctx.translate(W / 2, 470); ctx.scale(k, k); ctx.rotate(-.04);
-      rr(-490, -150, 980, 300, 40, RED); txt('ഈഫൽ ടവർ വരെ', 0, -55, 74, ML, '#fff'); txt('വിൽക്കാൻ കഴിവുള്ള ഫ്രണ്ട്? 😂', 0, 55, 54, ML, '#fff'); ctx.restore();
+      rr(-490, -150, 980, 300, 40, RED); txt('ഈഫൽ ടവർ വരെ വിൽക്കാൻ', 0, -55, 62, ML, '#fff'); txt('കഴിവുള്ള ഫ്രണ്ട് നിങ്ങൾക്കുണ്ടോ? 😂', 0, 55, 54, ML, '#fff'); ctx.restore();
       const p = seg(t, .9, 1.2); if (p > 0) { ctx.save(); ctx.translate(W / 2, 1520); const s = back(p) * (1 + .05 * Math.sin(t * 8)); ctx.scale(s, s);
-        rr(-330, -80, 660, 160, 80, INK); txt('@ TAG ചെയ്യൂ 👇', 0, 4, 66, ML, '#fff'); ctx.restore(); }
+        rr(-440, -80, 880, 160, 80, INK); txt('ഇത് അവന് ഷെയർ ചെയ്യൂ 📤', 0, 4, 56, ML, '#fff'); ctx.restore(); }
       if (t > 4.6) { const f = back(seg(t, 4.6, 4.95)); ctx.save(); ctx.translate(W / 2, 980); ctx.scale(f, f);
         rr(-300, -110, 600, 220, 24, PAPER); txt('കഥ ഫയൽസ്', 0, -30, 80, ML, INK); txt('FOLLOW for more', 0, 55, 44, OSW, RED); ctx.restore(); }
     } },
